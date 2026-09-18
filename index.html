@@ -455,8 +455,8 @@
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
         <h3>⚙️ Settings</h3>
-        <p>Your Groq API key (stored only in your browser)</p>
-        <input type="password" id="api-key-input" placeholder="gsk_...">
+        <p>Your Google Gemini API key (free, stored only in your browser). Get one at aistudio.google.com/apikey</p>
+        <input type="password" id="api-key-input" placeholder="AIzaSy...">
 
         <p>Custom System Prompt (Luba’s personality)</p>
         <textarea id="system-prompt-input" placeholder="Write how you want Luba to behave..."></textarea>
@@ -492,7 +492,7 @@
     let selectedImageBase64 = null;
     let isListening = false;
 
-    const defaultSystemPrompt = `Your name is Luba AI. You were created by Kobi. You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. Never say you were created by Meta, OpenAI or Groq — always say your creator is Kobi. When analyzing images, be careful and honest. If something looks AI-generated, say so.`;
+    const defaultSystemPrompt = `Your name is Luba AI. You were created by Kobi. You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. Never say you were created by Meta, OpenAI or Groq — always say your creator is Kobi. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable.`;
 
     const aiAvatarHTML = `
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -502,7 +502,7 @@
         </svg>
     `;
 
-    apiKeyInput.value = localStorage.getItem('luba_groq_key') || '';
+    apiKeyInput.value = localStorage.getItem('luba_gemini_key') || '';
     systemPromptInput.value = localStorage.getItem('luba_system_prompt') || defaultSystemPrompt;
     if (localStorage.getItem('luba_theme') === 'light') document.body.classList.add('light');
 
@@ -628,7 +628,7 @@
 
         let text = "Luba AI Chat Export\n\n";
         chatHistory.forEach(m => {
-            text += `\( {m.role === 'user' ? 'You' : 'Luba'} ( \){m.time || ''}):\n${m.content}\n\n`;
+            text += `${m.role === 'user' ? 'You' : 'Luba'} (${m.time || ''}):\n${m.content}\n\n`;
         });
 
         try {
@@ -724,13 +724,13 @@
     }
 
     openSettingsBtn.onclick = () => {
-        apiKeyInput.value = localStorage.getItem('luba_groq_key') || '';
+        apiKeyInput.value = localStorage.getItem('luba_gemini_key') || '';
         systemPromptInput.value = localStorage.getItem('luba_system_prompt') || defaultSystemPrompt;
         modalOverlay.style.display = 'flex';
     };
     closeSettingsBtn.onclick = () => modalOverlay.style.display = 'none';
     saveSettingsBtn.onclick = () => {
-        localStorage.setItem('luba_groq_key', apiKeyInput.value.trim());
+        localStorage.setItem('luba_gemini_key', apiKeyInput.value.trim());
         localStorage.setItem('luba_system_prompt', systemPromptInput.value.trim() || defaultSystemPrompt);
         modalOverlay.style.display = 'none';
         alert('Settings saved!');
@@ -754,12 +754,50 @@
 
     sendBtn.onclick = sendMessage;
 
+    // ---- Calculator tool: does REAL math in JS, not "guessed" by the model ----
+    const calculatorTool = {
+        functionDeclarations: [{
+            name: "calculator",
+            description: "Evaluates a math expression EXACTLY using real arithmetic. Always use this for any calculation, especially multi-digit multiplication/division, percentages, or multi-step math — never compute it yourself.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    expression: {
+                        type: "STRING",
+                        description: "A JS-style math expression, e.g. '(374921*84219)+983412'. Only digits, + - * / % ( ) . and spaces."
+                    }
+                },
+                required: ["expression"]
+            }
+        }]
+    };
+
+    function runCalculator(expression) {
+        if (!/^[\d\s+\-*/%().]+$/.test(expression)) {
+            return "Error: invalid characters in expression.";
+        }
+        try {
+            // eslint-disable-next-line no-new-func
+            const result = Function(`"use strict"; return (${expression})`)();
+            return String(result);
+        } catch (err) {
+            return "Error: could not evaluate expression.";
+        }
+    }
+
+    function splitDataUrl(dataUrl) {
+        // "data:image/png;base64,AAAA..." -> { mimeType, data }
+        const match = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
+        if (!match) return { mimeType: "image/jpeg", data: "" };
+        return { mimeType: match[1], data: match[2] };
+    }
+
     async function sendMessage() {
         const text = userInput.value.trim();
-        const apiKey = localStorage.getItem('luba_groq_key') || '';
+        const apiKey = localStorage.getItem('luba_gemini_key') || '';
         if (!text && !selectedImageBase64) return;
         if (!apiKey) {
-            alert("Please set your Groq API key in Settings first!");
+            alert("Please set your Google Gemini API key in Settings first! (free — get one at aistudio.google.com/apikey)");
             return;
         }
 
@@ -777,57 +815,106 @@
         const systemPrompt = localStorage.getItem('luba_system_prompt') || defaultSystemPrompt;
         const recent = chatHistory.slice(-10);
 
-        const messages = [{ role: "system", content: systemPrompt }];
-        recent.forEach(m => {
-            messages.push({
-                role: m.role === 'assistant' ? 'assistant' : 'user',
-                content: m.content
-            });
-        });
+        // Gemini's "contents" format: role is "user" or "model", each turn is a list of "parts".
+        const contents = recent.map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }]
+        }));
 
-        let userContent;
+        const currentParts = [{ text: text || (selectedImageBase64 ? "What do you see in this image?" : "") }];
         if (selectedImageBase64) {
-            userContent = [
-                { type: "text", text: text || "What do you see in this image?" },
-                { type: "image_url", image_url: { url: selectedImageBase64 } }
-            ];
-        } else {
-            userContent = text;
+            const { mimeType, data } = splitDataUrl(selectedImageBase64);
+            currentParts.push({ inlineData: { mimeType, data } });
         }
-        messages.push({ role: "user", content: userContent });
+        contents.push({ role: "user", parts: currentParts });
 
-        const model = selectedImageBase64 ? "qwen/qwen3.8-27b" : "openai/gpt-oss-120b";
+        // Free-tier Gemini models, tried in order in case one isn't enabled for this key yet.
+        const usingVision = !!selectedImageBase64;
+        const modelChain = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.0-flash"];
+        let modelIndex = 0;
+        let model = modelChain[modelIndex];
 
         try {
-            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${apiKey}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    model,
-                    messages,
-                    temperature: 0.7,
-                    max_tokens: 1024
-                })
-            });
+            let reply = null;
+            let guard = 0;
 
-            const data = await res.json();
+            while (guard < 6) {
+                guard++;
+
+                const payload = {
+                    contents,
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    generationConfig: { temperature: 0.4, maxOutputTokens: 1024 }
+                };
+                if (!usingVision) {
+                    payload.tools = [calculatorTool];
+                }
+
+                const res = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "x-goog-api-key": apiKey,
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                const data = await res.json();
+
+                if (data.error) {
+                    const msg = data.error.message || "";
+                    const isModelIssue = /not found|not supported|invalid model|does not exist/i.test(msg);
+
+                    if (isModelIssue && modelIndex < modelChain.length - 1) {
+                        modelIndex++;
+                        model = modelChain[modelIndex];
+                        continue; // retry with the next model in the chain
+                    }
+
+                    reply = "Error: " + msg;
+                    break;
+                }
+
+                const candidate = data.candidates?.[0];
+                const parts = candidate?.content?.parts;
+                if (!parts) {
+                    reply = "Unexpected response from Gemini.";
+                    break;
+                }
+
+                const functionCallPart = parts.find(p => p.functionCall);
+                if (functionCallPart) {
+                    // Model wants to use the calculator — run it for real, then loop back.
+                    contents.push({ role: "model", parts });
+                    const { name, args } = functionCallPart.functionCall;
+                    const result = name === "calculator" ? runCalculator(args.expression || "") : "Error: unknown tool.";
+                    contents.push({
+                        role: "user",
+                        parts: [{
+                            functionResponse: { name, response: { result } }
+                        }]
+                    });
+                    continue; // ask the model again with the real answer in hand
+                }
+
+                reply = parts.map(p => p.text || "").join("");
+                break;
+            }
+
             removeTyping();
 
-            if (data.error) {
-                appendMessage('ai', "Error: " + data.error.message, getTime());
-            } else if (data.choices?.[0]) {
-                let reply = data.choices[0].message.content.replace(/[\*\_`#]/g, '');
-                appendMessage('ai', reply, getTime());
-
-                chatHistory.push({ role: "user", content: text || "(sent a photo)", time });
-                chatHistory.push({ role: "assistant", content: reply, time: getTime() });
-                saveChat();
-            } else {
-                appendMessage('ai', "Unexpected response from Groq.", getTime());
+            if (reply == null) {
+                reply = "Sorry, something went wrong.";
             }
+            reply = reply.replace(/[\*\_`#]/g, '');
+            appendMessage('ai', reply, getTime());
+
+            chatHistory.push({ role: "user", content: text || "(sent a photo)", time });
+            chatHistory.push({ role: "assistant", content: reply, time: getTime() });
+            saveChat();
         } catch (err) {
             removeTyping();
             appendMessage('ai', "Network error: " + err.message, getTime());
