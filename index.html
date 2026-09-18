@@ -171,6 +171,76 @@
             border-radius: 8px;
             margin-top: 8px;
             display: block;
+            cursor: pointer;
+        }
+
+        /* --- Fullscreen image lightbox (view large / screenshot / close) --- */
+        .lightbox-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            padding: 20px;
+        }
+
+        .lightbox-overlay.active {
+            display: flex;
+        }
+
+        .lightbox-overlay img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 6px;
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            color: #fff;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 301;
+        }
+
+        .lightbox-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .lightbox-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        /* --- Generated image wrapper --- */
+        .generated-image-wrap {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+            margin-top: 8px;
+        }
+
+        .generated-image-wrap img {
+            margin-top: 0;
         }
 
         .timestamp {
@@ -452,6 +522,12 @@
     </div>
 </div>
 
+<div class="lightbox-overlay" id="lightbox-overlay">
+    <button class="lightbox-close" id="lightbox-close" title="Close">×</button>
+    <img id="lightbox-img" src="" alt="Full screen image">
+    <div class="lightbox-hint">Tap and hold the image to save, or take a screenshot</div>
+</div>
+
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
         <h3>⚙️ Settings</h3>
@@ -492,6 +568,37 @@
     let selectedImageBase64 = null;
     let isListening = false;
 
+    // ---- Fullscreen image lightbox ----
+    const lightboxOverlay = document.getElementById('lightbox-overlay');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxClose = document.getElementById('lightbox-close');
+
+    function openLightbox(src) {
+        lightboxImg.src = src;
+        lightboxOverlay.classList.add('active');
+    }
+
+    function closeLightbox() {
+        lightboxOverlay.classList.remove('active');
+        lightboxImg.src = '';
+    }
+
+    lightboxClose.onclick = closeLightbox;
+    lightboxOverlay.onclick = (e) => {
+        // Clicking the dark backdrop (not the image itself) also closes it.
+        if (e.target === lightboxOverlay) closeLightbox();
+    };
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeLightbox();
+    });
+
+    // Any image posted into the chat (user photo or AI-generated) opens fullscreen on tap.
+    chatContainer.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+            openLightbox(e.target.src);
+        }
+    });
+
     const defaultSystemPrompt = `Your name is Luba AI. You were created by Kobi. You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. Never say you were created by Meta, OpenAI or Groq — always say your creator is Kobi. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it.`;
 
     const aiAvatarHTML = `
@@ -531,7 +638,7 @@
             return;
         }
         chatHistory.forEach(msg => {
-            appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, msg.time);
+            appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, msg.time, !!msg.isHtml);
         });
     }
 
@@ -807,6 +914,13 @@
         return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
     }
 
+    // Builds the HTML for a generated image (tap it to view fullscreen).
+    function buildGeneratedImageHTML(url) {
+        return `<div class="generated-image-wrap">
+            <img src="${url}" alt="Generated image">
+        </div>`;
+    }
+
     function splitDataUrl(dataUrl) {
         // "data:image/png;base64,AAAA..." -> { mimeType, data }
         const match = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
@@ -945,12 +1059,12 @@
 
             const hasImages = generatedImageUrls.length > 0;
             const displayReply = hasImages
-                ? reply + generatedImageUrls.map(u => `\n\n<img src="${u}" alt="Generated image">`).join('')
+                ? reply + generatedImageUrls.map(u => `\n\n${buildGeneratedImageHTML(u)}`).join('')
                 : reply;
             appendMessage('ai', displayReply, getTime(), hasImages);
 
             chatHistory.push({ role: "user", content: text || "(sent a photo)", time });
-            chatHistory.push({ role: "assistant", content: reply, time: getTime() });
+            chatHistory.push({ role: "assistant", content: reply, time: getTime(), isHtml: hasImages });
             saveChat();
         } catch (err) {
             removeTyping();
