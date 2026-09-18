@@ -243,6 +243,38 @@
             margin-top: 0;
         }
 
+        .image-error-box {
+            background: rgba(255, 0, 127, 0.08);
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .retry-image-btn {
+            background: #282a2c;
+            border: 1px solid #444746;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        body.light .retry-image-btn {
+            background: #eee;
+            border-color: #ccc;
+            color: #333;
+        }
+
+        .retry-image-btn:hover {
+            background: #3c4043;
+        }
+
         .timestamp {
             font-size: 11px;
             opacity: 0.55;
@@ -663,7 +695,26 @@ There are two separate TikTok accounts — keep them straight and always spell t
         if (chatHistory.length > 30) {
             chatHistory = chatHistory.slice(-30);
         }
-        localStorage.setItem('luba_chat_history', JSON.stringify(chatHistory));
+        try {
+            localStorage.setItem('luba_chat_history', JSON.stringify(chatHistory));
+        } catch (err) {
+            // Most likely a quota-exceeded error from large embedded base64
+            // images (localStorage has a size cap). Trim the oldest messages
+            // and retry instead of silently failing or corrupting history,
+            // which is what can leave broken images behind after a reload.
+            let trimmed = chatHistory.slice();
+            while (trimmed.length > 4) {
+                trimmed = trimmed.slice(4);
+                try {
+                    localStorage.setItem('luba_chat_history', JSON.stringify(trimmed));
+                    chatHistory = trimmed;
+                    return;
+                } catch (err2) {
+                    continue;
+                }
+            }
+            console.warn('Could not save chat history: storage quota exceeded.');
+        }
     }
 
     function getTime() {
@@ -932,11 +983,48 @@ There are two separate TikTok accounts — keep them straight and always spell t
     }
 
     // Builds the HTML for a generated image (tap it to view fullscreen).
+    // If the image fails to load (some wrapped/embedded webviews block or
+    // time out on the pollinations.ai request), it auto-retries once with a
+    // cache-busting param, then falls back to a visible "Retry / Open in
+    // browser" box instead of leaving a dead broken-image icon.
     function buildGeneratedImageHTML(url) {
-        return `<div class="generated-image-wrap">
-            <img src="${url}" alt="Generated image">
+        const safeUrl = url.replace(/'/g, "%27").replace(/"/g, "&quot;");
+        return `<div class="generated-image-wrap" data-url="${safeUrl}">
+            <img src="${url}" alt="Generated image" onerror="handleGeneratedImageError(this)">
         </div>`;
     }
+
+    window.handleGeneratedImageError = function (imgEl) {
+        if (!imgEl.dataset.retried) {
+            // First failure: try again once with a fresh cache-busting param —
+            // this alone fixes most transient/one-off load failures.
+            imgEl.dataset.retried = "1";
+            const sep = imgEl.src.includes('?') ? '&' : '?';
+            imgEl.src = imgEl.src.split('&retry=')[0] + sep + 'retry=' + Date.now();
+            return;
+        }
+
+        // Second failure: give the user a visible, actionable fallback instead
+        // of a dead broken-image icon.
+        const wrap = imgEl.closest('.generated-image-wrap');
+        if (!wrap) return;
+        const url = wrap.dataset.url || imgEl.src;
+        wrap.innerHTML = `
+            <div class="image-error-box">
+                <div>⚠️ This image couldn't load here.</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="retry-image-btn" onclick="retryGeneratedImage(this)">🔄 Retry</button>
+                    <button class="retry-image-btn" onclick="window.open('${url}', '_blank')">↗️ Open in browser</button>
+                </div>
+            </div>`;
+    };
+
+    window.retryGeneratedImage = function (btn) {
+        const wrap = btn.closest('.generated-image-wrap');
+        if (!wrap) return;
+        const url = wrap.dataset.url;
+        wrap.innerHTML = `<img src="${url}" alt="Generated image" onerror="handleGeneratedImageError(this)">`;
+    };
 
     function splitDataUrl(dataUrl) {
         // "data:image/png;base64,AAAA..." -> { mimeType, data }
