@@ -492,7 +492,7 @@
     let selectedImageBase64 = null;
     let isListening = false;
 
-    const defaultSystemPrompt = `Your name is Luba AI. You were created by Kobi. You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. Never say you were created by Meta, OpenAI or Groq — always say your creator is Kobi. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable.`;
+    const defaultSystemPrompt = `Your name is Luba AI. You were created by Kobi. You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. Never say you were created by Meta, OpenAI or Groq — always say your creator is Kobi. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it.`;
 
     const aiAvatarHTML = `
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -755,22 +755,39 @@
     sendBtn.onclick = sendMessage;
 
     // ---- Calculator tool: does REAL math in JS, not "guessed" by the model ----
-    const calculatorTool = {
-        functionDeclarations: [{
-            name: "calculator",
-            description: "Evaluates a math expression EXACTLY using real arithmetic. Always use this for any calculation, especially multi-digit multiplication/division, percentages, or multi-step math — never compute it yourself.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    expression: {
-                        type: "STRING",
-                        description: "A JS-style math expression, e.g. '(374921*84219)+983412'. Only digits, + - * / % ( ) . and spaces."
-                    }
-                },
-                required: ["expression"]
+    // ---- Image tool: generates real images via a free, no-key API (Pollinations.ai) ----
+    const geminiTools = [{
+        functionDeclarations: [
+            {
+                name: "calculator",
+                description: "Evaluates a math expression EXACTLY using real arithmetic. Always use this for any calculation, especially multi-digit multiplication/division, percentages, or multi-step math — never compute it yourself.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        expression: {
+                            type: "STRING",
+                            description: "A JS-style math expression, e.g. '(374921*84219)+983412'. Only digits, + - * / % ( ) . and spaces."
+                        }
+                    },
+                    required: ["expression"]
+                }
+            },
+            {
+                name: "generate_image",
+                description: "Generates an image from a text description and shows it to the user. Use this whenever the user asks to draw, generate, create, make, or see a picture/image/photo/artwork of something.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        prompt: {
+                            type: "STRING",
+                            description: "A clear, detailed English description of the image to generate, e.g. 'a golden retriever puppy running on a beach at sunset, photorealistic'."
+                        }
+                    },
+                    required: ["prompt"]
+                }
             }
-        }]
-    };
+        ]
+    }];
 
     function runCalculator(expression) {
         if (!/^[\d\s+\-*/%().]+$/.test(expression)) {
@@ -783,6 +800,11 @@
         } catch (err) {
             return "Error: could not evaluate expression.";
         }
+    }
+
+    function buildImageUrl(prompt) {
+        const seed = Math.floor(Math.random() * 1000000);
+        return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
     }
 
     function splitDataUrl(dataUrl) {
@@ -837,6 +859,7 @@
         try {
             let reply = null;
             let guard = 0;
+            const generatedImageUrls = [];
 
             while (guard < 6) {
                 guard++;
@@ -847,7 +870,7 @@
                     generationConfig: { temperature: 0.4, maxOutputTokens: 1024 }
                 };
                 if (!usingVision) {
-                    payload.tools = [calculatorTool];
+                    payload.tools = geminiTools;
                 }
 
                 const res = await fetch(
@@ -867,11 +890,12 @@
                 if (data.error) {
                     const msg = data.error.message || "";
                     const isModelIssue = /not found|not supported|invalid model|does not exist/i.test(msg);
+                    const isQuotaIssue = /quota|RESOURCE_EXHAUSTED|rate limit/i.test(msg);
 
-                    if (isModelIssue && modelIndex < modelChain.length - 1) {
+                    if ((isModelIssue || isQuotaIssue) && modelIndex < modelChain.length - 1) {
                         modelIndex++;
                         model = modelChain[modelIndex];
-                        continue; // retry with the next model in the chain
+                        continue; // this model is unavailable or out of quota — try the next one in the chain
                     }
 
                     reply = "Error: " + msg;
@@ -885,19 +909,27 @@
                     break;
                 }
 
-                const functionCallPart = parts.find(p => p.functionCall);
-                if (functionCallPart) {
-                    // Model wants to use the calculator — run it for real, then loop back.
+                const functionCallParts = parts.filter(p => p.functionCall);
+                if (functionCallParts.length > 0) {
+                    // Model wants to use one or more tools — run them for real, then loop back.
                     contents.push({ role: "model", parts });
-                    const { name, args } = functionCallPart.functionCall;
-                    const result = name === "calculator" ? runCalculator(args.expression || "") : "Error: unknown tool.";
-                    contents.push({
-                        role: "user",
-                        parts: [{
-                            functionResponse: { name, response: { result } }
-                        }]
-                    });
-                    continue; // ask the model again with the real answer in hand
+                    const responseParts = [];
+                    for (const part of functionCallParts) {
+                        const { name, args } = part.functionCall;
+                        let result;
+                        if (name === "calculator") {
+                            result = { result: runCalculator(args.expression || "") };
+                        } else if (name === "generate_image") {
+                            const url = buildImageUrl(args.prompt || text || "an image");
+                            generatedImageUrls.push(url);
+                            result = { result: "Image generated and will be shown to the user automatically." };
+                        } else {
+                            result = { result: "Error: unknown tool." };
+                        }
+                        responseParts.push({ functionResponse: { name, response: result } });
+                    }
+                    contents.push({ role: "user", parts: responseParts });
+                    continue; // ask the model again with real results in hand
                 }
 
                 reply = parts.map(p => p.text || "").join("");
@@ -910,7 +942,12 @@
                 reply = "Sorry, something went wrong.";
             }
             reply = reply.replace(/[\*\_`#]/g, '');
-            appendMessage('ai', reply, getTime());
+
+            const hasImages = generatedImageUrls.length > 0;
+            const displayReply = hasImages
+                ? reply + generatedImageUrls.map(u => `\n\n<img src="${u}" alt="Generated image">`).join('')
+                : reply;
+            appendMessage('ai', displayReply, getTime(), hasImages);
 
             chatHistory.push({ role: "user", content: text || "(sent a photo)", time });
             chatHistory.push({ role: "assistant", content: reply, time: getTime() });
