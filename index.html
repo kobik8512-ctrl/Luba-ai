@@ -1386,16 +1386,22 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
         try {
             let reply = null;
+            let accumulatedText = ""; // built up across auto-continue turns for long answers
             let guard = 0;
+            let continueCount = 0;
+            const MAX_CONTINUES = 6; // generous ceiling so a long proof/recipe/essay can finish, but never loops forever
             const generatedImageUrls = [];
 
-            while (guard < 6) {
+            while (guard < 16) {
                 guard++;
 
                 const payload = {
                     contents,
                     systemInstruction: { parts: [{ text: systemPrompt }] },
-                    generationConfig: { temperature: 0.4, maxOutputTokens: 1024 }
+                    // 8192 is comfortably above the old 1024 cap that was cutting off
+                    // long math proofs, recipes, etc mid-sentence. Auto-continue below
+                    // handles the rare case where even that isn't enough.
+                    generationConfig: { temperature: 0.4, maxOutputTokens: 8192 }
                 };
                 if (!usingVision) {
                     payload.tools = geminiTools;
@@ -1459,7 +1465,24 @@ There are two separate TikTok accounts — keep them straight and always spell t
                     continue; // ask the model again with real results in hand
                 }
 
-                reply = parts.map(p => p.text || "").join("");
+                accumulatedText += parts.map(p => p.text || "").join("");
+
+                // Gemini reports finishReason "MAX_TOKENS" when the output got cut
+                // off purely because of the length cap (not because the model was
+                // actually done). In that case, automatically ask it to keep going
+                // from exactly where it stopped instead of leaving a truncated reply.
+                const wasCutOff = candidate?.finishReason === "MAX_TOKENS";
+                if (wasCutOff && continueCount < MAX_CONTINUES) {
+                    continueCount++;
+                    contents.push({ role: "model", parts });
+                    contents.push({
+                        role: "user",
+                        parts: [{ text: "Continue your previous answer exactly where you left off. Do not repeat anything you already said, and do not add any preamble like \"continuing...\" — just pick back up mid-thought and keep going to the end." }]
+                    });
+                    continue;
+                }
+
+                reply = accumulatedText;
                 break;
             }
 
