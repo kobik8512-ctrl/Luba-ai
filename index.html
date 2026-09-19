@@ -806,7 +806,8 @@ There are two separate TikTok accounts — keep them straight and always spell t
             return;
         }
         chatHistory.forEach(msg => {
-            appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, msg.time, !!msg.isHtml);
+            const text = (msg.isHtml && msg.displayHtml) ? msg.displayHtml : msg.content;
+            appendMessage(msg.role === 'user' ? 'user' : 'ai', text, msg.time, !!msg.isHtml);
         });
     }
 
@@ -1009,8 +1010,13 @@ There are two separate TikTok accounts — keep them straight and always spell t
         renderSavedChatsList();
     };
 
-    photoBtn.onclick = () => imageInput.click();
-    imageInput.onchange = e => {
+    // Some embedded WebViews (like the one wrapping this app) stop responding
+    // to a reused <input type="file"> after the native picker is cancelled
+    // once. Swapping in a fresh clone of the input before every tap forces
+    // the file chooser to actually reopen every time, not just the first.
+    let imageInputEl = imageInput;
+
+    function handleImageInputChange(e) {
         const file = e.target.files[0];
         if (!file) return;
         if (file.size > 12 * 1024 * 1024) {
@@ -1024,11 +1030,22 @@ There are two separate TikTok accounts — keep them straight and always spell t
             imagePreview.style.display = 'block';
         };
         reader.readAsDataURL(file);
+    }
+
+    photoBtn.onclick = () => {
+        const fresh = imageInputEl.cloneNode(true);
+        fresh.value = '';
+        imageInputEl.parentNode.replaceChild(fresh, imageInputEl);
+        imageInputEl = fresh;
+        imageInputEl.onchange = handleImageInputChange;
+        imageInputEl.click();
     };
+    imageInputEl.onchange = handleImageInputChange;
+
     removeImageBtn.onclick = () => {
         selectedImageBase64 = null;
         imagePreview.style.display = 'none';
-        imageInput.value = '';
+        imageInputEl.value = '';
     };
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1231,11 +1248,20 @@ There are two separate TikTok accounts — keep them straight and always spell t
         }
 
         const time = getTime();
+        const imageToSend = selectedImageBase64; // capture before we clear the live attachment below
         let display = text || "(sent a photo)";
-        if (selectedImageBase64) {
-            display = (text ? text + "\n\n" : "") + `<img src="${selectedImageBase64}">`;
+        if (imageToSend) {
+            display = (text ? text + "\n\n" : "") + `<img src="${imageToSend}">`;
         }
-        appendMessage('user', display, time, !!selectedImageBase64);
+        appendMessage('user', display, time, !!imageToSend);
+
+        // Clear the attached-photo preview right away, as soon as the message
+        // is sent — previously this only cleared once the AI's reply came
+        // back, so the photo thumbnail sat in the input box the whole time
+        // it looked like it was still "waiting to send."
+        selectedImageBase64 = null;
+        imagePreview.style.display = 'none';
+        imageInputEl.value = '';
 
         userInput.value = '';
         sendBtn.disabled = true;
@@ -1251,15 +1277,15 @@ There are two separate TikTok accounts — keep them straight and always spell t
             parts: [{ text: m.content }]
         }));
 
-        const currentParts = [{ text: text || (selectedImageBase64 ? "What do you see in this image?" : "") }];
-        if (selectedImageBase64) {
-            const { mimeType, data } = splitDataUrl(selectedImageBase64);
+        const currentParts = [{ text: text || (imageToSend ? "What do you see in this image?" : "") }];
+        if (imageToSend) {
+            const { mimeType, data } = splitDataUrl(imageToSend);
             currentParts.push({ inlineData: { mimeType, data } });
         }
         contents.push({ role: "user", parts: currentParts });
 
         // Free-tier Gemini models, tried in order in case one isn't enabled for this key yet.
-        const usingVision = !!selectedImageBase64;
+        const usingVision = !!imageToSend;
         const modelChain = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.0-flash"];
         let modelIndex = 0;
         let model = modelChain[modelIndex];
@@ -1356,16 +1382,34 @@ There are two separate TikTok accounts — keep them straight and always spell t
                 : reply;
             appendMessage('ai', displayReply, getTime(), hasImages);
 
-            chatHistory.push({ role: "user", content: text || "(sent a photo)", time });
-            chatHistory.push({ role: "assistant", content: reply, time: getTime(), isHtml: hasImages });
+            // IMPORTANT: content stays plain text (what gets sent back to the
+            // AI as conversation context on future turns, and what stays
+            // reasonably sized in localStorage). displayHtml carries the
+            // actual <img> markup so the photo/generated picture is still
+            // there after closing and reopening the app — previously only
+            // the plain caption was saved here, which is why photos vanished
+            // on reload.
+            chatHistory.push({
+                role: "user",
+                content: text || "(sent a photo)",
+                time,
+                displayHtml: imageToSend ? display : null,
+                isHtml: !!imageToSend
+            });
+            chatHistory.push({
+                role: "assistant",
+                content: reply,
+                time: getTime(),
+                displayHtml: hasImages ? displayReply : null,
+                isHtml: hasImages
+            });
             saveChat();
         } catch (err) {
             removeTyping();
             appendMessage('ai', "Network error: " + err.message, getTime());
         } finally {
-            selectedImageBase64 = null;
-            imagePreview.style.display = 'none';
-            imageInput.value = '';
+            // The photo attachment/preview was already cleared right after
+            // sending (see above) — nothing image-related to reset here.
             sendBtn.disabled = false;
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
