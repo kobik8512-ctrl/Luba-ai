@@ -462,6 +462,18 @@
             margin-bottom: 12px;
         }
 
+        .settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .settings-row span {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
         .modal input, .modal textarea {
             width: 100%;
             background: var(--input-bg);
@@ -502,6 +514,92 @@
             background: #555;
             color: white;
         }
+
+        /* --- Saved chats panel --- */
+        .modal-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .saved-chats-close {
+            position: static;
+            background: rgba(255, 255, 255, 0.08);
+            width: 34px;
+            height: 34px;
+            font-size: 20px;
+        }
+
+        .save-chat-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .save-chat-row input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .save-chat-row .save-btn {
+            white-space: nowrap;
+            padding: 0 14px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        #saved-chats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .saved-chat-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            background: var(--bubble-user);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            cursor: pointer;
+        }
+
+        .saved-chat-item:hover {
+            border-color: var(--accent);
+        }
+
+        .saved-chat-name {
+            font-size: 14px;
+            font-weight: bold;
+            word-break: break-word;
+        }
+
+        .saved-chat-meta {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 2px;
+        }
+
+        .saved-chat-delete {
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            flex-shrink: 0;
+            padding: 4px;
+        }
+
+        .saved-chats-empty {
+            font-size: 13px;
+            opacity: 0.6;
+            text-align: center;
+            padding: 16px 0;
+        }
     </style>
 </head>
 <body>
@@ -531,8 +629,7 @@
         <div class="logo">Luba AI</div>
     </div>
     <div class="header-actions">
-        <button class="icon-btn" id="theme-btn">🌓</button>
-        <button class="icon-btn" id="export-btn">💾</button>
+        <button class="icon-btn" id="export-btn" title="Saved Chats">💾</button>
         <button class="icon-btn" id="clear-chat-btn">🗑️</button>
         <button class="icon-btn" id="open-settings-btn">⚙️</button>
     </div>
@@ -560,9 +657,30 @@
     <div class="lightbox-hint">Tap and hold the image to save, or take a screenshot</div>
 </div>
 
+<div class="modal-overlay" id="saved-chats-overlay">
+    <div class="modal">
+        <div class="modal-header-row">
+            <h3>💾 Saved Chats</h3>
+            <button class="lightbox-close saved-chats-close" id="close-saved-chats-btn" title="Close">×</button>
+        </div>
+
+        <div class="save-chat-row">
+            <input type="text" id="save-chat-name-input" placeholder="Name this chat...">
+            <button class="modal-btn save-btn" id="save-current-chat-btn">+ Save</button>
+        </div>
+
+        <div id="saved-chats-list"></div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
         <h3>⚙️ Settings</h3>
+
+        <div class="settings-row">
+            <span>Appearance</span>
+            <button class="icon-btn" id="theme-btn">🌓 Toggle Theme</button>
+        </div>
 
         <p>Luba's personality (her name and creator are locked in and can't be changed here)</p>
         <textarea id="system-prompt-input" placeholder="Write how you want Luba to behave..."></textarea>
@@ -796,31 +914,97 @@ There are two separate TikTok accounts — keep them straight and always spell t
         localStorage.setItem('luba_theme', document.body.classList.contains('light') ? 'light' : 'dark');
     };
 
+    // ---- Saved Chats panel ----
+    const savedChatsOverlay = document.getElementById('saved-chats-overlay');
+    const closeSavedChatsBtn = document.getElementById('close-saved-chats-btn');
+    const saveChatNameInput = document.getElementById('save-chat-name-input');
+    const saveCurrentChatBtn = document.getElementById('save-current-chat-btn');
+    const savedChatsList = document.getElementById('saved-chats-list');
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.innerText = str;
+        return div.innerHTML;
+    }
+
+    function getSavedChats() {
+        try {
+            return JSON.parse(localStorage.getItem('luba_saved_chats') || '[]');
+        } catch {
+            return [];
+        }
+    }
+
+    function setSavedChats(list) {
+        try {
+            localStorage.setItem('luba_saved_chats', JSON.stringify(list));
+        } catch (err) {
+            alert("Couldn't save — storage is full. Try deleting an old saved chat first.");
+        }
+    }
+
+    function renderSavedChatsList() {
+        const saved = getSavedChats();
+        if (saved.length === 0) {
+            savedChatsList.innerHTML = '<div class="saved-chats-empty">No saved chats yet. Type a name above and tap + Save to save this conversation.</div>';
+            return;
+        }
+        savedChatsList.innerHTML = saved.map(c => `
+            <div class="saved-chat-item" onclick="loadSavedChat('${c.id}')">
+                <div>
+                    <div class="saved-chat-name">${escapeHtml(c.name)}</div>
+                    <div class="saved-chat-meta">${c.messages.length} messages · ${escapeHtml(c.savedAt)}</div>
+                </div>
+                <button class="saved-chat-delete" onclick="deleteSavedChat(event, '${c.id}')" title="Delete">🗑️</button>
+            </div>
+        `).join('');
+    }
+
+    window.loadSavedChat = function (id) {
+        const saved = getSavedChats();
+        const entry = saved.find(c => c.id === id);
+        if (!entry) return;
+        chatHistory = entry.messages.slice();
+        saveChat();
+        renderSavedMessages();
+        savedChatsOverlay.style.display = 'none';
+    };
+
+    window.deleteSavedChat = function (e, id) {
+        e.stopPropagation();
+        if (!confirm('Delete this saved chat?')) return;
+        const saved = getSavedChats().filter(c => c.id !== id);
+        setSavedChats(saved);
+        renderSavedChatsList();
+    };
+
     exportBtn.onclick = () => {
+        renderSavedChatsList();
+        saveChatNameInput.value = '';
+        savedChatsOverlay.style.display = 'flex';
+    };
+
+    closeSavedChatsBtn.onclick = () => savedChatsOverlay.style.display = 'none';
+    savedChatsOverlay.onclick = (e) => {
+        if (e.target === savedChatsOverlay) savedChatsOverlay.style.display = 'none';
+    };
+
+    saveCurrentChatBtn.onclick = () => {
         if (chatHistory.length === 0) {
             alert("No messages to save yet.");
             return;
         }
-
-        let text = "Luba AI Chat Export\n\n";
-        chatHistory.forEach(m => {
-            text += `${m.role === 'user' ? 'You' : 'Luba'} (${m.time || ''}):\n${m.content}\n\n`;
+        const name = saveChatNameInput.value.trim() || `Chat — ${new Date().toLocaleString()}`;
+        const saved = getSavedChats();
+        saved.unshift({
+            id: 'chat_' + Date.now(),
+            name,
+            messages: chatHistory.slice(),
+            savedAt: getTime()
         });
-
-        try {
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `luba-chat-${Date.now()}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            alert("✅ Chat saved! Check your Downloads folder.");
-        } catch (err) {
-            alert("❌ Save failed on this browser.\nTry using Chrome.");
-        }
+        setSavedChats(saved);
+        saveChatNameInput.value = '';
+        renderSavedChatsList();
     };
 
     photoBtn.onclick = () => imageInput.click();
