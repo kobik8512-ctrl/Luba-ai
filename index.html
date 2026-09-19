@@ -563,8 +563,6 @@
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
         <h3>⚙️ Settings</h3>
-        <p>Your Google Gemini API key (free, stored only in your browser). Get one at aistudio.google.com/apikey</p>
-        <input type="password" id="api-key-input" placeholder="AIzaSy...">
 
         <p>Luba's personality (her name and creator are locked in and can't be changed here)</p>
         <textarea id="system-prompt-input" placeholder="Write how you want Luba to behave..."></textarea>
@@ -584,7 +582,6 @@
     const openSettingsBtn = document.getElementById('open-settings-btn');
     const closeSettingsBtn = document.getElementById('close-settings-btn');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
-    const apiKeyInput = document.getElementById('api-key-input');
     const systemPromptInput = document.getElementById('system-prompt-input');
     const clearChatBtn = document.getElementById('clear-chat-btn');
     const photoBtn = document.getElementById('photo-btn');
@@ -595,6 +592,11 @@
     const themeBtn = document.getElementById('theme-btn');
     const exportBtn = document.getElementById('export-btn');
     const micBtn = document.getElementById('mic-btn');
+
+    // ---- Your backend proxy ----
+    // After you deploy the Cloudflare Worker (worker.js), paste its URL here.
+    // It looks like: https://luba-ai-proxy.YOUR-SUBDOMAIN.workers.dev
+    const WORKER_URL = "https://luba-ai-proxy.kobik8512.workers.dev";
 
     let chatHistory = [];
     let selectedImageBase64 = null;
@@ -658,7 +660,6 @@ There are two separate TikTok accounts — keep them straight and always spell t
         </svg>
     `;
 
-    apiKeyInput.value = localStorage.getItem('luba_gemini_key') || '';
     systemPromptInput.value = localStorage.getItem('luba_system_prompt') || defaultPersonality;
     if (localStorage.getItem('luba_theme') === 'light') document.body.classList.add('light');
 
@@ -899,13 +900,11 @@ There are two separate TikTok accounts — keep them straight and always spell t
     }
 
     openSettingsBtn.onclick = () => {
-        apiKeyInput.value = localStorage.getItem('luba_gemini_key') || '';
         systemPromptInput.value = localStorage.getItem('luba_system_prompt') || defaultPersonality;
         modalOverlay.style.display = 'flex';
     };
     closeSettingsBtn.onclick = () => modalOverlay.style.display = 'none';
     saveSettingsBtn.onclick = () => {
-        localStorage.setItem('luba_gemini_key', apiKeyInput.value.trim());
         localStorage.setItem('luba_system_prompt', systemPromptInput.value.trim() || defaultPersonality);
         modalOverlay.style.display = 'none';
         alert('Settings saved!');
@@ -1035,10 +1034,10 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
     async function sendMessage() {
         const text = userInput.value.trim();
-        const apiKey = localStorage.getItem('luba_gemini_key') || '';
         if (!text && !selectedImageBase64) return;
-        if (!apiKey) {
-            alert("Please set your Google Gemini API key in Settings first! (free — get one at aistudio.google.com/apikey)");
+
+        if (!WORKER_URL || WORKER_URL.includes('YOUR-WORKER-NAME')) {
+            alert("Luba isn't fully set up yet — the developer needs to finish the backend setup (WORKER_URL) before this app can talk to the AI.");
             return;
         }
 
@@ -1093,17 +1092,16 @@ There are two separate TikTok accounts — keep them straight and always spell t
                     payload.tools = geminiTools;
                 }
 
-                const res = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "x-goog-api-key": apiKey,
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify(payload)
-                    }
-                );
+                // Instead of calling Google directly with a key, the app calls
+                // YOUR worker, which holds the key server-side and forwards
+                // the request on. The user never sees or needs a key.
+                const res = await fetch(WORKER_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ model, payload })
+                });
 
                 const data = await res.json();
 
