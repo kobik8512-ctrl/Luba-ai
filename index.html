@@ -629,9 +629,9 @@
         <div class="logo">Luba AI</div>
     </div>
     <div class="header-actions">
-        <button class="icon-btn" id="export-btn" title="Saved Chats">💾</button>
-        <button class="icon-btn" id="clear-chat-btn">🗑️</button>
-        <button class="icon-btn" id="open-settings-btn">⚙️</button>
+        <button class="icon-btn" id="export-btn" title="Saved Chats"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v16l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg></button>
+        <button class="icon-btn" id="clear-chat-btn" title="Clear chat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+        <button class="icon-btn" id="open-settings-btn" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
 </header>
 
@@ -643,8 +643,8 @@
         <button id="remove-image">×</button>
     </div>
     <div id="input-container">
-        <button class="action-btn" id="photo-btn" title="Photo">📷</button>
-        <button class="action-btn" id="mic-btn" title="Voice">🎤</button>
+        <button class="action-btn" id="photo-btn" title="Photo"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        <button class="action-btn" id="mic-btn" title="Voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg></button>
         <input type="file" id="image-input" accept="image/*" style="display:none">
         <textarea id="user-input" placeholder="Ask Luba AI something..."></textarea>
         <button class="send-btn" id="send-btn">Send</button>
@@ -660,7 +660,7 @@
 <div class="modal-overlay" id="saved-chats-overlay">
     <div class="modal">
         <div class="modal-header-row">
-            <h3>💾 Saved Chats</h3>
+            <h3><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin-right:4px;"><path d="M6 3h12a1 1 0 0 1 1 1v16l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg>Saved Chats</h3>
             <button class="lightbox-close saved-chats-close" id="close-saved-chats-btn" title="Close">×</button>
         </div>
 
@@ -675,11 +675,11 @@
 
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
-        <h3>⚙️ Settings</h3>
+        <h3><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin-right:4px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</h3>
 
         <div class="settings-row">
             <span>Appearance</span>
-            <button class="icon-btn" id="theme-btn">🌓 Toggle Theme</button>
+            <button class="icon-btn" id="theme-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg> Toggle Theme</button>
         </div>
 
         <p>Luba's personality (her name and creator are locked in and can't be changed here)</p>
@@ -861,14 +861,16 @@ There are two separate TikTok accounts — keep them straight and always spell t
         }
 
         if (sender === 'ai') {
+            const COPY_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+            const CHECK_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
             const copyBtn = document.createElement('button');
             copyBtn.className = 'copy-btn';
-            copyBtn.innerText = '📋';
+            copyBtn.innerHTML = COPY_ICON;
             copyBtn.title = 'Copy';
             copyBtn.onclick = () => {
                 navigator.clipboard.writeText(content.innerText);
-                copyBtn.innerText = '✅';
-                setTimeout(() => copyBtn.innerText = '📋', 1500);
+                copyBtn.innerHTML = CHECK_ICON;
+                setTimeout(() => copyBtn.innerHTML = COPY_ICON, 1500);
             };
             content.appendChild(copyBtn);
         }
@@ -955,7 +957,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
                     <div class="saved-chat-name">${escapeHtml(c.name)}</div>
                     <div class="saved-chat-meta">${c.messages.length} messages · ${escapeHtml(c.savedAt)}</div>
                 </div>
-                <button class="saved-chat-delete" onclick="deleteSavedChat(event, '${c.id}')" title="Delete">🗑️</button>
+                <button class="saved-chat-delete" onclick="deleteSavedChat(event, '${c.id}')" title="Delete"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
             </div>
         `).join('');
     }
@@ -1194,10 +1196,13 @@ There are two separate TikTok accounts — keep them straight and always spell t
         const url = wrap.dataset.url || imgEl.src;
         wrap.innerHTML = `
             <div class="image-error-box">
-                <div>⚠️ This image couldn't load here.</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                    <span>This image couldn't load here.</span>
+                </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button class="retry-image-btn" onclick="retryGeneratedImage(this)">🔄 Retry</button>
-                    <button class="retry-image-btn" onclick="window.open('${url}', '_blank')">↗️ Open in browser</button>
+                    <button class="retry-image-btn" onclick="retryGeneratedImage(this)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Retry</button>
+                    <button class="retry-image-btn" onclick="window.open('${url}', '_blank')"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:3px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in browser</button>
                 </div>
             </div>`;
     };
