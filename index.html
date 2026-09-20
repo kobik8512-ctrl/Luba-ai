@@ -109,6 +109,25 @@
             background: #3c4043;
         }
 
+        .icon-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .icon-btn.active:hover {
+            background: #e00070;
+        }
+
+        .icon-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .icon-btn:disabled:hover {
+            background: #282a2c;
+        }
+
         body.light .icon-btn:hover {
             background: #ddd;
         }
@@ -649,6 +668,7 @@
     </div>
     <div class="header-actions">
         <button class="icon-btn" id="export-btn" title="Saved Chats"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v16l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg></button>
+        <button class="icon-btn" id="study-mode-btn" title="Study Mode: explains step-by-step instead of just giving the answer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 10-10-5L2 10l10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Study</button>
         <button class="icon-btn" id="clear-chat-btn" title="Clear chat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
         <button class="icon-btn" id="open-settings-btn" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
@@ -729,6 +749,8 @@
     const themeBtn = document.getElementById('theme-btn');
     const exportBtn = document.getElementById('export-btn');
     const micBtn = document.getElementById('mic-btn');
+    const studyModeBtn = document.getElementById('study-mode-btn');
+    let isStudyModeOn = localStorage.getItem('luba_study_mode') === 'true';
 
     // ---- Your backend proxy ----
     // After you deploy the Cloudflare Worker (worker.js), paste its URL here.
@@ -849,12 +871,29 @@ There are two separate TikTok accounts — keep them straight and always spell t
     // ---- Editable personality (this is what shows up in Settings) ----
     const defaultPersonality = `You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it. For any math, equations, or formulas, always write them using LaTeX: $...$ for inline math and $$...$$ for a bigger displayed equation on its own line. The app automatically renders this as proper math symbols (fractions, summations, square roots, exponents, etc), so always use real LaTeX rather than typing math out with plain slashes, carets, or parentheses.`;
 
+    // ---- Study Mode ----
+    // When on, this gets appended to the system prompt so ANY question that's
+    // learnable — math, science, coding, language, history, whatever — gets
+    // taught, not just answered. Off by default; toggled from the header
+    // button and remembered per device via localStorage.
+    const STUDY_MODE_INSTRUCTIONS = `STUDY MODE IS CURRENTLY ON. The user turned on a tutoring mode, and it changes how you answer any homework-style or "figure this out" question (math, science, coding, language, history, anything learnable) until they turn it off:
+- Do not just hand over a short final answer with no explanation.
+- Walk through the reasoning step by step: name the concept, formula, or method being used and why it applies here, in plain language someone could actually learn from — not just a wall of steps with no context.
+- For calculations, still use the calculator tool for the actual arithmetic, but explain in words what each step is doing and why.
+- Define any term or symbol along the way that isn't obvious.
+- Give the final answer clearly, but only after the reasoning — the explanation is the point, not an afterthought bolted onto the answer.
+- When it fits naturally, end with a short check-in or a related practice question, so it feels like tutoring rather than a lookup.
+- Stay focused and as concise as you can while still being genuinely clear — thorough, not padded with filler.
+- Keep using LaTeX ($...$ / $$...$$) for any math exactly as usual.
+- This applies even to arithmetic that looks quick or trivial (e.g. "297 + 973 * 93"). Do not skip the explanation just because you could give the number in one line — walk through the order of operations (PEMDAS/BODMAS) step by step, then give the final result. Never reply with only the final number while study mode is on.`;
+
     function buildSystemPrompt() {
         const customPersonality = localStorage.getItem('luba_system_prompt') || defaultPersonality;
         const identityBlock = isVerifiedKobi
             ? CORE_IDENTITY + "\n\n" + USER_PROFILE
             : CORE_IDENTITY + "\n\n" + UNVERIFIED_NOTE;
-        return identityBlock + "\n\n" + customPersonality;
+        const studyBlock = isStudyModeOn ? "\n\n" + STUDY_MODE_INSTRUCTIONS : "";
+        return identityBlock + "\n\n" + customPersonality + studyBlock;
     }
 
     const aiAvatarHTML = `
@@ -1026,6 +1065,22 @@ There are two separate TikTok accounts — keep them straight and always spell t
     themeBtn.onclick = () => {
         document.body.classList.toggle('light');
         localStorage.setItem('luba_theme', document.body.classList.contains('light') ? 'light' : 'dark');
+    };
+
+    studyModeBtn.classList.toggle('active', isStudyModeOn);
+
+    studyModeBtn.onclick = () => {
+        isStudyModeOn = !isStudyModeOn;
+        localStorage.setItem('luba_study_mode', isStudyModeOn ? 'true' : 'false');
+        studyModeBtn.classList.toggle('active', isStudyModeOn);
+
+        const msg = isStudyModeOn
+            ? "📚 Study mode is ON — from now on I'll walk through explanations step by step instead of just giving you the answer."
+            : "Study mode is OFF — back to normal, straight-to-the-point answers.";
+        const t = getTime();
+        appendMessage('ai', msg, t);
+        chatHistory.push({ role: 'assistant', content: msg, time: t });
+        saveChat();
     };
 
     // ---- Saved Chats panel ----
@@ -1413,6 +1468,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
         userInput.value = '';
         sendBtn.disabled = true;
+        studyModeBtn.disabled = true;
         showTyping();
 
         const systemPrompt = buildSystemPrompt();
@@ -1589,6 +1645,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
             // The photo attachment/preview was already cleared right after
             // sending (see above) — nothing image-related to reset here.
             sendBtn.disabled = false;
+            studyModeBtn.disabled = false;
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     }
