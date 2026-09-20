@@ -1322,15 +1322,25 @@ There are two separate TikTok accounts — keep them straight and always spell t
                 localStorage.setItem('luba_verified_kobi', 'true');
                 pushPlainExchange(text.replace(/./g, '•'), "Password verified 🔓 Welcome back, Kobi!");
             } else {
+                // A wrong answer also revokes any earlier verification on this
+                // device — someone else typing on Kobi's phone later, or a
+                // second wrong guess, should not stay "trusted" from before.
+                isVerifiedKobi = false;
+                localStorage.removeItem('luba_verified_kobi');
                 pushPlainExchange(text.replace(/./g, '•'), "That's not the right password, so I can't confirm you're Kobi. I'll keep treating you as a regular user for now.");
             }
             return;
         }
 
         // ---- Step 2: did someone just claim to be Kobi? ----
-        // Only fires while not already verified. Intercepted before it ever
-        // reaches the model, so Luba can't be argued into believing it.
-        if (!isVerifiedKobi && KOBI_CLAIM_REGEX.test(text)) {
+        // This ALWAYS fires on a matching claim, even if this device was
+        // verified before. Verification is not a permanent "trust this
+        // browser forever" flag — every time someone says "I'm Kobi" (or
+        // similar) in the chat itself, Luba re-challenges for the password
+        // right then, so it can't be talked into casually greeting an
+        // impostor as Kobi just because someone verified earlier. Intercepted
+        // before it ever reaches the model, so Luba can't be argued out of it.
+        if (KOBI_CLAIM_REGEX.test(text)) {
             userInput.value = '';
             awaitingKobiPassword = true;
             pushPlainExchange(text, "Wait — if you're really Kobi, what's the password? 🔒");
