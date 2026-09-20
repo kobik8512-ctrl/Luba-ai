@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Luba AI</title>
+    <!-- KaTeX renders LaTeX math (the $...$ / $$...$$ style output Gemini
+         writes) as real math symbols instead of raw text with backslashes
+         and dollar signs. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     <style>
         :root {
             --bg: #131314;
@@ -172,6 +178,19 @@
             margin-top: 8px;
             display: block;
             cursor: pointer;
+        }
+
+        /* Rendered LaTeX math should match the chat's text color and wrap
+           instead of overflowing narrow phone screens. */
+        .content .katex {
+            color: var(--text);
+        }
+
+        .content .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 4px 0;
+            margin: 6px 0;
         }
 
         /* --- Fullscreen image lightbox (view large / screenshot / close) --- */
@@ -828,7 +847,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
 - Your (Luba AI's) own TikTok username is @luba_ai — note the underscore between "luba" and "ai". If someone asks for your TikTok, or Luba AI's TikTok, answer with @luba_ai (never "lubaai" without the underscore, and never Kobi's account).`;
 
     // ---- Editable personality (this is what shows up in Settings) ----
-    const defaultPersonality = `You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it.`;
+    const defaultPersonality = `You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it. For any math, equations, or formulas, always write them using LaTeX: $...$ for inline math and $$...$$ for a bigger displayed equation on its own line. The app automatically renders this as proper math symbols (fractions, summations, square roots, exponents, etc), so always use real LaTeX rather than typing math out with plain slashes, carets, or parentheses.`;
 
     function buildSystemPrompt() {
         const customPersonality = localStorage.getItem('luba_system_prompt') || defaultPersonality;
@@ -909,6 +928,28 @@ There are two separate TikTok accounts — keep them straight and always spell t
         return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
+    // Scans a message bubble for LaTeX math ($...$, $$...$$, \(...\), \[...\])
+    // and swaps it for real rendered math via KaTeX. Safe to call on every
+    // message, including plain ones with no math in them — it just does
+    // nothing if it finds no delimiters.
+    function renderMathIn(el) {
+        if (typeof window.renderMathInElement !== 'function') return; // KaTeX still loading or blocked — leave raw text as-is
+        try {
+            renderMathInElement(el, {
+                delimiters: [
+                    { left: "$$", right: "$$", display: true },
+                    { left: "\\[", right: "\\]", display: true },
+                    { left: "\\(", right: "\\)", display: false },
+                    { left: "$", right: "$", display: false }
+                ],
+                throwOnError: false,
+                ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+            });
+        } catch (err) {
+            // If rendering fails for any reason, just leave the plain text.
+        }
+    }
+
     function appendMessage(sender, text, time = null, isHtml = false) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${sender}`;
@@ -928,6 +969,8 @@ There are two separate TikTok accounts — keep them straight and always spell t
         } else {
             content.innerText = text;
         }
+
+        renderMathIn(content);
 
         if (sender === 'ai') {
             const COPY_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
@@ -1501,7 +1544,15 @@ There are two separate TikTok accounts — keep them straight and always spell t
             if (reply == null) {
                 reply = "Sorry, something went wrong.";
             }
-            reply = reply.replace(/[\*\_`#]/g, '');
+            // Strip plain markdown noise (bold markers, backticks, heading
+            // hashes) but deliberately leave underscores/asterisks alone —
+            // LaTeX math needs them (x_1 for subscripts, a*b for
+            // multiplication, x^2 etc), and stripping them blindly broke
+            // math rendering.
+            reply = reply
+                .replace(/\*\*(.+?)\*\*/g, '$1')
+                .replace(/[`]/g, '')
+                .replace(/^#{1,6}\s*/gm, '');
 
             const hasImages = generatedImageUrls.length > 0;
             const displayReply = hasImages
