@@ -42,15 +42,10 @@
         body {
             background-color: var(--bg);
             color: var(--text);
-            height: 100vh;
-            overflow: hidden;
-            transition: background 0.3s, color 0.3s;
-        }
-
-        #app-shell {
-            display: none; /* shown via JS once logged in */
+            display: flex;
             flex-direction: column;
             height: 100vh;
+            transition: background 0.3s, color 0.3s;
         }
 
         header {
@@ -643,313 +638,9 @@
             text-align: center;
             padding: 16px 0;
         }
-        /* ===== Auth screens ===== */
-        #auth-overlay {
-            position: fixed;
-            inset: 0;
-            background:
-                radial-gradient(circle at 20% 15%, rgba(255, 0, 127, 0.18), transparent 45%),
-                radial-gradient(circle at 85% 80%, rgba(0, 210, 255, 0.16), transparent 45%),
-                var(--bg);
-            display: none; /* shown via JS when logged out */
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            z-index: 200;
-            overflow-y: auto;
-        }
-
-        .auth-card {
-            width: 100%;
-            max-width: 380px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-
-        .auth-logo {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 10px;
-            filter: drop-shadow(0 0 14px rgba(255, 0, 127, 0.45));
-        }
-
-        .auth-title {
-            font-size: 1.9rem;
-            font-weight: bold;
-            background: linear-gradient(75deg, #ff007f, #9b51e0, #00d2ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 26px;
-        }
-
-        .auth-screen {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .auth-subtitle {
-            font-size: 14px;
-            opacity: 0.7;
-            margin-bottom: 6px;
-        }
-
-        .auth-input {
-            width: 100%;
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 14px 16px;
-            border-radius: 14px;
-            outline: none;
-            font-size: 15px;
-            transition: border-color 0.2s;
-        }
-
-        .auth-input:focus {
-            border-color: var(--accent);
-        }
-
-        .auth-field-label {
-            text-align: left;
-            font-size: 13px;
-            font-weight: bold;
-            opacity: 0.75;
-            margin: 4px 2px -4px;
-        }
-
-        .auth-toggle-row {
-            display: flex;
-            gap: 10px;
-        }
-
-        .auth-toggle-btn {
-            flex: 1;
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 13px 10px;
-            border-radius: 14px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .auth-toggle-btn.selected {
-            border-color: var(--accent);
-            background: rgba(255, 0, 127, 0.14);
-            box-shadow: 0 0 0 1px var(--accent) inset;
-        }
-
-        .auth-error {
-            color: #ff5c8a;
-            font-size: 13px;
-            min-height: 16px;
-            text-align: left;
-            padding: 0 2px;
-        }
-
-        .live-status {
-            font-size: 12.5px;
-            min-height: 17px;
-            text-align: left;
-            padding: 0 2px;
-            margin-top: -6px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .live-status.checking { color: #999; }
-        .live-status.ok { color: #3ddc84; }
-        .live-status.bad { color: #ff5c8a; }
-
-        .live-status svg { flex-shrink: 0; }
-
-        .auth-btn {
-            width: 100%;
-            padding: 15px;
-            border-radius: 26px;
-            border: none;
-            font-size: 15.5px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.15s, opacity 0.2s;
-        }
-
-        .auth-btn:active {
-            transform: scale(0.98);
-        }
-
-        .auth-btn:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-        }
-
-        .auth-btn-primary {
-            background: linear-gradient(75deg, #ff007f, #9b51e0);
-            color: #fff;
-        }
-
-        .auth-btn-outline {
-            background: transparent;
-            border: 1.5px solid var(--border);
-            color: var(--text);
-        }
-
-        .auth-btn-text {
-            background: transparent;
-            color: var(--accent);
-            padding: 8px;
-            font-weight: 600;
-        }
-
-        #auth-loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.55);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 250;
-        }
-
-        .auth-loading-spinner {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-top-color: var(--accent);
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* ===== Profile picture (settings + chat bubbles) ===== */
-        .avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 50%;
-        }
-
-        .profile-pic-row {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 16px;
-        }
-
-        .profile-pic-wrap {
-            position: relative;
-            width: 64px;
-            height: 64px;
-            flex-shrink: 0;
-            cursor: pointer;
-        }
-
-        .profile-pic-wrap img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid var(--border);
-        }
-
-        .profile-pic-edit-badge {
-            position: absolute;
-            bottom: -2px;
-            right: -2px;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background: var(--accent);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid var(--header);
-        }
-
-        .profile-name {
-            font-size: 16px;
-            font-weight: bold;
-        }
-
-        .profile-sub {
-            font-size: 12px;
-            opacity: 0.6;
-            margin-top: 2px;
-        }
-
-        .settings-username-row {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 6px;
-        }
-
-        .settings-username-row input {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        .settings-username-row button {
-            white-space: nowrap;
-            padding: 0 14px;
-            border-radius: 8px;
-            font-size: 13px;
-        }
-
-        .settings-cooldown-note {
-            font-size: 12px;
-            opacity: 0.6;
-            margin-bottom: 14px;
-        }
-
-        .logout-btn {
-            width: 100%;
-            background: transparent;
-            border: 1.5px solid var(--border);
-            color: #ff5c8a;
-            padding: 11px;
-            border-radius: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 6px;
-        }
-
-        /* ===== "Luba is thinking..." typing indicator ===== */
-        .thinking-text {
-            background: linear-gradient(90deg, var(--text) 0%, var(--accent) 50%, var(--text) 100%);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: shimmer 1.8s linear infinite;
-            font-weight: 600;
-            font-size: 14px;
-            margin-right: 8px;
-        }
-
-        @keyframes shimmer {
-            to { background-position: -200% center; }
-        }
-
-        .thinking-dots {
-            display: inline-flex;
-            gap: 4px;
-            vertical-align: middle;
-        }
     </style>
 </head>
 <body>
-
-<div id="app-shell">
 
 <header>
     <div class="brand-container">
@@ -999,71 +690,6 @@
     </div>
 </div>
 
-</div><!-- /app-shell -->
-
-<!-- ===== Auth screens (shown until the person logs in / signs up) ===== -->
-<div id="auth-overlay">
-    <div class="auth-card">
-        <svg class="auth-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="authGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#ff007f"/>
-                    <stop offset="50%" stop-color="#9b51e0"/>
-                    <stop offset="100%" stop-color="#00d2ff"/>
-                </linearGradient>
-            </defs>
-            <circle cx="50" cy="50" r="38" stroke="url(#authGrad)" stroke-width="3.5" fill="none" opacity="0.7"/>
-            <path d="M32 28 L32 68 Q32 74 38 74 L62 74 Q68 74 68 68 L68 58 Q68 52 62 52 L48 52 L48 28 Q48 22 42 22 L38 22 Q32 22 32 28 Z" fill="url(#authGrad)"/>
-            <circle cx="50" cy="50" r="7" fill="url(#authGrad)"/>
-        </svg>
-        <div class="auth-title">Luba AI</div>
-
-        <!-- Choice screen -->
-        <div class="auth-screen" id="auth-choice-screen">
-            <p class="auth-subtitle">Your AI, your account. Log in or make one to get started.</p>
-            <button class="auth-btn auth-btn-primary" id="show-login-btn">Log In</button>
-            <button class="auth-btn auth-btn-outline" id="show-signup-btn">Sign Up</button>
-        </div>
-
-        <!-- Login screen -->
-        <div class="auth-screen" id="auth-login-screen" style="display:none;">
-            <p class="auth-subtitle">Welcome back 👋</p>
-            <input type="text" id="login-username" class="auth-input" placeholder="Username" autocomplete="username">
-            <input type="password" id="login-password" class="auth-input" placeholder="Password" autocomplete="current-password">
-            <div class="auth-error" id="login-error"></div>
-            <button class="auth-btn auth-btn-primary" id="login-submit-btn">Log In</button>
-            <button class="auth-btn auth-btn-text" id="login-back-btn">‹ Back</button>
-        </div>
-
-        <!-- Sign up screen -->
-        <div class="auth-screen" id="auth-signup-screen" style="display:none;">
-            <p class="auth-subtitle">Let's set you up.</p>
-            <input type="text" id="signup-username" class="auth-input" placeholder="Username (3-20 chars, no spaces)" autocomplete="username" maxlength="20">
-            <div class="live-status" id="signup-username-status"></div>
-            <input type="password" id="signup-password" class="auth-input" placeholder="Password (min 8 characters)" autocomplete="new-password">
-            <input type="password" id="signup-password-confirm" class="auth-input" placeholder="Confirm password" autocomplete="new-password">
-            <div class="live-status" id="signup-password-match-status"></div>
-
-            <div class="auth-field-label">I am a...</div>
-            <div class="auth-toggle-row">
-                <button type="button" class="auth-toggle-btn" id="gender-boy-btn" data-gender="boy">🙋‍♂️ Boy</button>
-                <button type="button" class="auth-toggle-btn" id="gender-girl-btn" data-gender="girl">🙋‍♀️ Girl</button>
-            </div>
-
-            <div class="auth-field-label">Birthday</div>
-            <input type="date" id="signup-birthday" class="auth-input">
-
-            <div class="auth-error" id="signup-error"></div>
-            <button class="auth-btn auth-btn-primary" id="signup-submit-btn">Sign Up</button>
-            <button class="auth-btn auth-btn-text" id="signup-back-btn">‹ Back</button>
-        </div>
-    </div>
-</div>
-
-<div id="auth-loading-overlay">
-    <div class="auth-loading-spinner"></div>
-</div>
-
 <div class="lightbox-overlay" id="lightbox-overlay">
     <button class="lightbox-close" id="lightbox-close" title="Close">×</button>
     <img id="lightbox-img" src="" alt="Full screen image">
@@ -1090,24 +716,6 @@
     <div class="modal">
         <h3><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin-right:4px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</h3>
 
-        <div class="profile-pic-row">
-            <div class="profile-pic-wrap" id="profile-pic-wrap" title="Change profile picture">
-                <img id="profile-pic-img" src="" alt="Profile picture">
-                <div class="profile-pic-edit-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>
-                <input type="file" id="profile-pic-input" accept="image/*" style="display:none">
-            </div>
-            <div>
-                <div class="profile-name" id="settings-profile-name">—</div>
-                <div class="profile-sub" id="settings-profile-sub">—</div>
-            </div>
-        </div>
-
-        <div class="settings-username-row">
-            <input type="text" id="settings-username-input" placeholder="Username">
-            <button class="modal-btn save-btn" id="settings-change-username-btn">Change</button>
-        </div>
-        <div class="settings-cooldown-note" id="settings-username-note"></div>
-
         <div class="settings-row">
             <span>Appearance</span>
             <button class="icon-btn" id="theme-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg> Toggle Theme</button>
@@ -1120,8 +728,6 @@
             <button class="modal-btn cancel-btn" id="close-settings-btn">Cancel</button>
             <button class="modal-btn save-btn" id="save-settings-btn">Save</button>
         </div>
-
-        <button class="logout-btn" id="logout-btn">Log Out</button>
     </div>
 </div>
 
@@ -1144,7 +750,7 @@
     const exportBtn = document.getElementById('export-btn');
     const micBtn = document.getElementById('mic-btn');
     const studyModeBtn = document.getElementById('study-mode-btn');
-    let isStudyModeOn = localStorage.getItem(storageKey('luba_study_mode')) === 'true';
+    let isStudyModeOn = localStorage.getItem('luba_study_mode') === 'true';
 
     // ---- Your backend proxy ----
     // After you deploy the Cloudflare Worker (worker.js), paste its URL here.
@@ -1154,425 +760,6 @@
     let chatHistory = [];
     let selectedImageBase64 = null;
     let isListening = false;
-
-    // =====================================================================
-    // ==================  ACCOUNTS: LOGIN / SIGN UP  =====================
-    // =====================================================================
-    // Usernames need to be unique across EVERYONE, not just on one phone, so
-    // this can't be done with localStorage alone (every device's storage is
-    // separate). It talks to the same Worker used for the AI calls, which
-    // needs a small addition (see the accompanying worker-additions.js) to
-    // store accounts in Cloudflare KV and enforce that uniqueness for real.
-
-    const appShell = document.getElementById('app-shell');
-    const authOverlay = document.getElementById('auth-overlay');
-    const authLoadingOverlay = document.getElementById('auth-loading-overlay');
-
-    const authChoiceScreen = document.getElementById('auth-choice-screen');
-    const authLoginScreen = document.getElementById('auth-login-screen');
-    const authSignupScreen = document.getElementById('auth-signup-screen');
-    const showLoginBtn = document.getElementById('show-login-btn');
-    const showSignupBtn = document.getElementById('show-signup-btn');
-    const loginBackBtn = document.getElementById('login-back-btn');
-    const signupBackBtn = document.getElementById('signup-back-btn');
-
-    const loginUsernameInput = document.getElementById('login-username');
-    const loginPasswordInput = document.getElementById('login-password');
-    const loginErrorEl = document.getElementById('login-error');
-    const loginSubmitBtn = document.getElementById('login-submit-btn');
-
-    const signupUsernameInput = document.getElementById('signup-username');
-    const signupPasswordInput = document.getElementById('signup-password');
-    const signupPasswordConfirmInput = document.getElementById('signup-password-confirm');
-    const signupBirthdayInput = document.getElementById('signup-birthday');
-    const genderBoyBtn = document.getElementById('gender-boy-btn');
-    const genderGirlBtn = document.getElementById('gender-girl-btn');
-    const signupErrorEl = document.getElementById('signup-error');
-    const signupSubmitBtn = document.getElementById('signup-submit-btn');
-    const signupUsernameStatus = document.getElementById('signup-username-status');
-    const signupPasswordMatchStatus = document.getElementById('signup-password-match-status');
-
-    const profilePicWrap = document.getElementById('profile-pic-wrap');
-    const profilePicImg = document.getElementById('profile-pic-img');
-    const profilePicInput = document.getElementById('profile-pic-input');
-    const settingsProfileName = document.getElementById('settings-profile-name');
-    const settingsProfileSub = document.getElementById('settings-profile-sub');
-    const settingsUsernameInput = document.getElementById('settings-username-input');
-    const settingsChangeUsernameBtn = document.getElementById('settings-change-username-btn');
-    const settingsUsernameNote = document.getElementById('settings-username-note');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    // Simple default avatar (a soft gradient circle with no photo) so the UI
-    // never shows a broken image before someone sets a real profile picture.
-    const DEFAULT_AVATAR = "data:image/svg+xml;utf8," + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff007f"/><stop offset="100%" stop-color="#00d2ff"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="38" r="16" fill="#fff" opacity="0.9"/><ellipse cx="50" cy="82" rx="28" ry="20" fill="#fff" opacity="0.9"/></svg>`
-    );
-
-    let currentUser = null; // { username, gender, birthday, avatarDataUrl }
-
-    // Everything the person does — chat history, saved chats, personality,
-    // theme, study mode — is now scoped to their account, not shared across
-    // whoever's logged in on this device. Falls back to a plain key before
-    // login (harmless, since the app UI is hidden until then anyway).
-    function storageKey(base) {
-        return currentUser ? `${base}_${currentUser.username.toLowerCase()}` : base;
-    }
-    let authToken = localStorage.getItem('luba_auth_token') || null;
-    let selectedSignupGender = null;
-
-    // Small curated list — just enough to block the obvious stuff in
-    // usernames. Checked as a case-insensitive substring match.
-    const USERNAME_BLOCKLIST = ['fuck', 'shit', 'bitch', 'asshole', 'nigger', 'nigga', 'faggot', 'cunt', 'pussy', 'whore', 'slut', 'rape', 'nazi'];
-    const EMOJI_REGEX = /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}]/u;
-
-    function validateUsername(u) {
-        if (!u) return "Enter a username.";
-        if (EMOJI_REGEX.test(u)) return "No emojis in the username.";
-        if (/\s/.test(u)) return "No spaces in the username.";
-        if (!/^[A-Za-z0-9_]{3,20}$/.test(u)) return "Username must be 3-20 characters: letters, numbers, or underscore only.";
-        const lower = u.toLowerCase();
-        if (USERNAME_BLOCKLIST.some(w => lower.includes(w))) return "That username isn't allowed.";
-        return null;
-    }
-
-    function validatePassword(p) {
-        if (!p) return "Enter a password.";
-        if (p.length < 8) return "Password must be at least 8 characters.";
-        return null;
-    }
-
-    // ---- Live status icons ----
-    const ICON_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-    const ICON_X = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-
-    function setLiveStatus(el, state, text) {
-        el.className = 'live-status' + (state ? ' ' + state : '');
-        if (state === 'ok') el.innerHTML = ICON_CHECK + text;
-        else if (state === 'bad') el.innerHTML = ICON_X + text;
-        else if (state === 'checking') el.innerHTML = text;
-        else el.innerHTML = '';
-    }
-
-    // ---- Live username availability check (Roblox-style), debounced ----
-    // Runs the exact same format check as signup itself, then asks the
-    // server (not localStorage — this has to be the real shared account
-    // list for it to mean anything) whether the name is actually free.
-    let usernameCheckTimer = null;
-    let usernameCheckToken = 0; // guards against a slow older check overwriting a newer result
-    signupUsernameInput.addEventListener('input', () => {
-        const value = signupUsernameInput.value.trim();
-        clearTimeout(usernameCheckTimer);
-
-        const formatErr = validateUsername(value);
-        if (!value) { setLiveStatus(signupUsernameStatus, '', ''); return; }
-        if (formatErr) { setLiveStatus(signupUsernameStatus, 'bad', formatErr); return; }
-
-        setLiveStatus(signupUsernameStatus, 'checking', 'Checking availability…');
-        const myToken = ++usernameCheckToken;
-        usernameCheckTimer = setTimeout(async () => {
-            try {
-                const data = await callAccountAPI({ action: 'check_username', username: value });
-                if (myToken !== usernameCheckToken) return; // a newer keystroke already superseded this check
-                setLiveStatus(
-                    signupUsernameStatus,
-                    data.available ? 'ok' : 'bad',
-                    data.available ? 'Username is available' : 'Username is already taken'
-                );
-            } catch (err) {
-                if (myToken !== usernameCheckToken) return;
-                setLiveStatus(signupUsernameStatus, 'bad', "Couldn't check right now");
-            }
-        }, 450);
-    });
-
-    // ---- Live password-match check ----
-    function updatePasswordMatchStatus() {
-        const p1 = signupPasswordInput.value;
-        const p2 = signupPasswordConfirmInput.value;
-        if (!p2) { setLiveStatus(signupPasswordMatchStatus, '', ''); return; }
-        if (p1 === p2) setLiveStatus(signupPasswordMatchStatus, 'ok', 'Passwords match');
-        else setLiveStatus(signupPasswordMatchStatus, 'bad', "Passwords don't match");
-    }
-    signupPasswordInput.addEventListener('input', updatePasswordMatchStatus);
-    signupPasswordConfirmInput.addEventListener('input', updatePasswordMatchStatus);
-
-    async function callAccountAPI(payload) {
-        const res = await fetch(WORKER_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-        let data;
-        try {
-            data = await res.json();
-        } catch {
-            throw new Error("The server sent back something unexpected. Try again in a moment.");
-        }
-        if (!data.ok) {
-            throw new Error(data.error || "Something went wrong.");
-        }
-        return data;
-    }
-
-    function showAuthLoading(on) {
-        authLoadingOverlay.style.display = on ? 'flex' : 'none';
-    }
-
-    function showAuthScreen(name) {
-        authChoiceScreen.style.display = name === 'choice' ? 'flex' : 'none';
-        authLoginScreen.style.display = name === 'login' ? 'flex' : 'none';
-        authSignupScreen.style.display = name === 'signup' ? 'flex' : 'none';
-        loginErrorEl.textContent = '';
-        signupErrorEl.textContent = '';
-        setLiveStatus(signupUsernameStatus, '', '');
-        setLiveStatus(signupPasswordMatchStatus, '', '');
-    }
-
-    showLoginBtn.onclick = () => showAuthScreen('login');
-    showSignupBtn.onclick = () => showAuthScreen('signup');
-    loginBackBtn.onclick = () => showAuthScreen('choice');
-    signupBackBtn.onclick = () => showAuthScreen('choice');
-
-    function selectGender(g) {
-        selectedSignupGender = g;
-        genderBoyBtn.classList.toggle('selected', g === 'boy');
-        genderGirlBtn.classList.toggle('selected', g === 'girl');
-    }
-    genderBoyBtn.onclick = () => selectGender('boy');
-    genderGirlBtn.onclick = () => selectGender('girl');
-
-    function applyLoggedInProfile(profile) {
-        currentUser = profile;
-        authOverlay.style.display = 'none';
-        appShell.style.display = 'flex';
-        settingsProfileName.textContent = currentUser.username;
-        settingsProfileSub.textContent = currentUser.gender === 'girl' ? '🙋‍♀️ Girl' : '🙋‍♂️ Boy';
-        settingsUsernameInput.value = currentUser.username;
-        profilePicImg.src = currentUser.avatarDataUrl || DEFAULT_AVATAR;
-
-        // These are per-account local prefs — reload them now that we know
-        // who's actually logged in, rather than whatever the last account
-        // on this device left behind.
-        document.body.classList.toggle('light', localStorage.getItem(storageKey('luba_theme')) === 'light');
-        isStudyModeOn = localStorage.getItem(storageKey('luba_study_mode')) === 'true';
-        studyModeBtn.classList.toggle('active', isStudyModeOn);
-        systemPromptInput.value = localStorage.getItem(storageKey('luba_system_prompt')) || defaultPersonality;
-
-        initChatUI();
-    }
-
-    async function attemptResumeSession() {
-        if (!authToken) {
-            showAuthLoading(false);
-            authOverlay.style.display = 'flex';
-            return;
-        }
-        try {
-            const data = await callAccountAPI({ action: 'get_profile', token: authToken });
-            applyLoggedInProfile(data.profile);
-        } catch (err) {
-            // Token invalid/expired (or worker not set up for accounts yet) —
-            // fall back to the login screen instead of getting stuck.
-            localStorage.removeItem('luba_auth_token');
-            authToken = null;
-            authOverlay.style.display = 'flex';
-        } finally {
-            showAuthLoading(false);
-        }
-    }
-
-    loginSubmitBtn.onclick = async () => {
-        const username = loginUsernameInput.value.trim();
-        const password = loginPasswordInput.value;
-        if (!username || !password) {
-            loginErrorEl.textContent = "Enter your username and password.";
-            return;
-        }
-        loginSubmitBtn.disabled = true;
-        showAuthLoading(true);
-        try {
-            const data = await callAccountAPI({ action: 'login', username, password });
-            authToken = data.token;
-            localStorage.setItem('luba_auth_token', authToken);
-            applyLoggedInProfile(data.profile);
-        } catch (err) {
-            loginErrorEl.textContent = err.message;
-        } finally {
-            loginSubmitBtn.disabled = false;
-            showAuthLoading(false);
-        }
-    };
-
-    signupSubmitBtn.onclick = async () => {
-        const username = signupUsernameInput.value.trim();
-        const password = signupPasswordInput.value;
-        const confirm = signupPasswordConfirmInput.value;
-        const birthday = signupBirthdayInput.value;
-
-        const usernameErr = validateUsername(username);
-        if (usernameErr) { signupErrorEl.textContent = usernameErr; return; }
-        const passwordErr = validatePassword(password);
-        if (passwordErr) { signupErrorEl.textContent = passwordErr; return; }
-        if (password !== confirm) { signupErrorEl.textContent = "Passwords don't match."; return; }
-        if (!selectedSignupGender) { signupErrorEl.textContent = "Pick Boy or Girl."; return; }
-        if (!birthday) { signupErrorEl.textContent = "Enter your birthday."; return; }
-
-        signupSubmitBtn.disabled = true;
-        showAuthLoading(true);
-        try {
-            const data = await callAccountAPI({
-                action: 'signup',
-                username,
-                password,
-                gender: selectedSignupGender,
-                birthday
-            });
-            authToken = data.token;
-            localStorage.setItem('luba_auth_token', authToken);
-            applyLoggedInProfile(data.profile);
-        } catch (err) {
-            signupErrorEl.textContent = err.message;
-        } finally {
-            signupSubmitBtn.disabled = false;
-            showAuthLoading(false);
-        }
-    };
-
-    [loginUsernameInput, loginPasswordInput].forEach(el => {
-        el.addEventListener('keydown', e => { if (e.key === 'Enter') loginSubmitBtn.click(); });
-    });
-
-    logoutBtn.onclick = () => {
-        if (!confirm("Log out of this account?")) return;
-        if (authToken) {
-            callAccountAPI({ action: 'logout', token: authToken }).catch(() => {}); // best-effort
-        }
-        localStorage.removeItem('luba_auth_token');
-        authToken = null;
-        currentUser = null;
-        chatHistory = [];
-        chatContainer.innerHTML = '';
-        modalOverlay.style.display = 'none';
-        appShell.style.display = 'none';
-        authOverlay.style.display = 'flex';
-        showAuthScreen('choice');
-        loginUsernameInput.value = '';
-        loginPasswordInput.value = '';
-    };
-
-    // ---- Profile picture (settings) ----
-    // Downscaled to a small square before upload — keeps things fast and
-    // avoids storing huge images for a little avatar.
-    function resizeImageToDataUrl(file, maxSize) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = ev => {
-                const img = new Image();
-                img.onload = () => {
-                    const size = Math.min(maxSize, Math.max(img.width, img.height));
-                    const canvas = document.createElement('canvas');
-                    canvas.width = size;
-                    canvas.height = size;
-                    const ctx = canvas.getContext('2d');
-                    // Center-crop to a square so avatars aren't stretched.
-                    const minSide = Math.min(img.width, img.height);
-                    const sx = (img.width - minSide) / 2;
-                    const sy = (img.height - minSide) / 2;
-                    ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
-                    resolve(canvas.toDataURL('image/jpeg', 0.85));
-                };
-                img.onerror = reject;
-                img.src = ev.target.result;
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    }
-
-    let profilePicInputEl = profilePicInput;
-    profilePicWrap.onclick = () => {
-        // Same fresh-clone trick as the chat photo picker — some WebViews
-        // stop reopening a reused file input after the first cancel.
-        const fresh = profilePicInputEl.cloneNode(true);
-        fresh.value = '';
-        profilePicInputEl.parentNode.replaceChild(fresh, profilePicInputEl);
-        profilePicInputEl = fresh;
-        profilePicInputEl.onchange = handleProfilePicChange;
-        profilePicInputEl.click();
-    };
-    profilePicInputEl.onchange = handleProfilePicChange;
-
-    async function handleProfilePicChange(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        try {
-            const dataUrl = await resizeImageToDataUrl(file, 256);
-            profilePicImg.src = dataUrl; // optimistic preview
-            const data = await callAccountAPI({ action: 'update_avatar', token: authToken, avatarDataUrl: dataUrl });
-            currentUser.avatarDataUrl = data.profile.avatarDataUrl;
-        } catch (err) {
-            alert("Couldn't update your profile picture: " + err.message);
-            profilePicImg.src = currentUser.avatarDataUrl || DEFAULT_AVATAR; // revert preview
-        }
-    }
-
-    // ---- Live check while typing a new username in Settings ----
-    let settingsUsernameCheckTimer = null;
-    let settingsUsernameCheckToken = 0;
-    settingsUsernameInput.addEventListener('input', () => {
-        const value = settingsUsernameInput.value.trim();
-        clearTimeout(settingsUsernameCheckTimer);
-
-        if (!currentUser || value.toLowerCase() === currentUser.username.toLowerCase()) {
-            settingsUsernameNote.style.color = '';
-            settingsUsernameNote.textContent = '';
-            return;
-        }
-        const formatErr = validateUsername(value);
-        if (!value) { settingsUsernameNote.textContent = ''; return; }
-        if (formatErr) {
-            settingsUsernameNote.style.color = '#ff5c8a';
-            settingsUsernameNote.textContent = formatErr;
-            return;
-        }
-
-        settingsUsernameNote.style.color = '';
-        settingsUsernameNote.textContent = 'Checking availability…';
-        const myToken = ++settingsUsernameCheckToken;
-        settingsUsernameCheckTimer = setTimeout(async () => {
-            try {
-                const data = await callAccountAPI({ action: 'check_username', username: value });
-                if (myToken !== settingsUsernameCheckToken) return;
-                settingsUsernameNote.style.color = data.available ? '#3ddc84' : '#ff5c8a';
-                settingsUsernameNote.textContent = data.available ? 'Username is available' : 'Username is already taken';
-            } catch {
-                if (myToken !== settingsUsernameCheckToken) return;
-                settingsUsernameNote.textContent = '';
-            }
-        }, 450);
-    });
-
-    // ---- Username change (max once every 7 days) ----
-    settingsChangeUsernameBtn.onclick = async () => {
-        const newUsername = settingsUsernameInput.value.trim();
-        if (newUsername === currentUser.username) return;
-        const err = validateUsername(newUsername);
-        if (err) { settingsUsernameNote.textContent = err; settingsUsernameNote.style.color = '#ff5c8a'; return; }
-
-        settingsChangeUsernameBtn.disabled = true;
-        try {
-            const data = await callAccountAPI({ action: 'update_username', token: authToken, newUsername });
-            currentUser.username = data.profile.username;
-            settingsProfileName.textContent = currentUser.username;
-            settingsUsernameNote.style.color = '';
-            settingsUsernameNote.textContent = "Username updated! You can change it again in 7 days.";
-        } catch (e2) {
-            settingsUsernameNote.style.color = '#ff5c8a';
-            settingsUsernameNote.textContent = e2.message;
-        } finally {
-            settingsChangeUsernameBtn.disabled = false;
-        }
-    };
 
     // ---- Kobi identity verification gate ----
     // Anyone can *say* "I'm Kobi" in a chat message, and a model can be
@@ -1701,15 +888,12 @@ There are two separate TikTok accounts — keep them straight and always spell t
 - This applies even to arithmetic that looks quick or trivial (e.g. "297 + 973 * 93"). Do not skip the explanation just because you could give the number in one line — walk through the order of operations (PEMDAS/BODMAS) step by step, then give the final result. Never reply with only the final number while study mode is on.`;
 
     function buildSystemPrompt() {
-        const customPersonality = localStorage.getItem(storageKey('luba_system_prompt')) || defaultPersonality;
+        const customPersonality = localStorage.getItem('luba_system_prompt') || defaultPersonality;
         const identityBlock = isVerifiedKobi
             ? CORE_IDENTITY + "\n\n" + USER_PROFILE
             : CORE_IDENTITY + "\n\n" + UNVERIFIED_NOTE;
         const studyBlock = isStudyModeOn ? "\n\n" + STUDY_MODE_INSTRUCTIONS : "";
-        const usernameBlock = currentUser
-            ? `\n\nThe person you're talking to is logged in with the username "${currentUser.username}". Call them by that name (in greetings, when addressing them directly, etc) — unless they're verified as Kobi, in which case just call them Kobi as usual.`
-            : "";
-        return identityBlock + usernameBlock + "\n\n" + customPersonality + studyBlock;
+        return identityBlock + "\n\n" + customPersonality + studyBlock;
     }
 
     const aiAvatarHTML = `
@@ -1720,19 +904,11 @@ There are two separate TikTok accounts — keep them straight and always spell t
         </svg>
     `;
 
-    systemPromptInput.value = localStorage.getItem(storageKey('luba_system_prompt')) || defaultPersonality;
-    if (localStorage.getItem(storageKey('luba_theme')) === 'light') document.body.classList.add('light');
+    systemPromptInput.value = localStorage.getItem('luba_system_prompt') || defaultPersonality;
+    if (localStorage.getItem('luba_theme') === 'light') document.body.classList.add('light');
 
     window.addEventListener('DOMContentLoaded', () => {
-        showAuthLoading(true);
-        attemptResumeSession();
-    });
-
-    // Runs once someone is actually logged in — loads their saved chat (or
-    // starts a fresh greeting) and shows the app. Previously this ran
-    // unconditionally on page load; now it's gated behind auth.
-    function initChatUI() {
-        const saved = localStorage.getItem(storageKey('luba_chat_history'));
+        const saved = localStorage.getItem('luba_chat_history');
         if (saved) {
             try {
                 chatHistory = JSON.parse(saved);
@@ -1743,7 +919,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
         } else {
             initDefaultChat();
         }
-    }
+    });
 
     function initDefaultChat() {
         appendMessage('ai', "Hey! I'm Luba AI 😎 How can I help you today?");
@@ -1766,7 +942,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
             chatHistory = chatHistory.slice(-30);
         }
         try {
-            localStorage.setItem(storageKey('luba_chat_history'), JSON.stringify(chatHistory));
+            localStorage.setItem('luba_chat_history', JSON.stringify(chatHistory));
         } catch (err) {
             // Most likely a quota-exceeded error from large embedded base64
             // images (localStorage has a size cap). Trim the oldest messages
@@ -1776,7 +952,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
             while (trimmed.length > 4) {
                 trimmed = trimmed.slice(4);
                 try {
-                    localStorage.setItem(storageKey('luba_chat_history'), JSON.stringify(trimmed));
+                    localStorage.setItem('luba_chat_history', JSON.stringify(trimmed));
                     chatHistory = trimmed;
                     return;
                 } catch (err2) {
@@ -1819,12 +995,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
-        if (sender === 'user') {
-            const pic = (currentUser && currentUser.avatarDataUrl) ? currentUser.avatarDataUrl : DEFAULT_AVATAR;
-            avatar.innerHTML = `<img src="${pic}" alt="You">`;
-        } else {
-            avatar.innerHTML = aiAvatarHTML;
-        }
+        avatar.innerHTML = sender === 'user' ? 'U' : aiAvatarHTML;
 
         const body = document.createElement('div');
         body.className = 'message-body';
@@ -1877,10 +1048,9 @@ There are two separate TikTok accounts — keep them straight and always spell t
             <div class="avatar">${aiAvatarHTML}</div>
             <div class="message-body">
                 <div class="content">
-                    <span class="thinking-text">Luba is thinking</span>
-                    <span class="thinking-dots typing">
+                    <div class="typing">
                         <span></span><span></span><span></span>
-                    </span>
+                    </div>
                 </div>
             </div>`;
         chatContainer.appendChild(div);
@@ -1894,14 +1064,14 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
     themeBtn.onclick = () => {
         document.body.classList.toggle('light');
-        localStorage.setItem(storageKey('luba_theme'), document.body.classList.contains('light') ? 'light' : 'dark');
+        localStorage.setItem('luba_theme', document.body.classList.contains('light') ? 'light' : 'dark');
     };
 
     studyModeBtn.classList.toggle('active', isStudyModeOn);
 
     studyModeBtn.onclick = () => {
         isStudyModeOn = !isStudyModeOn;
-        localStorage.setItem(storageKey('luba_study_mode'), isStudyModeOn ? 'true' : 'false');
+        localStorage.setItem('luba_study_mode', isStudyModeOn ? 'true' : 'false');
         studyModeBtn.classList.toggle('active', isStudyModeOn);
 
         const msg = isStudyModeOn
@@ -1928,7 +1098,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
     function getSavedChats() {
         try {
-            return JSON.parse(localStorage.getItem(storageKey('luba_saved_chats')) || '[]');
+            return JSON.parse(localStorage.getItem('luba_saved_chats') || '[]');
         } catch {
             return [];
         }
@@ -1936,7 +1106,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
     function setSavedChats(list) {
         try {
-            localStorage.setItem(storageKey('luba_saved_chats'), JSON.stringify(list));
+            localStorage.setItem('luba_saved_chats', JSON.stringify(list));
         } catch (err) {
             alert("Couldn't save — storage is full. Try deleting an old saved chat first.");
         }
@@ -2099,12 +1269,12 @@ There are two separate TikTok accounts — keep them straight and always spell t
     }
 
     openSettingsBtn.onclick = () => {
-        systemPromptInput.value = localStorage.getItem(storageKey('luba_system_prompt')) || defaultPersonality;
+        systemPromptInput.value = localStorage.getItem('luba_system_prompt') || defaultPersonality;
         modalOverlay.style.display = 'flex';
     };
     closeSettingsBtn.onclick = () => modalOverlay.style.display = 'none';
     saveSettingsBtn.onclick = () => {
-        localStorage.setItem(storageKey('luba_system_prompt'), systemPromptInput.value.trim() || defaultPersonality);
+        localStorage.setItem('luba_system_prompt', systemPromptInput.value.trim() || defaultPersonality);
         modalOverlay.style.display = 'none';
         alert('Settings saved!');
     };
@@ -2398,4 +1568,87 @@ There are two separate TikTok accounts — keep them straight and always spell t
                         } else {
                             result = { result: "Error: unknown tool." };
                         }
-                        responseParts.push({ 
+                        responseParts.push({ functionResponse: { name, response: result } });
+                    }
+                    contents.push({ role: "user", parts: responseParts });
+                    continue; // ask the model again with real results in hand
+                }
+
+                accumulatedText += parts.map(p => p.text || "").join("");
+
+                // Gemini reports finishReason "MAX_TOKENS" when the output got cut
+                // off purely because of the length cap (not because the model was
+                // actually done). In that case, automatically ask it to keep going
+                // from exactly where it stopped instead of leaving a truncated reply.
+                const wasCutOff = candidate?.finishReason === "MAX_TOKENS";
+                if (wasCutOff && continueCount < MAX_CONTINUES) {
+                    continueCount++;
+                    contents.push({ role: "model", parts });
+                    contents.push({
+                        role: "user",
+                        parts: [{ text: "Continue your previous answer exactly where you left off. Do not repeat anything you already said, and do not add any preamble like \"continuing...\" — just pick back up mid-thought and keep going to the end." }]
+                    });
+                    continue;
+                }
+
+                reply = accumulatedText;
+                break;
+            }
+
+            removeTyping();
+
+            if (reply == null) {
+                reply = "Sorry, something went wrong.";
+            }
+            // Strip plain markdown noise (bold markers, backticks, heading
+            // hashes) but deliberately leave underscores/asterisks alone —
+            // LaTeX math needs them (x_1 for subscripts, a*b for
+            // multiplication, x^2 etc), and stripping them blindly broke
+            // math rendering.
+            reply = reply
+                .replace(/\*\*(.+?)\*\*/g, '$1')
+                .replace(/[`]/g, '')
+                .replace(/^#{1,6}\s*/gm, '');
+
+            const hasImages = generatedImageUrls.length > 0;
+            const displayReply = hasImages
+                ? reply + generatedImageUrls.map(u => `\n\n${buildGeneratedImageHTML(u)}`).join('')
+                : reply;
+            appendMessage('ai', displayReply, getTime(), hasImages);
+
+            // IMPORTANT: content stays plain text (what gets sent back to the
+            // AI as conversation context on future turns, and what stays
+            // reasonably sized in localStorage). displayHtml carries the
+            // actual <img> markup so the photo/generated picture is still
+            // there after closing and reopening the app — previously only
+            // the plain caption was saved here, which is why photos vanished
+            // on reload.
+            chatHistory.push({
+                role: "user",
+                content: text || "(sent a photo)",
+                time,
+                displayHtml: imageToSend ? display : null,
+                isHtml: !!imageToSend
+            });
+            chatHistory.push({
+                role: "assistant",
+                content: reply,
+                time: getTime(),
+                displayHtml: hasImages ? displayReply : null,
+                isHtml: hasImages
+            });
+            saveChat();
+        } catch (err) {
+            removeTyping();
+            appendMessage('ai', "Network error: " + err.message, getTime());
+        } finally {
+            // The photo attachment/preview was already cleared right after
+            // sending (see above) — nothing image-related to reset here.
+            sendBtn.disabled = false;
+            studyModeBtn.disabled = false;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+</script>
+</body>
+</html>
