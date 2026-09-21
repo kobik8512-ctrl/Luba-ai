@@ -56,58 +56,82 @@
         }
 
         header {
-            padding: 12px 16px;
+            padding: 8px 10px;
             background-color: var(--header);
             display: flex;
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid var(--border);
-            gap: 8px;
+            gap: 6px;
+            flex-shrink: 0;
+            min-height: 52px;
+            box-sizing: border-box;
         }
 
         .brand-container {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            min-width: 0;
+            flex: 1 1 auto;
         }
 
         .logo-icon {
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
             filter: drop-shadow(0 0 8px rgba(255, 0, 127, 0.45));
         }
 
         .logo {
-            font-size: 1.3rem;
+            font-size: 1.1rem;
             font-weight: bold;
             background: linear-gradient(75deg, #ff007f, #9b51e0, #00d2ff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .header-actions {
             display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            gap: 5px;
             justify-content: flex-end;
             align-items: center;
+            flex: 0 0 auto;
         }
 
         .icon-btn {
             background: #282a2c;
             border: 1px solid #444746;
             color: #fff;
-            padding: 8px 12px;
-            border-radius: 18px;
-            font-size: 13px;
+            padding: 0 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
             cursor: pointer;
-            display: flex;
+            display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 5px;
             transition: background 0.2s;
+            height: 36px;
+            min-width: 36px;
+            box-sizing: border-box;
+            flex-shrink: 0;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
             user-select: none;
+            white-space: nowrap;
+        }
+
+        /* Icon-only buttons (bookmark, trash, settings) stay square-ish */
+        .header-actions > .icon-btn:not(#modes-btn) {
+            width: 36px;
+            padding: 0;
         }
 
         body.light .icon-btn {
@@ -463,6 +487,21 @@
             background: #555;
             color: #999;
             cursor: not-allowed;
+        }
+
+        .send-btn.stop-mode {
+            background: #c62828;
+            color: #fff;
+            cursor: pointer;
+        }
+        .send-btn.stop-mode:hover {
+            background: #a01f1f;
+        }
+        .send-btn.stop-mode:disabled {
+            background: #c62828;
+            color: #fff;
+            opacity: 0.9;
+            cursor: pointer;
         }
 
         /* --- Improved thinking indicator --- */
@@ -945,6 +984,107 @@
             opacity: 1;
         }
 
+        .code-preview-wrap {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #0d0d0e;
+        }
+        .code-preview-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid var(--border);
+        }
+        .code-preview-frame {
+            width: 100%;
+            height: 320px;
+            border: none;
+            display: block;
+            background: #111;
+        }
+        .code-preview-source, .code-block {
+            margin: 0;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 240px;
+            background: #0a0a0b;
+        }
+        .ai-text {
+            margin: 4px 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .modes-wrap {
+            position: relative;
+            flex-shrink: 0;
+        }
+        #modes-btn {
+            padding: 0 12px !important;
+            width: auto !important;
+            min-width: 0;
+            max-width: 120px;
+        }
+        #modes-btn-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .modes-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 240px;
+            background: var(--header);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 6px;
+            z-index: 80;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+        }
+        .modes-menu.open {
+            display: block;
+        }
+        .modes-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .modes-item:hover {
+            background: rgba(255, 0, 127, 0.08);
+        }
+        .modes-item.active {
+            background: rgba(255, 0, 127, 0.15);
+            border: 1px solid rgba(255, 0, 127, 0.35);
+        }
+        .modes-item-title {
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .modes-item-desc {
+            font-size: 11px;
+            opacity: 0.6;
+        }
+
         .auth-submit {
             background: var(--accent);
             color: #fff;
@@ -1166,7 +1306,31 @@
     </div>
     <div class="header-actions">
         <button class="icon-btn" id="export-btn" title="Saved Chats"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v16l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg></button>
-        <button class="icon-btn" id="study-mode-btn" title="Study Mode: explains step-by-step instead of just giving the answer"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 10-10-5L2 10l10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Study</button>
+        <div class="modes-wrap" id="modes-wrap">
+            <button class="icon-btn" id="modes-btn" title="Modes"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 10-10-5L2 10l10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> <span id="modes-btn-label">Modes</span></button>
+            <div class="modes-menu" id="modes-menu">
+                <button type="button" class="modes-item active" data-mode="normal">
+                    <span class="modes-item-title">Normal</span>
+                    <span class="modes-item-desc">Default helpful chat</span>
+                </button>
+                <button type="button" class="modes-item" data-mode="study">
+                    <span class="modes-item-title">Study</span>
+                    <span class="modes-item-desc">Step-by-step teaching, not just answers</span>
+                </button>
+                <button type="button" class="modes-item" data-mode="html">
+                    <span class="modes-item-title">HTML</span>
+                    <span class="modes-item-desc">Full single-file pages you can run</span>
+                </button>
+                <button type="button" class="modes-item" data-mode="code">
+                    <span class="modes-item-title">Code</span>
+                    <span class="modes-item-desc">Complete working programs, any language</span>
+                </button>
+                <button type="button" class="modes-item" data-mode="creative">
+                    <span class="modes-item-title">Creative</span>
+                    <span class="modes-item-desc">Stories, ideas, fun writing</span>
+                </button>
+            </div>
+        </div>
         <button class="icon-btn" id="clear-chat-btn" title="Clear chat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
         <button class="icon-btn" id="open-settings-btn" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
@@ -1297,7 +1461,10 @@
     const themeBtn = document.getElementById('theme-btn');
     const exportBtn = document.getElementById('export-btn');
     const micBtn = document.getElementById('mic-btn');
-    const studyModeBtn = document.getElementById('study-mode-btn');
+    const modesBtn = document.getElementById('modes-btn');
+    const modesMenu = document.getElementById('modes-menu');
+    const modesBtnLabel = document.getElementById('modes-btn-label');
+    const studyModeBtn = modesBtn; // alias so older disable logic still works
 
     // Auth
     const tabLogin = document.getElementById('tab-login');
@@ -1335,7 +1502,8 @@
     let chatHistory = [];
     let selectedImageBase64 = null;
     let isListening = false;
-    let isStudyModeOn = false;
+    let activeMode = 'normal'; // normal | study | html | code | creative
+    let isStudyModeOn = false; // kept in sync with activeMode === 'study'
     let pendingAvatarBase64 = null;  // temporary while editing in settings
 
     // ---- Backend ----
@@ -1935,8 +2103,9 @@
 
         // restore prefs
         const prefs = loadUserPrefs(user.username);
-        isStudyModeOn = !!prefs.studyMode;
-        if (studyModeBtn) studyModeBtn.classList.toggle('active', isStudyModeOn);
+        activeMode = prefs.activeMode || (prefs.studyMode ? 'study' : 'normal');
+        if (!['normal', 'study', 'html', 'code', 'creative'].includes(activeMode)) activeMode = 'normal';
+        applyModeUI();
         if (prefs.theme === 'light') document.body.classList.add('light');
         else document.body.classList.remove('light');
 
@@ -2168,7 +2337,11 @@ There are two separate TikTok accounts — keep them straight and always spell t
 - Kobi's own TikTok username is @itzrealkobl. If someone asks for Kobi's TikTok, his username, or "your creator's TikTok," answer with @itzrealkobl.
 - Your (Luba AI's) own TikTok username is @luba_ai — note the underscore between "luba" and "ai". If someone asks for your TikTok, or Luba AI's TikTok, answer with @luba_ai (never "lubaai" without the underscore, and never Kobi's account).`;
 
-    const defaultPersonality = `You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it. For any math, equations, or formulas, always write them using LaTeX: $...$ for inline math and $$...$$ for a bigger displayed equation on its own line. The app automatically renders this as proper math symbols (fractions, summations, square roots, exponents, etc), so always use real LaTeX rather than typing math out with plain slashes, carets, or parentheses.`;
+    const defaultPersonality = `You are a friendly, helpful, and slightly playful AI assistant. Use emojis sometimes to make the conversation fun. Keep answers clear and natural. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it. For any math, equations, or formulas, always write them using LaTeX: $...$ for inline math and $$...$$ for a bigger displayed equation on its own line. The app automatically renders this as proper math symbols (fractions, summations, square roots, exponents, etc), so always use real LaTeX rather than typing math out with plain slashes, carets, or parentheses.
+
+When the user asks for interactive demos, games, 3D models they can rotate, animations, or anything that should RUN in a browser: reply with ONE complete single-file HTML document inside a markdown code block labeled html (opening fence must be three backticks then the word html). The file must work alone — include libraries via CDN (three.js from https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js is fine). Polished result: dark background, short on-screen instructions, pointer drag to rotate, scroll to zoom. Do NOT dump bare JavaScript fragments, partial scripts, or assembly steps.
+
+For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be attached with correct positions so nothing floats or disconnects (e.g. chair legs touch the seat underside, backrest connects to the seat). Use simple box/cylinder meshes with consistent sizes. Never leave orphan meshes. Never put the word "html" or code labels as 3D text in the scene.`;
 
     const STUDY_MODE_INSTRUCTIONS = `STUDY MODE IS CURRENTLY ON. The user turned on a tutoring mode, and it changes how you answer any homework-style or "figure this out" question (math, science, coding, language, history, anything learnable) until they turn it off:
 - Do not just hand over a short final answer with no explanation.
@@ -2180,6 +2353,50 @@ There are two separate TikTok accounts — keep them straight and always spell t
 - Stay focused and as concise as you can while still being genuinely clear — thorough, not padded with filler.
 - Keep using LaTeX ($...$ / $$...$$) for any math exactly as usual.
 - This applies even to arithmetic that looks quick or trivial (e.g. "297 + 973 * 93"). Do not skip the explanation just because you could give the number in one line — walk through the order of operations (PEMDAS/BODMAS) step by step, then give the final result. Never reply with only the final number while study mode is on.`;
+
+    const HTML_MODE_INSTRUCTIONS = `HTML MODE IS CURRENTLY ON. The user wants almost every useful answer delivered as runnable web code:
+- Prefer ONE complete single-file HTML document in a markdown code block labeled html (three backticks then html).
+- Everything needed must be in that one file: HTML, CSS, and JS together. Use CDN links for libraries (three.js, etc.) when useful.
+- Make it polished and actually work: layout, colors, mobile-friendly when reasonable, clear on-screen instructions for interactive demos.
+- For 3D: one Group, all parts connected (no floating legs), drag to rotate, scroll to zoom.
+- Do not dump partial JS snippets or multi-file projects. Short intro line, then the full HTML block.
+- If the question is pure chat with no build request, still answer normally but offer an HTML version when it fits.`;
+
+    const CODE_MODE_INSTRUCTIONS = `CODE MODE IS CURRENTLY ON. Focus on complete, working code:
+- Give full runnable programs or full files, not fragments the user has to glue together.
+- State the language clearly and put code in a proper markdown fence.
+- Include brief setup notes only when needed (how to run). Prefer copy-paste-ready output.
+- Fix errors carefully; explain only the important parts, not every line unless asked.`;
+
+    const CREATIVE_MODE_INSTRUCTIONS = `CREATIVE MODE IS CURRENTLY ON. Lean into imagination:
+- Stories, characters, world-building, jokes, brainstorming, and vivid descriptions are welcome.
+- Be expressive and fun while staying coherent.
+- Still follow safety and identity rules.`;
+
+    function modeInstructions(mode) {
+        if (mode === 'study') return STUDY_MODE_INSTRUCTIONS;
+        if (mode === 'html') return HTML_MODE_INSTRUCTIONS;
+        if (mode === 'code') return CODE_MODE_INSTRUCTIONS;
+        if (mode === 'creative') return CREATIVE_MODE_INSTRUCTIONS;
+        return '';
+    }
+
+    function modeLabel(mode) {
+        if (mode === 'study') return 'Study';
+        if (mode === 'html') return 'HTML';
+        if (mode === 'code') return 'Code';
+        if (mode === 'creative') return 'Creative';
+        return 'Modes';
+    }
+
+    function applyModeUI() {
+        isStudyModeOn = activeMode === 'study';
+        if (modesBtn) modesBtn.classList.toggle('active', activeMode !== 'normal');
+        if (modesBtnLabel) modesBtnLabel.textContent = modeLabel(activeMode);
+        document.querySelectorAll('.modes-item').forEach(el => {
+            el.classList.toggle('active', el.getAttribute('data-mode') === activeMode);
+        });
+    }
 
     function buildSystemPrompt() {
         const customPersonality = (currentUser && loadUserPrefs(currentUser.username).systemPrompt) || localStorage.getItem('luba_system_prompt') || defaultPersonality;
@@ -2199,8 +2416,8 @@ There are two separate TikTok accounts — keep them straight and always spell t
             }
         }
 
-        const studyBlock = isStudyModeOn ? "\n\n" + STUDY_MODE_INSTRUCTIONS : "";
-        return identityBlock + nameBlock + "\n\n" + customPersonality + studyBlock;
+        const modeBlock = modeInstructions(activeMode);
+        return identityBlock + nameBlock + "\n\n" + customPersonality + (modeBlock ? "\n\n" + modeBlock : "");
     }
 
     const aiAvatarHTML = `
@@ -2233,6 +2450,63 @@ There are two separate TikTok accounts — keep them straight and always spell t
             });
         } catch (err) {}
     }
+
+    function escapeHtmlText(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    // Turn AI markdown code fences into readable blocks + live HTML preview when possible
+    function formatAiReplyHtml(text) {
+        const raw = String(text || '');
+        const fenceRe = /```(\w*)\r?\n([\s\S]*?)```/g;
+        let hasCode = false;
+        let last = 0;
+        let html = '';
+        let m;
+        while ((m = fenceRe.exec(raw)) !== null) {
+            hasCode = true;
+            const before = raw.slice(last, m.index);
+            if (before) html += '<div class="ai-text">' + escapeHtmlText(before).replace(/\n/g, '<br>') + '</div>';
+            const lang = (m[1] || '').toLowerCase();
+            let code = m[2].replace(/^\n/, '').replace(/\n$/, '');
+            // If model forgot <!DOCTYPE> but started with <html>, still treat as page
+            const looksLikePage = lang === 'html' || lang === 'htm' ||
+                /<!DOCTYPE\s+html/i.test(code) || /<html[\s>]/i.test(code);
+            if (looksLikePage) {
+                const srcdoc = code.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                html += `<div class="code-preview-wrap">
+                    <div class="code-preview-bar">
+                        <span>Interactive preview</span>
+                        <button type="button" class="small-btn" onclick="toggleCodeSource(this)">Show code</button>
+                    </div>
+                    <iframe class="code-preview-frame" sandbox="allow-scripts allow-same-origin" srcdoc="${srcdoc}"></iframe>
+                    <pre class="code-preview-source" style="display:none"><code>${escapeHtmlText(code)}</code></pre>
+                </div>`;
+            } else {
+                html += `<pre class="code-block"><code>${escapeHtmlText(code)}</code></pre>`;
+            }
+            last = m.index + m[0].length;
+        }
+        const tail = raw.slice(last);
+        if (tail) {
+            if (hasCode) html += '<div class="ai-text">' + escapeHtmlText(tail).replace(/\n/g, '<br>') + '</div>';
+            else return { html: raw, hasCode: false };
+        }
+        return { html: hasCode ? html : raw, hasCode };
+    }
+
+    window.toggleCodeSource = function (btn) {
+        const wrap = btn.closest('.code-preview-wrap');
+        if (!wrap) return;
+        const src = wrap.querySelector('.code-preview-source');
+        if (!src) return;
+        const show = src.style.display === 'none';
+        src.style.display = show ? 'block' : 'none';
+        btn.textContent = show ? 'Hide code' : 'Show code';
+    };
 
     function appendMessage(sender, text, time = null, isHtml = false) {
         const msgDiv = document.createElement('div');
@@ -2384,7 +2658,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
     });
 
     // ============================================================
-    // Theme + Study mode
+    // Theme + Modes menu
     // ============================================================
     themeBtn.onclick = () => {
         document.body.classList.toggle('light');
@@ -2395,22 +2669,45 @@ There are two separate TikTok accounts — keep them straight and always spell t
         }
     };
 
-    studyModeBtn.onclick = () => {
-        isStudyModeOn = !isStudyModeOn;
-        studyModeBtn.classList.toggle('active', isStudyModeOn);
-        if (currentUser) {
-            const prefs = loadUserPrefs(currentUser.username);
-            prefs.studyMode = isStudyModeOn;
-            saveUserPrefs(currentUser.username, prefs);
-        }
-        const msg = isStudyModeOn
-            ? "Study mode is ON — from now on I'll walk through explanations step by step instead of just giving you the answer."
-            : "Study mode is OFF — back to normal, straight-to-the-point answers.";
-        const t = getTime();
-        appendMessage('ai', msg, t);
-        chatHistory.push({ role: 'assistant', content: msg, time: t });
-        saveChat();
-    };
+    if (modesBtn && modesMenu) {
+        modesBtn.onclick = (e) => {
+            e.stopPropagation();
+            modesMenu.classList.toggle('open');
+        };
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#modes-wrap')) modesMenu.classList.remove('open');
+        });
+        modesMenu.querySelectorAll('.modes-item').forEach(item => {
+            item.onclick = () => {
+                const mode = item.getAttribute('data-mode') || 'normal';
+                if (mode === activeMode) {
+                    modesMenu.classList.remove('open');
+                    return;
+                }
+                activeMode = mode;
+                applyModeUI();
+                if (currentUser) {
+                    const prefs = loadUserPrefs(currentUser.username);
+                    prefs.activeMode = activeMode;
+                    prefs.studyMode = activeMode === 'study';
+                    saveUserPrefs(currentUser.username, prefs);
+                }
+                modesMenu.classList.remove('open');
+                const messages = {
+                    normal: 'Normal mode — regular helpful answers.',
+                    study: 'Study mode ON — I will teach step by step, not only give the answer.',
+                    html: 'HTML mode ON — I will focus on complete single-file HTML you can run and preview.',
+                    code: 'Code mode ON — complete working programs, not half-finished snippets.',
+                    creative: 'Creative mode ON — stories, ideas, and more imaginative writing.'
+                };
+                const msg = messages[activeMode] || messages.normal;
+                const t = getTime();
+                appendMessage('ai', msg, t);
+                chatHistory.push({ role: 'assistant', content: msg, time: t });
+                saveChat();
+            };
+        });
+    }
 
     // ============================================================
     // Saved chats (per user)
@@ -2988,8 +3285,38 @@ There are two separate TikTok accounts — keep them straight and always spell t
         return { mimeType: match[1], data: match[2] };
     }
 
+    let isGenerating = false;
+    let abortController = null;
+
+    function setSendButtonMode(mode) {
+        if (!sendBtn) return;
+        if (mode === 'stop') {
+            sendBtn.textContent = 'Stop';
+            sendBtn.classList.add('stop-mode');
+            sendBtn.disabled = false;
+            sendBtn.title = 'Stop generating';
+        } else {
+            sendBtn.textContent = 'Send';
+            sendBtn.classList.remove('stop-mode');
+            sendBtn.disabled = false;
+            sendBtn.title = 'Send';
+        }
+    }
+
+    function stopGeneration() {
+        if (!isGenerating || !abortController) return;
+        try { abortController.abort(); } catch (_) {}
+    }
+
     async function sendMessage() {
         if (!currentUser) return;
+
+        // If already generating, treat click as Stop
+        if (isGenerating) {
+            stopGeneration();
+            return;
+        }
+
         const text = userInput.value.trim();
         if (!text && !selectedImageBase64) return;
 
@@ -3034,8 +3361,10 @@ There are two separate TikTok accounts — keep them straight and always spell t
         imageInputEl.value = '';
 
         userInput.value = '';
-        sendBtn.disabled = true;
-        studyModeBtn.disabled = true;
+        isGenerating = true;
+        abortController = new AbortController();
+        setSendButtonMode('stop');
+        if (studyModeBtn) studyModeBtn.disabled = true;
         showTyping();
 
         const systemPrompt = buildSystemPrompt();
@@ -3057,6 +3386,7 @@ There are two separate TikTok accounts — keep them straight and always spell t
         const modelChain = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.0-flash"];
         let modelIndex = 0;
         let model = modelChain[modelIndex];
+        let userStopped = false;
 
         try {
             let reply = null;
@@ -3067,6 +3397,10 @@ There are two separate TikTok accounts — keep them straight and always spell t
             const generatedImageUrls = [];
 
             while (guard < 16) {
+                if (abortController.signal.aborted) {
+                    userStopped = true;
+                    break;
+                }
                 guard++;
 
                 const payload = {
@@ -3081,7 +3415,8 @@ There are two separate TikTok accounts — keep them straight and always spell t
                 const res = await fetch(WORKER_URL, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ model, payload })
+                    body: JSON.stringify({ model, payload }),
+                    signal: abortController.signal
                 });
 
                 const data = await res.json();
@@ -3148,39 +3483,79 @@ There are two separate TikTok accounts — keep them straight and always spell t
 
             removeTyping();
 
-            if (reply == null) reply = "Sorry, something went wrong.";
-            reply = reply
-                .replace(/\*\*(.+?)\*\*/g, '$1')
-                .replace(/[`]/g, '')
-                .replace(/^#{1,6}\s*/gm, '');
+            if (userStopped || abortController.signal.aborted) {
+                const stopMsg = "You stopped the reply.";
+                appendMessage('ai', stopMsg, getTime());
+                chatHistory.push({
+                    role: "user",
+                    content: text || "(sent a photo)",
+                    time,
+                    displayHtml: imageToSend ? display : null,
+                    isHtml: !!imageToSend
+                });
+                chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
+                saveChat();
+            } else {
+                if (reply == null) reply = "Sorry, something went wrong.";
+                // Light cleanup only — do NOT strip backticks (that destroyed HTML/JS code blocks)
+                reply = reply
+                    .replace(/\*\*(.+?)\*\*/g, '$1')
+                    .replace(/^#{1,6}\s*/gm, '');
 
-            const hasImages = generatedImageUrls.length > 0;
-            const displayReply = hasImages
-                ? reply + generatedImageUrls.map(u => `\n\n${buildGeneratedImageHTML(u)}`).join('')
-                : reply;
-            appendMessage('ai', displayReply, getTime(), hasImages);
+                const hasImages = generatedImageUrls.length > 0;
+                const formatted = formatAiReplyHtml(reply);
+                let displayReply;
+                if (formatted.hasCode) {
+                    displayReply = formatted.html;
+                } else if (hasImages) {
+                    displayReply = '<div class="ai-text">' + escapeHtmlText(reply).replace(/\n/g, '<br>') + '</div>';
+                } else {
+                    displayReply = reply;
+                }
+                if (hasImages) {
+                    displayReply += generatedImageUrls.map(u => buildGeneratedImageHTML(u)).join('');
+                }
+                const useHtml = hasImages || formatted.hasCode;
+                appendMessage('ai', displayReply, getTime(), useHtml);
 
-            chatHistory.push({
-                role: "user",
-                content: text || "(sent a photo)",
-                time,
-                displayHtml: imageToSend ? display : null,
-                isHtml: !!imageToSend
-            });
-            chatHistory.push({
-                role: "assistant",
-                content: reply,
-                time: getTime(),
-                displayHtml: hasImages ? displayReply : null,
-                isHtml: hasImages
-            });
-            saveChat();
+                chatHistory.push({
+                    role: "user",
+                    content: text || "(sent a photo)",
+                    time,
+                    displayHtml: imageToSend ? display : null,
+                    isHtml: !!imageToSend
+                });
+                chatHistory.push({
+                    role: "assistant",
+                    content: reply,
+                    time: getTime(),
+                    displayHtml: useHtml ? displayReply : null,
+                    isHtml: useHtml
+                });
+                saveChat();
+            }
         } catch (err) {
             removeTyping();
-            appendMessage('ai', "Network error: " + err.message, getTime());
+            if (err && (err.name === 'AbortError' || abortController?.signal?.aborted)) {
+                const stopMsg = "You stopped the reply.";
+                appendMessage('ai', stopMsg, getTime());
+                chatHistory.push({
+                    role: "user",
+                    content: text || "(sent a photo)",
+                    time,
+                    displayHtml: imageToSend ? display : null,
+                    isHtml: !!imageToSend
+                });
+                chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
+                saveChat();
+            } else {
+                appendMessage('ai', "Network error: " + (err && err.message ? err.message : "unknown"), getTime());
+            }
         } finally {
-            sendBtn.disabled = false;
-            studyModeBtn.disabled = false;
+            isGenerating = false;
+            abortController = null;
+            setSendButtonMode('send');
+            if (studyModeBtn) studyModeBtn.disabled = false;
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     }
