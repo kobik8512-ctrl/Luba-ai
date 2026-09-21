@@ -391,13 +391,26 @@
             display: none;
             position: relative;
             margin-bottom: 4px;
-            max-width: 180px;
+            max-width: 220px;
         }
 
-        #image-preview img {
+        #image-preview img,
+        #image-preview video {
             max-width: 100%;
+            max-height: 180px;
             border-radius: 12px;
             border: 1px solid var(--border);
+            display: block;
+            background: #000;
+        }
+
+        .content video {
+            max-width: 100%;
+            max-height: 280px;
+            border-radius: 8px;
+            margin-top: 8px;
+            display: block;
+            background: #000;
         }
 
         #remove-image {
@@ -504,18 +517,53 @@
             cursor: pointer;
         }
 
-        /* --- Improved thinking indicator --- */
+        /* --- Thinking indicator: bubble hugs the text, no empty space --- */
+        #typing-indicator .message-body {
+            max-width: none;
+        }
+        #typing-indicator .content {
+            display: inline-flex;
+            width: auto;
+            max-width: 100%;
+            padding: 10px 14px;
+            min-height: 0;
+        }
         .thinking-bubble {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 10px;
-            padding: 4px 0;
+            gap: 8px;
+            padding: 0;
+            margin: 0;
+            line-height: 1.3;
         }
 
         .thinking-text {
             font-size: 14px;
-            opacity: 0.85;
+            opacity: 0.9;
             letter-spacing: 0.2px;
+            line-height: 1.3;
+            white-space: nowrap;
+        }
+
+        .error-retry-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .retry-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .retry-btn:hover {
+            background: #e00070;
         }
 
         .thinking-dots {
@@ -1340,13 +1388,14 @@
 
 <div id="input-wrapper">
     <div id="image-preview">
-        <img id="preview-img" src="" alt="Selected">
+        <img id="preview-img" src="" alt="Selected" style="display:none">
+        <video id="preview-video" src="" controls playsinline style="display:none"></video>
         <button id="remove-image">×</button>
     </div>
     <div id="input-container">
-        <button class="action-btn" id="photo-btn" title="Photo"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        <button class="action-btn" id="photo-btn" title="Photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
         <button class="action-btn" id="mic-btn" title="Voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg></button>
-        <input type="file" id="image-input" accept="image/*" style="display:none">
+        <input type="file" id="image-input" accept="image/*,video/*" style="display:none">
         <textarea id="user-input" placeholder="Ask Luba AI something..."></textarea>
         <button class="send-btn" id="send-btn">Send</button>
     </div>
@@ -2816,21 +2865,60 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     };
 
     // ============================================================
-    // Image attachment
+    // Photo / video attachment
     // ============================================================
     let imageInputEl = imageInput;
+    const previewVideo = document.getElementById('preview-video');
+
+    function clearMediaPreview() {
+        selectedImageBase64 = null;
+        if (previewImg) {
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+        }
+        if (previewVideo) {
+            previewVideo.pause();
+            previewVideo.removeAttribute('src');
+            previewVideo.load();
+            previewVideo.style.display = 'none';
+        }
+        if (imagePreview) imagePreview.style.display = 'none';
+        if (imageInputEl) imageInputEl.value = '';
+    }
 
     function handleImageInputChange(e) {
         const file = e.target.files[0];
         if (!file) return;
-        if (file.size > 12 * 1024 * 1024) {
-            alert("Image too big (max 12MB)");
+        const isVideo = (file.type || '').startsWith('video/');
+        const isImage = (file.type || '').startsWith('image/');
+        if (!isVideo && !isImage) {
+            alert('Please choose a photo or video.');
+            return;
+        }
+        const maxBytes = isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024;
+        if (file.size > maxBytes) {
+            alert(isVideo ? 'Video too big (max 25MB)' : 'Image too big (max 12MB)');
             return;
         }
         const reader = new FileReader();
         reader.onload = ev => {
             selectedImageBase64 = ev.target.result;
-            previewImg.src = selectedImageBase64;
+            if (isVideo) {
+                if (previewImg) previewImg.style.display = 'none';
+                if (previewVideo) {
+                    previewVideo.src = selectedImageBase64;
+                    previewVideo.style.display = 'block';
+                }
+            } else {
+                if (previewVideo) {
+                    previewVideo.style.display = 'none';
+                    previewVideo.removeAttribute('src');
+                }
+                if (previewImg) {
+                    previewImg.src = selectedImageBase64;
+                    previewImg.style.display = 'block';
+                }
+            }
             imagePreview.style.display = 'block';
         };
         reader.readAsDataURL(file);
@@ -2847,9 +2935,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     imageInputEl.onchange = handleImageInputChange;
 
     removeImageBtn.onclick = () => {
-        selectedImageBase64 = null;
-        imagePreview.style.display = 'none';
-        imageInputEl.value = '';
+        clearMediaPreview();
     };
 
     // ============================================================
@@ -3287,6 +3373,26 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
     let isGenerating = false;
     let abortController = null;
+    // Last failed user message so Retry can resend
+    let lastFailedRequest = null; // { text, mediaBase64 }
+
+    function showErrorWithRetry(message) {
+        const safe = escapeHtmlText(message || 'Something went wrong.');
+        const html = `<div class="error-retry-wrap">
+            <div>${safe}</div>
+            <button type="button" class="retry-btn" onclick="window.retryLastLubaRequest && window.retryLastLubaRequest()">Retry</button>
+        </div>`;
+        appendMessage('ai', html, getTime(), true);
+    }
+
+    window.retryLastLubaRequest = function () {
+        if (isGenerating || !lastFailedRequest) return;
+        // Resend the same turn without adding another user bubble
+        sendMessage({
+            retryText: lastFailedRequest.text || '',
+            retryMedia: lastFailedRequest.mediaBase64 || null
+        });
+    };
 
     function setSendButtonMode(mode) {
         if (!sendBtn) return;
@@ -3308,7 +3414,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         try { abortController.abort(); } catch (_) {}
     }
 
-    async function sendMessage() {
+    async function sendMessage(opts) {
         if (!currentUser) return;
 
         // If already generating, treat click as Stop
@@ -3317,8 +3423,11 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             return;
         }
 
-        const text = userInput.value.trim();
-        if (!text && !selectedImageBase64) return;
+        const isRetry = !!(opts && (opts.retryText != null || opts.retryMedia != null));
+        const text = isRetry ? String(opts.retryText || '').trim() : userInput.value.trim();
+        const retryMedia = isRetry ? (opts.retryMedia || null) : null;
+        if (!isRetry && !text && !selectedImageBase64) return;
+        if (isRetry && !text && !retryMedia) return;
 
         // Kobi password challenge
         if (awaitingKobiPassword) {
@@ -3349,18 +3458,23 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         }
 
         const time = getTime();
-        const imageToSend = selectedImageBase64;
-        let display = text || "(sent a photo)";
+        const imageToSend = isRetry ? retryMedia : selectedImageBase64;
+        const mediaIsVideo = !!(imageToSend && /^data:video\//i.test(imageToSend));
+        let display = text || (imageToSend ? (mediaIsVideo ? "(sent a video)" : "(sent a photo)") : "");
         if (imageToSend) {
-            display = (text ? text + "\n\n" : "") + `<img src="${imageToSend}">`;
+            const mediaTag = mediaIsVideo
+                ? `<video src="${imageToSend}" controls playsinline></video>`
+                : `<img src="${imageToSend}">`;
+            display = (text ? text + "\n\n" : "") + mediaTag;
         }
-        appendMessage('user', display, time, !!imageToSend);
-
-        selectedImageBase64 = null;
-        imagePreview.style.display = 'none';
-        imageInputEl.value = '';
-
-        userInput.value = '';
+        // Retry does not add another user bubble
+        if (!isRetry) {
+            appendMessage('user', display, time, !!imageToSend);
+            clearMediaPreview();
+            if (userInput) userInput.value = '';
+        }
+        // Remember this turn for Retry if the API fails
+        lastFailedRequest = { text: text || '', mediaBase64: imageToSend || null };
         isGenerating = true;
         abortController = new AbortController();
         setSendButtonMode('stop');
@@ -3375,7 +3489,11 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             parts: [{ text: m.content }]
         }));
 
-        const currentParts = [{ text: text || (imageToSend ? "What do you see in this image?" : "") }];
+        const currentParts = [{
+            text: text || (imageToSend
+                ? (mediaIsVideo ? "Describe this video and what happens in it." : "What do you see in this image?")
+                : "")
+        }];
         if (imageToSend) {
             const { mimeType, data } = splitDataUrl(imageToSend);
             currentParts.push({ inlineData: { mimeType, data } });
@@ -3383,10 +3501,41 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         contents.push({ role: "user", parts: currentParts });
 
         const usingVision = !!imageToSend;
-        const modelChain = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.0-flash"];
+        // Fast models first. Remember last model that worked on this device.
+        const DEFAULT_MODELS = [
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-3.6-flash"
+        ];
+        let modelChain = DEFAULT_MODELS.slice();
+        try {
+            const lastGood = storageGet('luba_last_good_model');
+            if (lastGood && modelChain.includes(lastGood)) {
+                modelChain = [lastGood].concat(modelChain.filter(m => m !== lastGood));
+            }
+        } catch (_) {}
         let modelIndex = 0;
         let model = modelChain[modelIndex];
         let userStopped = false;
+
+        function fetchWithTimeout(url, options, ms) {
+            const timeoutCtrl = new AbortController();
+            const timer = setTimeout(() => timeoutCtrl.abort(), ms);
+            const parent = options.signal;
+            const onParentAbort = () => timeoutCtrl.abort();
+            if (parent) {
+                if (parent.aborted) timeoutCtrl.abort();
+                else parent.addEventListener('abort', onParentAbort, { once: true });
+            }
+            return fetch(url, { ...options, signal: timeoutCtrl.signal })
+                .finally(() => {
+                    clearTimeout(timer);
+                    if (parent) parent.removeEventListener('abort', onParentAbort);
+                });
+        }
 
         try {
             let reply = null;
@@ -3395,6 +3544,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             let continueCount = 0;
             const MAX_CONTINUES = 6;
             const generatedImageUrls = [];
+            const ATTEMPT_TIMEOUT_MS = 28000;
 
             while (guard < 16) {
                 if (abortController.signal.aborted) {
@@ -3406,24 +3556,41 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 const payload = {
                     contents,
                     systemInstruction: { parts: [{ text: systemPrompt }] },
-                    generationConfig: { temperature: 0.4, maxOutputTokens: 8192 }
+                    generationConfig: {
+                        temperature: 0.4,
+                        maxOutputTokens: 4096
+                    }
                 };
                 if (!usingVision) {
                     payload.tools = geminiTools;
                 }
 
-                const res = await fetch(WORKER_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ model, payload }),
-                    signal: abortController.signal
-                });
-
-                const data = await res.json();
+                let data;
+                try {
+                    const res = await fetchWithTimeout(WORKER_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ model, payload }),
+                        signal: abortController.signal
+                    }, ATTEMPT_TIMEOUT_MS);
+                    data = await res.json();
+                } catch (fetchErr) {
+                    if (abortController.signal.aborted) {
+                        userStopped = true;
+                        break;
+                    }
+                    // Timeout / network on this model → try next
+                    if (modelIndex < modelChain.length - 1) {
+                        modelIndex++;
+                        model = modelChain[modelIndex];
+                        continue;
+                    }
+                    throw fetchErr;
+                }
 
                 if (data.error) {
                     const msg = data.error.message || "";
-                    const isModelIssue = /not found|not supported|invalid model|does not exist/i.test(msg);
+                    const isModelIssue = /not found|not supported|invalid model|does not exist|no longer available/i.test(msg);
                     const isQuotaIssue = /quota|RESOURCE_EXHAUSTED|rate limit/i.test(msg);
 
                     if ((isModelIssue || isQuotaIssue) && modelIndex < modelChain.length - 1) {
@@ -3434,6 +3601,9 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                     reply = "Error: " + msg;
                     break;
                 }
+
+                // Cache working model so the next message is faster
+                try { storageSet('luba_last_good_model', model); } catch (_) {}
 
                 const candidate = data.candidates?.[0];
                 const parts = candidate?.content?.parts;
@@ -3484,11 +3654,12 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             removeTyping();
 
             if (userStopped || abortController.signal.aborted) {
+                lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
                 chatHistory.push({
                     role: "user",
-                    content: text || "(sent a photo)",
+                    content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
                     time,
                     displayHtml: imageToSend ? display : null,
                     isHtml: !!imageToSend
@@ -3497,51 +3668,68 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 saveChat();
             } else {
                 if (reply == null) reply = "Sorry, something went wrong.";
-                // Light cleanup only — do NOT strip backticks (that destroyed HTML/JS code blocks)
-                reply = reply
-                    .replace(/\*\*(.+?)\*\*/g, '$1')
-                    .replace(/^#{1,6}\s*/gm, '');
+                const isApiError = /^Error:/i.test(reply) || /high demand|try again later|RESOURCE_EXHAUSTED|rate limit|quota/i.test(reply);
 
-                const hasImages = generatedImageUrls.length > 0;
-                const formatted = formatAiReplyHtml(reply);
-                let displayReply;
-                if (formatted.hasCode) {
-                    displayReply = formatted.html;
-                } else if (hasImages) {
-                    displayReply = '<div class="ai-text">' + escapeHtmlText(reply).replace(/\n/g, '<br>') + '</div>';
+                if (isApiError) {
+                    showErrorWithRetry(reply);
+                    chatHistory.push({
+                        role: "user",
+                        content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
+                        time,
+                        displayHtml: imageToSend ? display : null,
+                        isHtml: !!imageToSend
+                    });
+                    chatHistory.push({ role: "assistant", content: reply, time: getTime() });
+                    saveChat();
                 } else {
-                    displayReply = reply;
-                }
-                if (hasImages) {
-                    displayReply += generatedImageUrls.map(u => buildGeneratedImageHTML(u)).join('');
-                }
-                const useHtml = hasImages || formatted.hasCode;
-                appendMessage('ai', displayReply, getTime(), useHtml);
+                    lastFailedRequest = null;
+                    // Light cleanup only — do NOT strip backticks
+                    reply = reply
+                        .replace(/\*\*(.+?)\*\*/g, '$1')
+                        .replace(/^#{1,6}\s*/gm, '');
 
-                chatHistory.push({
-                    role: "user",
-                    content: text || "(sent a photo)",
-                    time,
-                    displayHtml: imageToSend ? display : null,
-                    isHtml: !!imageToSend
-                });
-                chatHistory.push({
-                    role: "assistant",
-                    content: reply,
-                    time: getTime(),
-                    displayHtml: useHtml ? displayReply : null,
-                    isHtml: useHtml
-                });
-                saveChat();
+                    const hasImages = generatedImageUrls.length > 0;
+                    const formatted = formatAiReplyHtml(reply);
+                    let displayReply;
+                    if (formatted.hasCode) {
+                        displayReply = formatted.html;
+                    } else if (hasImages) {
+                        displayReply = '<div class="ai-text">' + escapeHtmlText(reply).replace(/\n/g, '<br>') + '</div>';
+                    } else {
+                        displayReply = reply;
+                    }
+                    if (hasImages) {
+                        displayReply += generatedImageUrls.map(u => buildGeneratedImageHTML(u)).join('');
+                    }
+                    const useHtml = hasImages || formatted.hasCode;
+                    appendMessage('ai', displayReply, getTime(), useHtml);
+
+                    chatHistory.push({
+                        role: "user",
+                        content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
+                        time,
+                        displayHtml: imageToSend ? display : null,
+                        isHtml: !!imageToSend
+                    });
+                    chatHistory.push({
+                        role: "assistant",
+                        content: reply,
+                        time: getTime(),
+                        displayHtml: useHtml ? displayReply : null,
+                        isHtml: useHtml
+                    });
+                    saveChat();
+                }
             }
         } catch (err) {
             removeTyping();
             if (err && (err.name === 'AbortError' || abortController?.signal?.aborted)) {
+                lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
                 chatHistory.push({
                     role: "user",
-                    content: text || "(sent a photo)",
+                    content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
                     time,
                     displayHtml: imageToSend ? display : null,
                     isHtml: !!imageToSend
@@ -3549,7 +3737,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
                 saveChat();
             } else {
-                appendMessage('ai', "Network error: " + (err && err.message ? err.message : "unknown"), getTime());
+                showErrorWithRetry("Network error: " + (err && err.message ? err.message : "unknown"));
             }
         } finally {
             isGenerating = false;
