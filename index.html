@@ -1043,11 +1043,22 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 8px;
             padding: 8px 10px;
             font-size: 12px;
             font-weight: 600;
             background: rgba(255,255,255,0.04);
             border-bottom: 1px solid var(--border);
+        }
+        .code-preview-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .code-preview-actions .small-btn {
+            font-size: 11px;
+            padding: 5px 10px;
+            white-space: nowrap;
         }
         .code-preview-frame {
             width: 100%;
@@ -1055,6 +1066,13 @@
             border: none;
             display: block;
             background: #111;
+        }
+        .code-block-wrap {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #0d0d0e;
         }
         .code-preview-source, .code-block {
             margin: 0;
@@ -2507,6 +2525,14 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             .replace(/>/g, '&gt;');
     }
 
+    // Store code so "Copy code" copies only the script, not the whole message
+    window.__lubaCodeStore = window.__lubaCodeStore || {};
+    function storeCodeBlock(code) {
+        const id = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+        window.__lubaCodeStore[id] = code;
+        return id;
+    }
+
     // Turn AI markdown code fences into readable blocks + live HTML preview when possible
     function formatAiReplyHtml(text) {
         const raw = String(text || '');
@@ -2521,6 +2547,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (before) html += '<div class="ai-text">' + escapeHtmlText(before).replace(/\n/g, '<br>') + '</div>';
             const lang = (m[1] || '').toLowerCase();
             let code = m[2].replace(/^\n/, '').replace(/\n$/, '');
+            const codeId = storeCodeBlock(code);
             // If model forgot <!DOCTYPE> but started with <html>, still treat as page
             const looksLikePage = lang === 'html' || lang === 'htm' ||
                 /<!DOCTYPE\s+html/i.test(code) || /<html[\s>]/i.test(code);
@@ -2529,13 +2556,22 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 html += `<div class="code-preview-wrap">
                     <div class="code-preview-bar">
                         <span>Interactive preview</span>
-                        <button type="button" class="small-btn" onclick="toggleCodeSource(this)">Show code</button>
+                        <div class="code-preview-actions">
+                            <button type="button" class="small-btn" onclick="toggleCodeSource(this)">Show code</button>
+                            <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy code</button>
+                        </div>
                     </div>
                     <iframe class="code-preview-frame" sandbox="allow-scripts allow-same-origin" srcdoc="${srcdoc}"></iframe>
                     <pre class="code-preview-source" style="display:none"><code>${escapeHtmlText(code)}</code></pre>
                 </div>`;
             } else {
-                html += `<pre class="code-block"><code>${escapeHtmlText(code)}</code></pre>`;
+                html += `<div class="code-block-wrap">
+                    <div class="code-preview-bar">
+                        <span>${escapeHtmlText(lang || 'code')}</span>
+                        <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy code</button>
+                    </div>
+                    <pre class="code-block"><code>${escapeHtmlText(code)}</code></pre>
+                </div>`;
             }
             last = m.index + m[0].length;
         }
@@ -2555,6 +2591,36 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         const show = src.style.display === 'none';
         src.style.display = show ? 'block' : 'none';
         btn.textContent = show ? 'Hide code' : 'Show code';
+    };
+
+    window.copyLubaCode = function (btn) {
+        const id = btn.getAttribute('data-code-id');
+        const code = (window.__lubaCodeStore && window.__lubaCodeStore[id]) || '';
+        if (!code) return;
+        const done = () => {
+            const old = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = old; }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code).then(done).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = code;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch (_) {}
+                ta.remove();
+                done();
+            });
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = code;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (_) {}
+            ta.remove();
+            done();
+        }
     };
 
     function appendMessage(sender, text, time = null, isHtml = false) {
