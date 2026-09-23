@@ -543,6 +543,7 @@
             letter-spacing: 0.2px;
             line-height: 1.3;
             white-space: nowrap;
+            transition: opacity 0.18s ease;
         }
 
         .error-retry-wrap {
@@ -2681,7 +2682,23 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         return msgDiv;
     }
 
+    let thinkingStatusTimer = null;
+
+    const THINKING_PHRASES = [
+        'Luba is thinking',
+        'Reading your message',
+        'Figuring out the best answer',
+        'Putting ideas together',
+        'Checking a few angles',
+        'Almost there',
+        'Crafting a reply',
+        'Double-checking the details',
+        'Connecting the dots',
+        'Working on it'
+    ];
+
     function showTyping() {
+        removeTyping();
         const div = document.createElement('div');
         div.className = 'message ai';
         div.id = 'typing-indicator';
@@ -2699,9 +2716,32 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             </div>`;
         chatContainer.appendChild(div);
         chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        // Rotate status text like Claude / Grok while waiting
+        let idx = 0;
+        const el = div.querySelector('.thinking-text');
+        thinkingStatusTimer = setInterval(() => {
+            if (!el || !document.getElementById('typing-indicator')) {
+                clearInterval(thinkingStatusTimer);
+                thinkingStatusTimer = null;
+                return;
+            }
+            idx = (idx + 1) % THINKING_PHRASES.length;
+            el.style.opacity = '0.35';
+            setTimeout(() => {
+                if (el) {
+                    el.textContent = THINKING_PHRASES[idx];
+                    el.style.opacity = '0.9';
+                }
+            }, 180);
+        }, 2200);
     }
 
     function removeTyping() {
+        if (thinkingStatusTimer) {
+            clearInterval(thinkingStatusTimer);
+            thinkingStatusTimer = null;
+        }
         const el = document.getElementById('typing-indicator');
         if (el) el.remove();
     }
