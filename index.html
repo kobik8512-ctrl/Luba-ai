@@ -3548,7 +3548,17 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         showTyping();
 
         const systemPrompt = buildSystemPrompt();
-        const recent = chatHistory.slice(-10);
+
+        // Fast path for easy chat ("hi", short questions) — less history, no tools, smaller output
+        const msgText = (text || '').trim();
+        const needsImageTool = /\b(draw|generate|create|make|paint|show)\b.{0,40}\b(image|picture|photo|art|artwork|illustration|wallpaper|logo)\b|\b(image|picture|photo)\b.{0,20}\b(of|for)\b/i.test(msgText);
+        const needsCalcTool = /[\d]+\s*[+\-*/x×÷]\s*[\d]|calculate|what(?:'s| is)\s+\d|solve\s+\d/i.test(msgText);
+        const needsTools = !!(needsImageTool || needsCalcTool);
+        const isSimpleChat = !imageToSend && !needsTools && msgText.length > 0 && msgText.length < 120
+            && activeMode === 'normal';
+
+        const historyLimit = isSimpleChat ? 4 : 10;
+        const recent = chatHistory.slice(-historyLimit);
 
         const contents = recent.map(m => ({
             role: m.role === 'assistant' ? 'model' : 'user',
@@ -3567,22 +3577,27 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         contents.push({ role: "user", parts: currentParts });
 
         const usingVision = !!imageToSend;
-        // Fast models first. Remember last model that worked on this device.
+        // Current models — Google blocks 2.0/2.5 flash for many new API keys
         const DEFAULT_MODELS = [
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash-lite",
-            "gemini-2.0-flash",
+            "gemini-3.6-flash",
             "gemini-3.1-flash-lite",
-            "gemini-3.6-flash"
+            "gemini-3.5-flash-lite",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash"
         ];
         let modelChain = DEFAULT_MODELS.slice();
         try {
             const lastGood = storageGet('luba_last_good_model');
-            if (lastGood && modelChain.includes(lastGood)) {
+            // Forget old models that return "no longer available to new users"
+            if (lastGood && /gemini-2\.0-flash|gemini-2\.5-flash$/.test(lastGood)) {
+                storageRemove('luba_last_good_model');
+            } else if (lastGood && modelChain.includes(lastGood)) {
                 modelChain = [lastGood].concat(modelChain.filter(m => m !== lastGood));
             }
         } catch (_) {}
+        if (isSimpleChat) {
+            modelChain = modelChain.slice(0, 3);
+        }
         let modelIndex = 0;
         let model = modelChain[modelIndex];
         let userStopped = false;
@@ -3608,9 +3623,10 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             let accumulatedText = "";
             let guard = 0;
             let continueCount = 0;
-            const MAX_CONTINUES = 6;
+            const MAX_CONTINUES = isSimpleChat ? 1 : 6;
             const generatedImageUrls = [];
-            const ATTEMPT_TIMEOUT_MS = 28000;
+            // Simple "hi" should fail over fast — not wait 28s per model
+            const ATTEMPT_TIMEOUT_MS = isSimpleChat ? 12000 : 25000;
 
             while (guard < 16) {
                 if (abortController.signal.aborted) {
@@ -3623,11 +3639,12 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                     contents,
                     systemInstruction: { parts: [{ text: systemPrompt }] },
                     generationConfig: {
-                        temperature: 0.4,
-                        maxOutputTokens: 4096
+                        temperature: isSimpleChat ? 0.6 : 0.4,
+                        maxOutputTokens: isSimpleChat ? 512 : 4096
                     }
                 };
-                if (!usingVision) {
+                // Tools only when needed — tool routing slows easy replies a lot
+                if (!usingVision && needsTools) {
                     payload.tools = geminiTools;
                 }
 
