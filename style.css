@@ -1,11 +1,6 @@
-/* Push the chat input container above the Netlify badge */
-.chat-input-container, footer, form {
-  position: relative;
-  z-index: 9999;
-  margin-bottom: 20px; /* Gives room above the badge */
-}
-
-/* Or hide Netlify drawer elements explicitly */
-[data-netlify-deploy-id], #netlify-identity-widget {
+/* Completely hides the Netlify badge overlay */
+[data-netlify-deploy-id], 
+#netlify-identity-widget, 
+div[class*="netlify"] {
   display: none !important;
 }
