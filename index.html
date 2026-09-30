@@ -3230,9 +3230,27 @@
         // renderSavedMessages already shows the welcome message if history is empty
         // (do NOT call initDefaultChat again — that was causing the double greeting)
         renderSavedMessages();
+
+        // Pull cloud chat (other phones) then keep polling while app is open
+        lastCloudChatUpdatedAt = null;
+        pullCloudChat({ force: true }).then((updated) => {
+            if (!updated && chatHistory.length === 0) {
+                // still empty after cloud — welcome already handled by renderSavedMessages
+            }
+            // If we only had local history, push it up so phone 2 can see it
+            if (getAuthToken() && chatHistory.length) {
+                cloudPost({
+                    action: 'save_chat',
+                    token: getAuthToken(),
+                    messages: chatHistory
+                }).catch(() => {});
+            }
+        }).catch(() => {});
+        startChatSyncPolling();
     }
 
     function logout() {
+        stopChatSyncPolling();
         const token = getAuthToken();
         if (token) {
             cloudPost({ action: 'logout', token }).catch(() => {});
@@ -3243,6 +3261,7 @@
         storageSet('luba_manual_logout', '1');
         currentUser = null;
         chatHistory = [];
+        lastCloudChatUpdatedAt = null;
         document.body.classList.remove('logged-in');
         hideBanScreen();
         chatContainer.innerHTML = '';
@@ -3838,12 +3857,71 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         });
     }
 
+    let chatSyncTimer = null;
+    let lastCloudChatUpdatedAt = null;
+
     function saveChat() {
         if (!currentUser) return;
         if (chatHistory.length > 30) {
             chatHistory = chatHistory.slice(-30);
         }
         saveUserChatHistory(currentUser.username, chatHistory);
+        // Sync to server so the same account sees chats on every phone
+        const token = getAuthToken();
+        if (token) {
+            cloudPost({
+                action: 'save_chat',
+                token,
+                messages: chatHistory
+            }).then((data) => {
+                if (data && data.ok) lastCloudChatUpdatedAt = Date.now();
+            }).catch(() => {});
+        }
+    }
+
+    async function pullCloudChat(opts) {
+        opts = opts || {};
+        const token = getAuthToken();
+        if (!token || !currentUser) return false;
+        const data = await cloudPost({ action: 'get_chat', token });
+        if (!data || !data.ok || !Array.isArray(data.messages)) return false;
+        if (!data.messages.length) return false;
+
+        // If cloud is newer / longer, use it
+        const cloudLen = data.messages.length;
+        const localLen = chatHistory.length;
+        const cloudUpdated = data.updatedAt || 0;
+        const shouldApply = opts.force
+            || cloudLen > localLen
+            || (cloudUpdated && lastCloudChatUpdatedAt && cloudUpdated > lastCloudChatUpdatedAt + 500)
+            || (cloudUpdated && !lastCloudChatUpdatedAt && cloudLen >= localLen);
+
+        if (!shouldApply && cloudLen <= localLen) {
+            if (cloudUpdated) lastCloudChatUpdatedAt = cloudUpdated;
+            return false;
+        }
+
+        chatHistory = data.messages.slice(-30);
+        lastCloudChatUpdatedAt = cloudUpdated || Date.now();
+        saveUserChatHistory(currentUser.username, chatHistory);
+        if (!opts.silent) renderSavedMessages();
+        return true;
+    }
+
+    function startChatSyncPolling() {
+        stopChatSyncPolling();
+        chatSyncTimer = setInterval(() => {
+            if (!currentUser || !getAuthToken()) return;
+            if (document.hidden) return;
+            pullCloudChat({ silent: false }).catch(() => {});
+        }, 12000);
+    }
+
+    function stopChatSyncPolling() {
+        if (chatSyncTimer) {
+            clearInterval(chatSyncTimer);
+            chatSyncTimer = null;
+        }
     }
 
     function pushPlainExchange(userText, aiText) {
