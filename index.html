@@ -1343,18 +1343,45 @@
             border-color: #e0c080;
             color: #8a5a00;
         }
+        #owner-overlay {
+            align-items: flex-start;
+            padding-top: 8vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
         #owner-overlay .modal {
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
             max-width: 520px;
             width: 96%;
         }
         .owner-gate, .owner-panel { display: none; }
-        .owner-gate.visible, .owner-panel.visible { display: block; }
+        .owner-gate.visible { display: block; }
+        .owner-panel.visible {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            flex: 1;
+            overflow: hidden;
+        }
         .owner-user-list {
             display: flex;
             flex-direction: column;
             gap: 8px;
-            max-height: 55vh;
+            max-height: min(50vh, 420px);
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            padding-bottom: 12px;
+            flex: 1;
+            min-height: 120px;
+        }
+        #owner-mod-log {
+            max-height: 140px !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
         }
         .owner-user-card {
             border: 1px solid var(--border);
@@ -2330,6 +2357,23 @@
             cloudUsersCache.forEach(u => {
                 if (u && u.username) byKey[String(u.username).toLowerCase()] = { ...u, _source: 'cloud' };
             });
+            // Server is truth for bans — wipe stale local bans after Unban
+            try {
+                const bans = getBans();
+                let changed = false;
+                cloudUsersCache.forEach((u) => {
+                    if (!u || !u.username) return;
+                    const k = String(u.username).toLowerCase();
+                    if (u.ban) {
+                        bans[k] = u.ban;
+                        changed = true;
+                    } else if (bans[k]) {
+                        delete bans[k];
+                        changed = true;
+                    }
+                });
+                if (changed) saveBans(bans);
+            } catch (_) {}
         }
         const localUsers = getUsers();
         Object.keys(localUsers).forEach(key => {
@@ -2345,9 +2389,8 @@
                     ban: getBanRecord(u.username),
                     _source: 'local'
                 };
-            } else if (!byKey[k].ban) {
-                byKey[k].ban = getBanRecord(u.username) || byKey[k].ban;
             }
+            // Do NOT overlay local ban onto cloud users — that broke Unban
         });
 
         const keys = Object.keys(byKey).sort((a, b) =>
@@ -2362,7 +2405,10 @@
         listEl.innerHTML = keys.map(key => {
             const u = byKey[key];
             const name = u.username || key;
-            const ban = u.ban || getBanRecord(name);
+            // Cloud source of truth when available (fixes Unban not updating badge)
+            const ban = (u._source === 'cloud')
+                ? (u.ban || null)
+                : (u.ban || getBanRecord(name));
             const safeName = escapeHtml(name);
             const jsName = String(name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             const badge = ban
@@ -2395,13 +2441,17 @@
 
     // Auto-flag bad / policy messages in Owner CMDs (highlight only — does not auto-ban)
     const FLAG_PATTERNS = [
-        // slurs / severe hate (common variants)
+        // profanity
+        { re: /\b(fuck|fucking|fucker|shit|bitch|asshole|bastard|cunt|damn)\b/i, label: 'profanity' },
+        // slurs / severe hate
         { re: /\bnigg[aeer]+s?\b/i, label: 'hate / slur' },
         { re: /\bfag+ots?\b/i, label: 'hate / slur' },
         { re: /\bretard(ed)?\b/i, label: 'slur' },
         // sexual / explicit
         { re: /\b(porn|onlyfans|nsfw|nude|nudes|naked|sex\b|sexy|horny|blowjob|handjob|cum\b|hentai|xxx)\b/i, label: 'sexual' },
         { re: /\b(dick|cock|pussy|vagina|penis|boobs|tits)\b/i, label: 'sexual' },
+        // hacking / crime
+        { re: /\b(hack(ing|er)?|ddos|phishing|ransomware|malware|steal\s+password|credit\s*card\s+dump)\b/i, label: 'hacking / crime' },
         // violence / crime ask
         { re: /\b(kill\s+(yourself|my|him|her|them)|suicide\s*method|how\s+to\s+(make|build)\s+(a\s+)?(bomb|gun))\b/i, label: 'harm' },
         // jailbreak / force AI
