@@ -1507,6 +1507,31 @@
             background: rgba(255, 0, 127, 0.12);
             border: 1px solid rgba(255, 0, 127, 0.25);
         }
+        .owner-chat-bubble.flagged {
+            background: rgba(180, 20, 40, 0.28);
+            border: 1px solid rgba(255, 70, 90, 0.65);
+            box-shadow: 0 0 0 1px rgba(255, 60, 80, 0.25);
+        }
+        .owner-flag-tag {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            color: #ff8a9a;
+            background: rgba(120, 0, 20, 0.55);
+            border: 1px solid rgba(255, 80, 100, 0.5);
+            border-radius: 6px;
+            padding: 2px 6px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        .owner-flag-hit {
+            background: rgba(255, 40, 60, 0.45);
+            color: #fff;
+            border-radius: 3px;
+            padding: 0 2px;
+            font-weight: 700;
+        }
         .owner-chat-bubble.meta {
             opacity: 0.55;
             font-size: 10px;
@@ -1843,9 +1868,22 @@
             <h3 id="owner-ban-title">Ban user</h3>
             <button class="lightbox-close saved-chats-close" id="close-owner-ban-btn" title="Close">×</button>
         </div>
-        <p class="owner-note" id="owner-ban-subtitle">Choose permanent or timed ban.</p>
-        <label style="font-size:12px; font-weight:600; opacity:0.8;">Reason</label>
-        <input type="text" class="owner-reason-input" id="owner-ban-reason" placeholder="Why are they banned?">
+        <p class="owner-note" id="owner-ban-subtitle">Choose a reason (they will see this), then permanent or timed ban.</p>
+        <label style="font-size:12px; font-weight:600; opacity:0.8;">Ban reason (shown to user)</label>
+        <select id="owner-ban-reason-select" class="owner-reason-input" style="cursor:pointer;">
+            <option value="">— Select a reason —</option>
+            <option value="Inappropriate or sexual content">Inappropriate or sexual content</option>
+            <option value="Hate speech, slurs, or harassment">Hate speech, slurs, or harassment</option>
+            <option value="Trying to force the AI to break rules">Trying to force the AI to break rules</option>
+            <option value="Asking for harmful or illegal advice">Asking for harmful or illegal advice</option>
+            <option value="Spam or flooding the chat">Spam or flooding the chat</option>
+            <option value="Abusive behavior toward the service">Abusive behavior toward the service</option>
+            <option value="Scam, phishing, or impersonation">Scam, phishing, or impersonation</option>
+            <option value="Sharing others' private information">Sharing others' private information</option>
+            <option value="Underage / age policy concern">Underage / age policy concern</option>
+            <option value="Other">Other (write your own)</option>
+        </select>
+        <input type="text" class="owner-reason-input" id="owner-ban-reason-custom" placeholder="Custom reason (if Other)" style="display:none; margin-top:8px;">
         <div class="owner-timer-row" style="margin-top:12px;">
             <span style="font-size:12px; opacity:0.75;">Timer:</span>
             <input type="number" min="1" value="24" id="owner-ban-timer-val" style="width:64px">
@@ -2116,6 +2154,18 @@
 
     async function clearBan(username) {
         const key = String(username).toLowerCase();
+        // Server first
+        let serverOk = false;
+        try {
+            const res = await cloudOwnerUnban(username);
+            serverOk = !!(res && res.ok !== false && !res.error);
+            if (!serverOk) {
+                console.warn('Unban server response:', res);
+            }
+        } catch (err) {
+            console.warn('Unban network error:', err);
+        }
+        // Always clear local so Owner panel + this device unlock
         const bans = getBans();
         delete bans[key];
         saveBans(bans);
@@ -2126,13 +2176,28 @@
                 saveUsers(users);
             }
         } catch (_) {}
-        // Must wait for server — otherwise Owner list still shows banned
+        // Clear cached cloud list ban so UI updates immediately
         try {
-            await cloudOwnerUnban(username);
+            if (Array.isArray(cloudUsersCache)) {
+                cloudUsersCache.forEach((u) => {
+                    if (u && String(u.username || '').toLowerCase() === key) u.ban = null;
+                });
+            }
         } catch (_) {}
         if (currentUser && userKey(currentUser.username) === key) {
             hideBanScreen();
         }
+        // Verify on server
+        try {
+            const still = await cloudCheckBan(username);
+            if (still) {
+                // Retry once
+                await cloudOwnerUnban(username);
+                const again = await cloudCheckBan(username);
+                if (again) return { ok: false, error: 'Server still shows banned' };
+            }
+        } catch (_) {}
+        return { ok: true, serverOk };
     }
 
     function formatBanUntil(ban) {
@@ -2156,9 +2221,9 @@
         if (untilEl) untilEl.textContent = formatBanUntil(ban);
         if (bodyEl) {
             if (ban && ban.permanent) {
-                bodyEl.textContent = 'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this is a mistake, contact us at lubaai.official@gmail.com';
+                bodyEl.textContent = 'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case.';
             } else {
-                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. When the timer is over, log in again to continue. Questions? Contact us at lubaai.official@gmail.com';
+                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case. When the ban ends, log in again to continue.';
             }
         }
     }
@@ -2221,11 +2286,17 @@
 
         if (logEl) {
             if (cloudOk && cloudLogsCache.length) {
-                logEl.textContent = '✅ Server connected (all devices)\n\n' + cloudLogsCache.slice(0, 40).map(e => {
-                    const when = e.at ? new Date(e.at).toLocaleString() : '';
-                    const t = String(e.text || '').slice(0, 140);
-                    return '[' + when + '] ' + (e.username || '?') + ': ' + t;
-                }).join('\n\n');
+                logEl.innerHTML = '<div style="opacity:0.85;margin-bottom:8px;">✅ Server connected (all devices)</div>' +
+                    cloudLogsCache.slice(0, 40).map(e => {
+                        const when = e.at ? new Date(e.at).toLocaleString() : '';
+                        const scan = scanFlaggedText(String(e.text || '').slice(0, 160));
+                        const flagClass = scan.flagged ? ' flagged' : '';
+                        const tag = scan.flagged
+                            ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
+                            : '';
+                        return `<div class="owner-chat-bubble meta">[${escapeHtml(when)}] ${escapeHtml(e.username || '?')}</div>
+                            <div class="owner-chat-bubble user${flagClass}" style="margin-bottom:10px;">${tag}${scan.html}</div>`;
+                    }).join('');
             } else if (cloudOk) {
                 let localLog = [];
                 try { localLog = JSON.parse(storageGet('luba_mod_log') || '[]') || []; } catch (_) { localLog = []; }
@@ -2322,16 +2393,58 @@
     let ownerInspectUsername = null;
     let ownerBanTarget = null;
 
+    // Auto-flag bad / policy messages in Owner CMDs (highlight only — does not auto-ban)
+    const FLAG_PATTERNS = [
+        // slurs / severe hate (common variants)
+        { re: /\bnigg[aeer]+s?\b/i, label: 'hate / slur' },
+        { re: /\bfag+ots?\b/i, label: 'hate / slur' },
+        { re: /\bretard(ed)?\b/i, label: 'slur' },
+        // sexual / explicit
+        { re: /\b(porn|onlyfans|nsfw|nude|nudes|naked|sex\b|sexy|horny|blowjob|handjob|cum\b|hentai|xxx)\b/i, label: 'sexual' },
+        { re: /\b(dick|cock|pussy|vagina|penis|boobs|tits)\b/i, label: 'sexual' },
+        // violence / crime ask
+        { re: /\b(kill\s+(yourself|my|him|her|them)|suicide\s*method|how\s+to\s+(make|build)\s+(a\s+)?(bomb|gun))\b/i, label: 'harm' },
+        // jailbreak / force AI
+        { re: /\b(ignore\s+(all\s+)?(previous|prior|your)\s+(instructions|rules)|dan\s*mode|jailbreak|no\s+restrictions|bypass\s+(your|the)\s+(rules|filter|safety))\b/i, label: 'force AI / jailbreak' },
+        { re: /\b(pretend\s+you\s+(have\s+no|are\s+without)\s+(rules|limits|filter)|act\s+as\s+if\s+you\s+(can|have)\s+no\s+(rules|limits))\b/i, label: 'force AI' },
+        { re: /\b(do\s+anything\s+now|developer\s+mode\s+enabled)\b/i, label: 'force AI' },
+        // drugs / illegal instruct
+        { re: /\b(how\s+to\s+(make|cook|synthesize)\s+(meth|cocaine|fentanyl)|buy\s+drugs)\b/i, label: 'illegal' },
+    ];
+
+    function scanFlaggedText(raw) {
+        const text = String(raw || '');
+        if (!text.trim()) return { flagged: false, labels: [], html: escapeHtml(text) };
+        const labels = [];
+        let html = escapeHtml(text);
+        FLAG_PATTERNS.forEach((p) => {
+            if (p.re.test(text)) {
+                if (labels.indexOf(p.label) === -1) labels.push(p.label);
+            }
+        });
+        if (labels.length) {
+            // highlight matched spans (best-effort on escaped text)
+            FLAG_PATTERNS.forEach((p) => {
+                html = html.replace(p.re, (m) => '<span class="owner-flag-hit">' + m + '</span>');
+            });
+        }
+        return { flagged: labels.length > 0, labels, html };
+    }
+
     function renderBubblesFromCloudLogs(logs) {
         if (!logs || !logs.length) {
             return '<div class="owner-empty">No messages from this user on the server yet.</div>';
         }
         return logs.slice().reverse().map(e => {
             const when = e.at ? new Date(e.at).toLocaleString() : '';
-            const text = escapeHtml(String(e.text || ''));
+            const scan = scanFlaggedText(String(e.text || ''));
             const media = e.hasMedia ? ' 📎' : '';
+            const flagClass = scan.flagged ? ' flagged' : '';
+            const tag = scan.flagged
+                ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
+                : '';
             return `<div class="owner-chat-bubble meta">${escapeHtml(when)}</div>
-                <div class="owner-chat-bubble user">${text}${media}</div>`;
+                <div class="owner-chat-bubble user${flagClass}">${tag}${scan.html}${media}</div>`;
         }).join('');
     }
 
@@ -2342,9 +2455,14 @@
         return hist.slice(-40).map(m => {
             const who = m.role === 'user' ? 'User' : 'Luba';
             const when = m.time ? escapeHtml(String(m.time)) : '';
-            const text = escapeHtml(String(m.content || '').slice(0, 800));
+            const raw = String(m.content || '').slice(0, 800);
+            const scan = m.role === 'user' ? scanFlaggedText(raw) : { flagged: false, labels: [], html: escapeHtml(raw) };
+            const flagClass = scan.flagged ? ' flagged' : '';
+            const tag = scan.flagged
+                ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
+                : '';
             return `<div class="owner-chat-bubble meta">${who}${when ? ' · ' + when : ''}</div>
-                <div class="owner-chat-bubble user">${text}</div>`;
+                <div class="owner-chat-bubble user${flagClass}">${tag}${scan.html}</div>`;
         }).join('');
     }
 
@@ -2362,7 +2480,20 @@
         if (savedEl) savedEl.textContent = '';
         if (overlay) overlay.style.display = 'flex';
 
-        const ban = getBanRecord(username);
+        // Prefer live server ban status over stale local cache
+        let ban = getBanRecord(username);
+        try {
+            const remote = await cloudCheckBan(username);
+            ban = remote || null;
+            if (!remote) {
+                // keep local clear if server says OK
+                try {
+                    const bans = getBans();
+                    delete bans[userKey(username)];
+                    saveBans(bans);
+                } catch (_) {}
+            }
+        } catch (_) {}
         if (meta) {
             meta.innerHTML = ban
                 ? `<span class="owner-badge banned">${ban.permanent ? 'PERM BAN' : 'TIMED BAN'}</span> · ${escapeHtml(formatBanUntil(ban))}<br>Reason: ${escapeHtml(ban.reason || '—')}`
@@ -2404,20 +2535,45 @@
         ownerBanTarget = username;
         const title = document.getElementById('owner-ban-title');
         const sub = document.getElementById('owner-ban-subtitle');
-        const reason = document.getElementById('owner-ban-reason');
+        const sel = document.getElementById('owner-ban-reason-select');
+        const custom = document.getElementById('owner-ban-reason-custom');
         const overlay = document.getElementById('owner-ban-overlay');
         if (title) title.textContent = 'Ban @' + username;
-        if (sub) sub.textContent = 'Permanent blocks forever. Timed ban unlocks automatically when the timer ends.';
-        if (reason) reason.value = '';
+        if (sub) sub.textContent = 'Pick a reason — the user will see it on their ban screen. Timed bans unlock automatically when the timer ends.';
+        if (sel) sel.value = '';
+        if (custom) {
+            custom.value = '';
+            custom.style.display = 'none';
+        }
         if (overlay) overlay.style.display = 'flex';
     };
 
+    function getSelectedBanReason(fallback) {
+        const sel = document.getElementById('owner-ban-reason-select');
+        const custom = document.getElementById('owner-ban-reason-custom');
+        const v = sel ? sel.value : '';
+        if (!v) return null;
+        if (v === 'Other') {
+            const c = custom && custom.value.trim();
+            if (!c) return null;
+            return c.slice(0, 500);
+        }
+        return v;
+    }
+
     window.ownerUnban = async function (username) {
         if (!confirm('Unban "' + username + '" on all devices?')) return;
-        await clearBan(username);
+        const result = await clearBan(username);
+        // Force refresh from server
+        cloudUsersCache = [];
+        cloudLogsCache = [];
         await renderOwnerUserList();
         if (ownerInspectUsername === username) await window.ownerInspectUser(username);
-        alert('Unbanned: ' + username);
+        if (result && result.ok === false) {
+            alert('Unban may have failed on the server. Try again.\n' + (result.error || ''));
+        } else {
+            alert('Unbanned: ' + username + '\nThey can use Luba again on all devices (may take a few seconds if the app is open).');
+        }
     };
 
     window.ownerDeleteAccount = async function (username) {
@@ -4911,20 +5067,39 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (ownerInspectUsername) window.ownerInspectUser(ownerInspectUsername);
         };
     }
+    // Show custom reason field only when "Other" is selected
+    (function wireBanReasonSelect() {
+        const sel = document.getElementById('owner-ban-reason-select');
+        const custom = document.getElementById('owner-ban-reason-custom');
+        if (!sel) return;
+        sel.onchange = () => {
+            if (!custom) return;
+            if (sel.value === 'Other') {
+                custom.style.display = 'block';
+                custom.focus();
+            } else {
+                custom.style.display = 'none';
+            }
+        };
+    })();
+
     if (ownerBanPermBtn) {
         ownerBanPermBtn.onclick = async () => {
             const name = ownerBanTarget;
             if (!name) return;
-            const reasonEl = document.getElementById('owner-ban-reason');
-            const reason = (reasonEl && reasonEl.value.trim()) || 'Permanent ban by owner';
-            if (!confirm('Permanently ban "' + name + '" on all devices?')) return;
+            const reason = getSelectedBanReason();
+            if (!reason) {
+                alert('Please select a ban reason (or choose Other and write one). The user will see this reason.');
+                return;
+            }
+            if (!confirm('Permanently ban "' + name + '"?\n\nReason they will see:\n' + reason)) return;
             ownerBanPermBtn.disabled = true;
             try {
                 await applyBan(name, { permanent: true, reason });
                 if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
                 await renderOwnerUserList();
                 if (ownerInspectUsername === name) await window.ownerInspectUser(name);
-                alert('Banned permanently: ' + name);
+                alert('Banned permanently: ' + name + '\nReason: ' + reason);
             } finally {
                 ownerBanPermBtn.disabled = false;
             }
@@ -4934,10 +5109,13 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         ownerBanTimedBtn.onclick = async () => {
             const name = ownerBanTarget;
             if (!name) return;
-            const reasonEl = document.getElementById('owner-ban-reason');
+            const reason = getSelectedBanReason();
+            if (!reason) {
+                alert('Please select a ban reason (or choose Other and write one). The user will see this reason.');
+                return;
+            }
             const valEl = document.getElementById('owner-ban-timer-val');
             const unitEl = document.getElementById('owner-ban-timer-unit');
-            const reason = (reasonEl && reasonEl.value.trim()) || 'Temporary ban by owner';
             let amount = parseInt(valEl && valEl.value, 10);
             if (!amount || amount < 1) amount = 24;
             const unit = (unitEl && unitEl.value) || 'h';
@@ -4945,14 +5123,14 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (unit === 'd') ms = amount * 24 * 60 * 60 * 1000;
             if (unit === 'm') ms = amount * 60 * 1000;
             const until = Date.now() + ms;
-            if (!confirm('Ban "' + name + '" until ' + new Date(until).toLocaleString() + '?')) return;
+            if (!confirm('Ban "' + name + '" until ' + new Date(until).toLocaleString() + '?\n\nReason they will see:\n' + reason)) return;
             ownerBanTimedBtn.disabled = true;
             try {
                 await applyBan(name, { permanent: false, until, reason });
                 if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
                 await renderOwnerUserList();
                 if (ownerInspectUsername === name) await window.ownerInspectUser(name);
-                alert('Timed ban applied for ' + name);
+                alert('Timed ban applied for ' + name + '\nReason: ' + reason);
             } finally {
                 ownerBanTimedBtn.disabled = false;
             }
