@@ -1824,6 +1824,7 @@
         <div class="owner-ban-row">
             <button type="button" class="small-btn danger" id="owner-inspect-ban-btn">Ban…</button>
             <button type="button" class="small-btn" id="owner-inspect-unban-btn">Unban</button>
+            <button type="button" class="small-btn danger" id="owner-inspect-delete-btn" style="background:#5c1010;">Delete account</button>
             <button type="button" class="small-btn" id="owner-inspect-refresh-btn">Refresh</button>
         </div>
         <div class="owner-section-label">Messages (all devices)</div>
@@ -2034,6 +2035,14 @@
         });
     }
 
+    async function cloudOwnerDeleteAccount(username) {
+        return cloudPost({
+            action: 'owner_delete_account',
+            ownerPassword: OWNER_PASSWORD,
+            username
+        });
+    }
+
     function getBans() {
         try {
             return JSON.parse(storageGet('luba_bans') || '{}') || {};
@@ -2147,9 +2156,9 @@
         if (untilEl) untilEl.textContent = formatBanUntil(ban);
         if (bodyEl) {
             if (ban && ban.permanent) {
-                bodyEl.textContent = 'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this is a mistake, contact the owner.';
+                bodyEl.textContent = 'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this is a mistake, contact us at lubaai.official@gmail.com';
             } else {
-                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. When the timer is over, log in again to continue.';
+                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. When the timer is over, log in again to continue. Questions? Contact us at lubaai.official@gmail.com';
             }
         }
     }
@@ -2303,6 +2312,7 @@
                         ${badge}
                         <button type="button" class="owner-mini-btn" onclick="event.stopPropagation(); window.ownerInspectUser && window.ownerInspectUser('${jsName}')">View</button>
                         <button type="button" class="owner-mini-btn ban" onclick="event.stopPropagation(); window.ownerOpenBanMenu && window.ownerOpenBanMenu('${jsName}')">Ban</button>
+                        <button type="button" class="owner-mini-btn ban" onclick="event.stopPropagation(); window.ownerDeleteAccount && window.ownerDeleteAccount('${jsName}')" title="Permanently delete">Del</button>
                     </div>
                 </div>
             </div>`;
@@ -2408,6 +2418,64 @@
         await renderOwnerUserList();
         if (ownerInspectUsername === username) await window.ownerInspectUser(username);
         alert('Unbanned: ' + username);
+    };
+
+    window.ownerDeleteAccount = async function (username) {
+        const warn1 =
+            'DELETE ACCOUNT @' + username + '?\n\n' +
+            'This is permanent. Their account, chats on the server, saved chats, bans, and profile will be erased.\n' +
+            'The username will become available for anyone to register again.\n\n' +
+            'Unban will NOT bring this account back.\n\n' +
+            'Continue?';
+        if (!confirm(warn1)) return;
+
+        const warn2 =
+            'Final warning.\n\n' +
+            'You are about to permanently delete @' + username + '.\n' +
+            'This cannot be undone. Type OK in your mind and press OK only if you are sure.';
+        if (!confirm(warn2)) return;
+
+        try {
+            const res = await cloudOwnerDeleteAccount(username);
+            if (!res || res.ok === false) {
+                alert('Delete failed: ' + ((res && res.error) || 'server error'));
+                return;
+            }
+        } catch (err) {
+            alert('Delete failed: network error');
+            return;
+        }
+
+        // Clean local caches too
+        try {
+            const users = getUsers();
+            delete users[String(username).toLowerCase()];
+            saveUsers(users);
+        } catch (_) {}
+        try {
+            const bans = getBans();
+            delete bans[String(username).toLowerCase()];
+            saveBans(bans);
+        } catch (_) {}
+        try {
+            localStorage.removeItem('luba_chat_' + String(username).toLowerCase());
+            localStorage.removeItem('luba_saved_' + String(username).toLowerCase());
+            localStorage.removeItem('luba_prefs_' + String(username).toLowerCase());
+        } catch (_) {}
+
+        if (ownerInspectUsername === username) {
+            const overlay = document.getElementById('owner-inspect-overlay');
+            if (overlay) overlay.style.display = 'none';
+            ownerInspectUsername = null;
+        }
+        await renderOwnerUserList();
+        alert(
+            'Account @' + username + ' has been permanently deleted.\n\n' +
+            '• Profile, server chat, and saved chats are gone\n' +
+            '• Username is free to register again\n' +
+            '• Unban will not restore this account\n' +
+            '• If they still have the app open, they will be locked out on the next action'
+        );
     };
 
     async function cloudOwnerUserLogs(username) {
@@ -3288,10 +3356,14 @@
         }).catch(() => {});
         pullNamedSavedChats().catch(() => {});
         startChatSyncPolling();
+        startBanPolling();
+        // Immediate ban check on enter
+        enforceLiveBan(true).catch(() => {});
     }
 
     function logout() {
         stopChatSyncPolling();
+        stopBanPolling();
         const token = getAuthToken();
         if (token) {
             cloudPost({ action: 'logout', token }).catch(() => {});
@@ -3976,6 +4048,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (!currentUser || !getAuthToken()) return;
             if (document.hidden) return;
             pullCloudChat({ silent: false }).catch(() => {});
+            enforceLiveBan(false).catch(() => {});
         }, 12000);
     }
 
@@ -3983,6 +4056,80 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         if (chatSyncTimer) {
             clearInterval(chatSyncTimer);
             chatSyncTimer = null;
+        }
+    }
+
+    // ---- Live ban enforcement (no refresh needed) ----
+    let banPollTimer = null;
+    let lastBanCheckAt = 0;
+    let banCheckInFlight = false;
+
+    async function enforceLiveBan(force) {
+        if (!currentUser || !currentUser.username) return false;
+        if (document.body.classList.contains('banned')) return true;
+        const now = Date.now();
+        if (!force && now - lastBanCheckAt < 2000) return false;
+        if (banCheckInFlight) return false;
+        banCheckInFlight = true;
+        lastBanCheckAt = now;
+        try {
+            let ban = getBanRecord(currentUser.username);
+            try {
+                const remote = await cloudCheckBan(currentUser.username);
+                if (remote) ban = remote;
+                else if (ban && !ban.permanent && ban.until && Date.now() >= ban.until) {
+                    ban = null;
+                } else if (!remote) {
+                    // Server says not banned — clear stale local ban
+                    if (ban) {
+                        try {
+                            const bans = getBans();
+                            delete bans[userKey(currentUser.username)];
+                            saveBans(bans);
+                        } catch (_) {}
+                        ban = null;
+                    }
+                }
+            } catch (_) {}
+            if (ban) {
+                try {
+                    const bans = getBans();
+                    bans[userKey(currentUser.username)] = ban;
+                    saveBans(bans);
+                } catch (_) {}
+                try {
+                    if (typeof abortController !== 'undefined' && abortController) {
+                        abortController.abort();
+                    }
+                } catch (_) {}
+                showBanScreen(ban);
+                stopBanPolling();
+                stopChatSyncPolling();
+                return true;
+            }
+        } finally {
+            banCheckInFlight = false;
+        }
+        return false;
+    }
+
+    function startBanPolling() {
+        stopBanPolling();
+        banPollTimer = setInterval(() => {
+            if (!currentUser) return;
+            if (document.body.classList.contains('banned')) {
+                stopBanPolling();
+                return;
+            }
+            if (document.hidden) return;
+            enforceLiveBan(false).catch(() => {});
+        }, 4000);
+    }
+
+    function stopBanPolling() {
+        if (banPollTimer) {
+            clearInterval(banPollTimer);
+            banPollTimer = null;
         }
     }
 
@@ -4035,8 +4182,9 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     };
 
     if (modesBtn && modesMenu) {
-        modesBtn.onclick = (e) => {
+        modesBtn.onclick = async (e) => {
             e.stopPropagation();
+            if (await enforceLiveBan(true)) return;
             modesMenu.classList.toggle('open');
         };
         document.addEventListener('click', (e) => {
@@ -4108,6 +4256,8 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         }
     }
 
+    let lastNamedSavedUpdatedAt = 0;
+
     function setSavedChats(list) {
         if (!currentUser) return;
         try {
@@ -4116,13 +4266,15 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             alert("Couldn't save — storage is full. Try deleting an old saved chat first.");
             return;
         }
-        // Sync named saves to server (all phones)
+        // Sync named saves to server (all phones) — server becomes source of truth (deletes included)
         const token = getAuthToken();
         if (token) {
             cloudPost({
                 action: 'save_named_chats',
                 token,
                 saved: list
+            }).then((data) => {
+                if (data && data.ok) lastNamedSavedUpdatedAt = Date.now();
             }).catch(() => {});
         }
     }
@@ -4133,26 +4285,29 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         const data = await cloudPost({ action: 'get_named_chats', token });
         if (!data || !data.ok || !Array.isArray(data.saved)) return;
         const cloudList = data.saved;
+        const cloudUpdated = data.updatedAt || 0;
         const localList = getSavedChats();
-        // Prefer whichever list is longer; merge by id
-        const byId = {};
-        localList.forEach((c) => { if (c && c.id) byId[c.id] = c; });
-        cloudList.forEach((c) => {
-            if (!c || !c.id) return;
-            if (!byId[c.id] || (c.messages || []).length >= (byId[c.id].messages || []).length) {
-                byId[c.id] = c;
-            }
-        });
-        const merged = Object.values(byId);
-        // Only write if something changed
-        if (merged.length !== localList.length || cloudList.length > localList.length) {
+
+        // Server wins when it is newer — so deletes on phone A disappear on phone B
+        if (cloudUpdated && cloudUpdated >= lastNamedSavedUpdatedAt) {
             try {
-                localStorage.setItem('luba_saved_' + userKey(currentUser.username), JSON.stringify(merged));
+                localStorage.setItem(
+                    'luba_saved_' + userKey(currentUser.username),
+                    JSON.stringify(cloudList)
+                );
             } catch (_) {}
-            // If local had extras, push merge up
-            if (token) {
-                cloudPost({ action: 'save_named_chats', token, saved: merged }).catch(() => {});
-            }
+            lastNamedSavedUpdatedAt = cloudUpdated;
+            return;
+        }
+
+        // Local is newer / cloud empty: upload local (including deletes already applied locally)
+        if (localList.length && (!cloudUpdated || lastNamedSavedUpdatedAt > cloudUpdated)) {
+            const res = await cloudPost({
+                action: 'save_named_chats',
+                token,
+                saved: localList
+            });
+            if (res && res.ok) lastNamedSavedUpdatedAt = Date.now();
         }
     }
 
@@ -4192,6 +4347,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     };
 
     exportBtn.onclick = async () => {
+        if (await enforceLiveBan(true)) return;
         saveChatNameInput.value = '';
         savedChatsOverlay.style.display = 'flex';
         savedChatsList.innerHTML = '<div class="saved-chats-empty">Loading saved chats…</div>';
@@ -4352,8 +4508,9 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     // ============================================================
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-    function openSettings() {
+    async function openSettings() {
         if (!currentUser) return;
+        if (await enforceLiveBan(true)) return;
         const prefs = loadUserPrefs(currentUser.username);
         systemPromptInput.value = prefs.systemPrompt || localStorage.getItem('luba_system_prompt') || defaultPersonality;
         settingsUsername.value = currentUser.username;
@@ -4703,6 +4860,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     const closeOwnerBanBtn = document.getElementById('close-owner-ban-btn');
     const ownerInspectBanBtn = document.getElementById('owner-inspect-ban-btn');
     const ownerInspectUnbanBtn = document.getElementById('owner-inspect-unban-btn');
+    const ownerInspectDeleteBtn = document.getElementById('owner-inspect-delete-btn');
     const ownerInspectRefreshBtn = document.getElementById('owner-inspect-refresh-btn');
     const ownerBanCancelBtn = document.getElementById('owner-ban-cancel-btn');
     const ownerBanTimedBtn = document.getElementById('owner-ban-timed-btn');
@@ -4741,6 +4899,11 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     if (ownerInspectUnbanBtn) {
         ownerInspectUnbanBtn.onclick = () => {
             if (ownerInspectUsername) window.ownerUnban(ownerInspectUsername);
+        };
+    }
+    if (ownerInspectDeleteBtn) {
+        ownerInspectDeleteBtn.onclick = () => {
+            if (ownerInspectUsername) window.ownerDeleteAccount(ownerInspectUsername);
         };
     }
     if (ownerInspectRefreshBtn) {
@@ -4796,8 +4959,9 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         };
     }
 
-    clearChatBtn.onclick = () => {
+    clearChatBtn.onclick = async () => {
         if (!currentUser) return;
+        if (await enforceLiveBan(true)) return;
         if (confirm("Clear all messages?")) {
             chatHistory = [];
             localStorage.removeItem('luba_chat_' + userKey(currentUser.username));
@@ -4810,7 +4974,24 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             if (!sendBtn.disabled) sendMessage();
+            return;
         }
+        // Any typing triggers a (throttled) ban check
+        enforceLiveBan(false).catch(() => {});
+    });
+    userInput.addEventListener('focus', () => {
+        enforceLiveBan(true).catch(() => {});
+    });
+    userInput.addEventListener('input', () => {
+        enforceLiveBan(false).catch(() => {});
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentUser) {
+            enforceLiveBan(true).catch(() => {});
+        }
+    });
+    window.addEventListener('focus', () => {
+        if (currentUser) enforceLiveBan(true).catch(() => {});
     });
     sendBtn.onclick = sendMessage;
 
@@ -4955,6 +5136,9 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
     async function sendMessage(opts) {
         if (!currentUser) return;
+
+        // Live ban: block before anything is sent
+        if (await enforceLiveBan(true)) return;
 
         // If already generating, treat click as Stop
         if (isGenerating) {
