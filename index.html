@@ -2070,7 +2070,7 @@
         return !!getBanRecord(username);
     }
 
-    function applyBan(username, opts) {
+    async function applyBan(username, opts) {
         const key = String(username).toLowerCase();
         const bans = getBans();
         const entry = {
@@ -2090,12 +2090,14 @@
                 saveUsers(users);
             }
         } catch (_) {}
-        // Push ban to ALL devices via Cloudflare Worker
-        cloudOwnerBan(username, {
-            permanent: entry.permanent,
-            until: entry.until,
-            reason: entry.reason
-        }).catch(() => {});
+        // Push ban to ALL devices via Cloudflare Worker (await so list refreshes correctly)
+        try {
+            await cloudOwnerBan(username, {
+                permanent: entry.permanent,
+                until: entry.until,
+                reason: entry.reason
+            });
+        } catch (_) {}
         // If currently logged in as that user, show ban screen
         if (currentUser && userKey(currentUser.username) === key) {
             showBanScreen(entry);
@@ -2103,7 +2105,7 @@
         return entry;
     }
 
-    function clearBan(username) {
+    async function clearBan(username) {
         const key = String(username).toLowerCase();
         const bans = getBans();
         delete bans[key];
@@ -2115,7 +2117,10 @@
                 saveUsers(users);
             }
         } catch (_) {}
-        cloudOwnerUnban(username).catch(() => {});
+        // Must wait for server — otherwise Owner list still shows banned
+        try {
+            await cloudOwnerUnban(username);
+        } catch (_) {}
         if (currentUser && userKey(currentUser.username) === key) {
             hideBanScreen();
         }
@@ -2397,11 +2402,11 @@
         if (overlay) overlay.style.display = 'flex';
     };
 
-    window.ownerUnban = function (username) {
-        if (!confirm('Unban "' + username + '"?')) return;
-        clearBan(username);
-        renderOwnerUserList();
-        if (ownerInspectUsername === username) window.ownerInspectUser(username);
+    window.ownerUnban = async function (username) {
+        if (!confirm('Unban "' + username + '" on all devices?')) return;
+        await clearBan(username);
+        await renderOwnerUserList();
+        if (ownerInspectUsername === username) await window.ownerInspectUser(username);
         alert('Unbanned: ' + username);
     };
 
@@ -2948,6 +2953,61 @@
         });
     }
 
+    function getAuthToken() {
+        return storageGet('luba_auth_token') || null;
+    }
+    function setAuthToken(token) {
+        if (token) storageSet('luba_auth_token', token);
+        else storageRemove('luba_auth_token');
+    }
+
+    function profileToLocalUser(profile, extras) {
+        extras = extras || {};
+        return {
+            username: profile.username,
+            passwordHash: extras.passwordHash || null,
+            gender: profile.gender === 'girl' ? 'girl' : (profile.gender === 'other' ? 'other' : 'boy'),
+            dob: profile.birthday || extras.dob || null,
+            profilePic: profile.avatarDataUrl || extras.profilePic || null,
+            lastUsernameChange: extras.lastUsernameChange || 0,
+            createdAt: extras.createdAt || Date.now(),
+            cloud: true
+        };
+    }
+
+    function cacheLocalUser(user) {
+        if (!user || !user.username) return;
+        const users = getUsers();
+        const key = userKey(user.username);
+        const prev = users[key] || {};
+        users[key] = { ...prev, ...user };
+        saveUsers(users);
+    }
+
+    async function tryMigrateLocalToCloud(localUser, password) {
+        // Old phone-only account → register on server so other phones can log in
+        if (!localUser || !password) return null;
+        const data = await cloudPost({
+            action: 'signup',
+            username: localUser.username,
+            password: password,
+            gender: localUser.gender || 'boy',
+            birthday: localUser.dob || '2000-01-01',
+            dob: localUser.dob || '2000-01-01'
+        });
+        if (data && data.ok && data.token) {
+            setAuthToken(data.token);
+            return profileToLocalUser(data.profile, {
+                passwordHash: localUser.passwordHash,
+                dob: localUser.dob,
+                profilePic: localUser.profilePic,
+                createdAt: localUser.createdAt
+            });
+        }
+        // Username might already exist on server with different password
+        return null;
+    }
+
     loginForm.onsubmit = async (e) => {
         e.preventDefault();
         loginError.textContent = '';
@@ -2957,38 +3017,80 @@
             loginError.textContent = 'Enter username and password.';
             return;
         }
-        const users = getUsers();
-        const user = users[uname.toLowerCase()];
-        if (!user) {
-            loginError.textContent = 'No account with that username.';
-            return;
-        }
-        if (!(await passwordMatches(pw, user.passwordHash))) {
-            loginError.textContent = 'Wrong password.';
-            return;
-        }
-        // Ban check: local first, then cloud (all devices)
-        let ban = getBanRecord(user.username);
-        if (!ban) {
-            try { ban = await cloudCheckBan(user.username); } catch (_) {}
-        }
-        if (ban) {
+
+        const loginBtn = document.getElementById('login-submit');
+        if (loginBtn) loginBtn.disabled = true;
+
+        try {
+            // 1) Cloud login (works on every phone)
+            const cloud = await cloudPost({
+                action: 'login',
+                username: uname,
+                password: pw
+            });
+
+            if (cloud && cloud.ban) {
+                const ban = cloud.ban;
+                try {
+                    const bans = getBans();
+                    bans[String(uname).toLowerCase()] = ban;
+                    saveBans(bans);
+                } catch (_) {}
+                currentUser = { username: uname };
+                setCurrentUsername(uname);
+                showBanScreen(ban);
+                return;
+            }
+
+            if (cloud && cloud.ok && cloud.token && cloud.profile) {
+                setAuthToken(cloud.token);
+                const user = profileToLocalUser(cloud.profile);
+                // keep a local password hash cache so device quick-open still works offline-ish
+                try { user.passwordHash = await hashPassword(pw); } catch (_) {}
+                cacheLocalUser(user);
+                setCurrentUsername(user.username);
+                rememberDeviceAccount(user.username);
+                await enterApp(user);
+                return;
+            }
+
+            // 2) Fallback: old local-only account on this phone
+            const users = getUsers();
+            const localUser = users[uname.toLowerCase()];
+            if (!localUser) {
+                loginError.textContent = (cloud && cloud.error)
+                    ? String(cloud.error)
+                    : 'No account with that username. Sign up first (accounts now work on all phones).';
+                return;
+            }
+            if (!(await passwordMatches(pw, localUser.passwordHash))) {
+                loginError.textContent = 'Wrong password.';
+                return;
+            }
+
+            let ban = getBanRecord(localUser.username) || await cloudCheckBan(localUser.username);
+            if (ban) {
+                try {
+                    const bans = getBans();
+                    bans[userKey(localUser.username)] = ban;
+                    saveBans(bans);
+                } catch (_) {}
+                currentUser = localUser;
+                setCurrentUsername(localUser.username);
+                showBanScreen(ban);
+                return;
+            }
+
+            // Migrate phone-only account to the server (so other phones can log in next time)
+            const migrated = await tryMigrateLocalToCloud(localUser, pw);
+            const user = migrated || localUser;
+            cacheLocalUser(user);
             setCurrentUsername(user.username);
-            currentUser = user;
-            // mirror cloud ban locally
-            try {
-                const bans = getBans();
-                bans[userKey(user.username)] = ban;
-                saveBans(bans);
-            } catch (_) {}
-            showBanScreen(ban);
-            return;
+            rememberDeviceAccount(user.username);
+            await enterApp(user);
+        } finally {
+            if (loginBtn) loginBtn.disabled = false;
         }
-        // success
-        setCurrentUsername(user.username);
-        rememberDeviceAccount(user.username);
-        cloudSyncUser(user).catch(() => {});
-        enterApp(user);
     };
 
     signupForm.onsubmit = async (e) => {
@@ -3018,30 +3120,69 @@
             return;
         }
 
-        const users = getUsers();
-        const key = nameCheck.value.toLowerCase();
-        if (users[key]) {
-            signupError.textContent = 'That username is already taken.';
-            return;
-        }
+        const signupBtn = document.getElementById('signup-submit');
+        if (signupBtn) signupBtn.disabled = true;
 
-        const hash = await hashPassword(pw);
-        const newUser = {
-            username: nameCheck.value,
-            passwordHash: hash,
-            gender: selectedGender,
-            dob: dob,
-            profilePic: null,
-            lastUsernameChange: 0,
-            createdAt: Date.now()
-        };
-        users[key] = newUser;
-        saveUsers(users);
-        setCurrentUsername(newUser.username);
-        rememberDeviceAccount(newUser.username);
-        // Register on central server so owner can see this account on any device
-        cloudSyncUser(newUser).catch(() => {});
-        enterApp(newUser);
+        try {
+            // Cloud signup first — account works on every phone
+            const cloud = await cloudPost({
+                action: 'signup',
+                username: nameCheck.value,
+                password: pw,
+                gender: selectedGender || 'boy',
+                birthday: dob,
+                dob: dob
+            });
+
+            if (cloud && cloud.ban) {
+                showBanScreen(cloud.ban);
+                return;
+            }
+
+            if (cloud && cloud.ok && cloud.token && cloud.profile) {
+                setAuthToken(cloud.token);
+                const user = profileToLocalUser(cloud.profile, { dob: dob });
+                try { user.passwordHash = await hashPassword(pw); } catch (_) {}
+                cacheLocalUser(user);
+                setCurrentUsername(user.username);
+                rememberDeviceAccount(user.username);
+                await enterApp(user);
+                return;
+            }
+
+            // If server says taken / error, show it (don't create phone-only ghost accounts)
+            if (cloud && cloud.error) {
+                signupError.textContent = String(cloud.error);
+                return;
+            }
+
+            // Server unreachable — last resort local account + warning
+            const users = getUsers();
+            const key = nameCheck.value.toLowerCase();
+            if (users[key]) {
+                signupError.textContent = 'That username is already taken on this phone.';
+                return;
+            }
+            const hash = await hashPassword(pw);
+            const newUser = {
+                username: nameCheck.value,
+                passwordHash: hash,
+                gender: selectedGender,
+                dob: dob,
+                profilePic: null,
+                lastUsernameChange: 0,
+                createdAt: Date.now(),
+                cloud: false
+            };
+            users[key] = newUser;
+            saveUsers(users);
+            setCurrentUsername(newUser.username);
+            rememberDeviceAccount(newUser.username);
+            alert('Server was offline — account saved only on this phone. Try again later so it works on other phones.');
+            await enterApp(newUser);
+        } finally {
+            if (signupBtn) signupBtn.disabled = false;
+        }
     };
 
     async function enterApp(user) {
@@ -3092,6 +3233,11 @@
     }
 
     function logout() {
+        const token = getAuthToken();
+        if (token) {
+            cloudPost({ action: 'logout', token }).catch(() => {});
+        }
+        setAuthToken(null);
         setCurrentUsername(null);
         // Remember intentional logout so auto-login doesn't immediately pull them back in
         storageSet('luba_manual_logout', '1');
@@ -3133,34 +3279,51 @@
         return (user && user.username) ? user : null;
     }
 
-    function tryAutoLogin() {
+    async function tryAutoLogin() {
         try {
             const manualLogout = storageGet('luba_manual_logout') === '1';
+            if (manualLogout) {
+                setCurrentUsername(null);
+                return false;
+            }
 
-            // 1) Current session (only if they didn't just log out on purpose)
-            let name = null;
-            if (!manualLogout) {
-                name = getCurrentUsername();
-                if (!name) {
-                    try {
-                        const snap = JSON.parse(storageGet('luba_session_user') || 'null');
-                        if (snap && snap.username) name = snap.username;
-                    } catch (_) {}
+            // 1) Cloud session token
+            const token = getAuthToken();
+            if (token) {
+                const data = await cloudPost({ action: 'get_profile', token });
+                if (data && data.ban) {
+                    showBanScreen(data.ban);
+                    return true;
                 }
+                if (data && data.ok && data.profile) {
+                    const user = profileToLocalUser(data.profile);
+                    cacheLocalUser(user);
+                    rememberDeviceAccount(user.username);
+                    await enterApp(user);
+                    return true;
+                }
+                // token dead
+                setAuthToken(null);
+            }
+
+            // 2) Local session name (same phone)
+            let name = getCurrentUsername();
+            if (!name) {
+                try {
+                    const snap = JSON.parse(storageGet('luba_session_user') || 'null');
+                    if (snap && snap.username) name = snap.username;
+                } catch (_) {}
             }
             let user = resolveUser(name);
 
-            // 2) Most recent account on this phone — auto-enter unless they logged out intentionally
-            if (!user && !manualLogout) {
+            if (!user) {
                 const deviceList = getDeviceAccounts();
-                if (deviceList.length > 0) {
-                    user = resolveUser(deviceList[0]);
-                }
+                if (deviceList.length > 0) user = resolveUser(deviceList[0]);
             }
 
             if (user) {
                 rememberDeviceAccount(user.username);
-                enterApp(user);
+                await enterApp(user);
                 return true;
             }
             setCurrentUsername(null);
@@ -4360,21 +4523,26 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         };
     }
     if (ownerBanPermBtn) {
-        ownerBanPermBtn.onclick = () => {
+        ownerBanPermBtn.onclick = async () => {
             const name = ownerBanTarget;
             if (!name) return;
             const reasonEl = document.getElementById('owner-ban-reason');
             const reason = (reasonEl && reasonEl.value.trim()) || 'Permanent ban by owner';
             if (!confirm('Permanently ban "' + name + '" on all devices?')) return;
-            applyBan(name, { permanent: true, reason });
-            if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
-            renderOwnerUserList();
-            if (ownerInspectUsername === name) window.ownerInspectUser(name);
-            alert('Banned permanently: ' + name);
+            ownerBanPermBtn.disabled = true;
+            try {
+                await applyBan(name, { permanent: true, reason });
+                if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
+                await renderOwnerUserList();
+                if (ownerInspectUsername === name) await window.ownerInspectUser(name);
+                alert('Banned permanently: ' + name);
+            } finally {
+                ownerBanPermBtn.disabled = false;
+            }
         };
     }
     if (ownerBanTimedBtn) {
-        ownerBanTimedBtn.onclick = () => {
+        ownerBanTimedBtn.onclick = async () => {
             const name = ownerBanTarget;
             if (!name) return;
             const reasonEl = document.getElementById('owner-ban-reason');
@@ -4389,11 +4557,16 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (unit === 'm') ms = amount * 60 * 1000;
             const until = Date.now() + ms;
             if (!confirm('Ban "' + name + '" until ' + new Date(until).toLocaleString() + '?')) return;
-            applyBan(name, { permanent: false, until, reason });
-            if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
-            renderOwnerUserList();
-            if (ownerInspectUsername === name) window.ownerInspectUser(name);
-            alert('Timed ban applied for ' + name);
+            ownerBanTimedBtn.disabled = true;
+            try {
+                await applyBan(name, { permanent: false, until, reason });
+                if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
+                await renderOwnerUserList();
+                if (ownerInspectUsername === name) await window.ownerInspectUser(name);
+                alert('Timed ban applied for ' + name);
+            } finally {
+                ownerBanTimedBtn.disabled = false;
+            }
         };
     }
 
