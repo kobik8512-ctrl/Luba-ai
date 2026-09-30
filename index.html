@@ -1659,7 +1659,7 @@
 <body>
 
 <!-- Owner emergency ball — login / ban screen (un-IP-ban without account) -->
-<button type="button" class="owner-fab" id="owner-fab-btn" title="Owner">●</button>
+<button type="button" class="owner-fab" id="owner-fab-btn" title="Owner tools">⚙</button>
 
 <!-- ========== AUTH SCREEN ========== -->
 <div id="auth-screen">
@@ -1910,7 +1910,6 @@
         </div>
     </div>
     <button type="button" class="ban-logout-btn" id="ban-logout-btn">Back to login</button>
-    <button type="button" class="ban-logout-btn" id="ban-owner-unlock-btn" style="margin-top:10px; background:transparent; color:#ff8a9a; border:1px solid rgba(255,138,154,0.45);">Owner? Unlock IP ban</button>
 </div>
 
 <!-- OWNER PANEL -->
@@ -2146,7 +2145,10 @@
     async function cloudCheckBan(username) {
         if (!username) return null;
         const data = await cloudPost({ action: 'check_ban', username });
-        if (data && data.ban) return data.ban;
+        if (!data) return null;
+        // IP ban takes priority for lock screens
+        if (data.ipBan) return Object.assign({}, data.ipBan, { _ipBan: true });
+        if (data.ban) return data.ban;
         return null;
     }
 
@@ -2314,11 +2316,10 @@
         // Verify on server
         try {
             const still = await cloudCheckBan(username);
-            if (still) {
-                // Retry once
+            if (still && !still._ipBan) {
                 await cloudOwnerUnban(username);
                 const again = await cloudCheckBan(username);
-                if (again) return { ok: false, error: 'Server still shows banned' };
+                if (again && !again._ipBan) return { ok: false, error: 'Server still shows banned' };
             }
         } catch (_) {}
         return { ok: true, serverOk };
@@ -2678,8 +2679,8 @@
         let ban = getBanRecord(username);
         try {
             const remote = await cloudCheckBan(username);
-            ban = remote || null;
-            if (!remote) {
+            ban = (remote && !remote._ipBan) ? remote : null;
+            if (!ban) {
                 // keep local clear if server says OK
                 try {
                     const bans = getBans();
@@ -3623,7 +3624,19 @@
                 return;
             }
 
-            let ban = getBanRecord(localUser.username) || await cloudCheckBan(localUser.username);
+            let ban = getBanRecord(localUser.username);
+            if (!ban) {
+                try {
+                    const remote = await cloudCheckBan(localUser.username);
+                    if (remote && remote._ipBan) {
+                        currentUser = localUser;
+                        setCurrentUsername(localUser.username);
+                        showBanScreen(remote, { kind: 'ip' });
+                        return;
+                    }
+                    ban = remote || null;
+                } catch (_) {}
+            }
             if (ban) {
                 try {
                     const bans = getBans();
@@ -3632,7 +3645,7 @@
                 } catch (_) {}
                 currentUser = localUser;
                 setCurrentUsername(localUser.username);
-                showBanScreen(ban);
+                showBanScreen(ban, { kind: 'ban' });
                 return;
             }
 
@@ -3746,8 +3759,38 @@
         // Ban gate — local + cloud
         let ban = getBanRecord(user.username);
         if (!ban) {
-            try { ban = await cloudCheckBan(user.username); } catch (_) {}
+            try {
+                const remote = await cloudCheckBan(user.username);
+                if (remote && remote._ipBan) {
+                    currentUser = user;
+                    setCurrentUsername(user.username);
+                    showBanScreen(remote, { kind: 'ip' });
+                    return;
+                }
+                ban = remote || null;
+            } catch (_) {}
         }
+        // Deleted account?
+        try {
+            const st = await cloudPost({
+                action: 'check_status',
+                token: getAuthToken() || undefined,
+                username: user.username
+            });
+            if (st && st.accountGone) {
+                currentUser = user;
+                setCurrentUsername(user.username);
+                showBanScreen(null, { kind: 'deleted' });
+                return;
+            }
+            if (st && st.ipBan) {
+                currentUser = user;
+                setCurrentUsername(user.username);
+                showBanScreen(st.ipBan, { kind: 'ip' });
+                return;
+            }
+            if (st && st.ban) ban = st.ban;
+        } catch (_) {}
         if (ban) {
             currentUser = user;
             setCurrentUsername(user.username);
@@ -3756,7 +3799,7 @@
                 bans[userKey(user.username)] = ban;
                 saveBans(bans);
             } catch (_) {}
-            showBanScreen(ban);
+            showBanScreen(ban, { kind: 'ban' });
             return;
         }
         hideBanScreen();
@@ -4539,15 +4582,36 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 status = null;
             }
 
-            // Fallback if worker not updated yet
+            // Fallback if check_status missing / fails
             if (!status || status.error) {
                 try {
                     const remote = await cloudCheckBan(currentUser.username);
+                    let banOnly = null;
+                    let ipOnly = null;
+                    if (remote && remote._ipBan) ipOnly = remote;
+                    else if (remote) banOnly = remote;
+                    let gone = false;
+                    const tok = getAuthToken();
+                    if (tok) {
+                        const prof = await cloudPost({ action: 'get_profile', token: tok });
+                        if (prof && (prof.error || prof.ok === false)) {
+                            const msg = String(prof.error || '').toLowerCase();
+                            if (msg.includes('not found') || msg.includes('expired') || msg.includes('session')) {
+                                gone = true;
+                            }
+                        }
+                    } else {
+                        const byName = await cloudPost({
+                            action: 'check_status',
+                            username: currentUser.username
+                        });
+                        if (byName && byName.accountGone) gone = true;
+                    }
                     status = {
                         ok: true,
-                        ban: remote || null,
-                        ipBan: (remote && remote.ip) ? remote : null,
-                        accountGone: false
+                        ban: banOnly,
+                        ipBan: ipOnly,
+                        accountGone: gone
                     };
                 } catch (_) {
                     status = null;
@@ -4567,12 +4631,15 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 try {
                     if (typeof abortController !== 'undefined' && abortController) abortController.abort();
                 } catch (_) {}
-                // Clear local session so they can't keep using offline cache
                 try {
                     setAuthToken(null);
                     const bans = getBans();
                     delete bans[userKey(currentUser.username)];
                     saveBans(bans);
+                    // Remove local copy of deleted account
+                    const users = getUsers();
+                    delete users[userKey(currentUser.username)];
+                    saveUsers(users);
                 } catch (_) {}
                 showBanScreen(null, { kind: 'deleted' });
                 stopChatSyncPolling();
@@ -4626,12 +4693,12 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
     function startBanPolling() {
         stopBanPolling();
+        // Fast poll so delete / ban / IP ban appear live (no refresh needed)
         banPollTimer = setInterval(() => {
             if (!currentUser) return;
             if (document.hidden) return;
-            // Keep polling even while banned — so Unban / Delete unlocks without refresh
             enforceLiveBan(false).catch(() => {});
-        }, 3000);
+        }, 2000);
     }
 
     function stopBanPolling() {
@@ -5409,10 +5476,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         }
     }
 
-    const banOwnerUnlockBtn = document.getElementById('ban-owner-unlock-btn');
-    if (banOwnerUnlockBtn) {
-        banOwnerUnlockBtn.onclick = () => { ownerEmergencyIpUnlock(); };
-    }
+    // Ban-screen "Owner? Unlock IP ban" button removed — use the ball only
     const ownerFabBtn = document.getElementById('owner-fab-btn');
     if (ownerFabBtn) {
         ownerFabBtn.onclick = () => { ownerEmergencyIpUnlock(); };
