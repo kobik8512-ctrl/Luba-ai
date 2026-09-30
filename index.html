@@ -1391,17 +1391,24 @@
         }
         .owner-user-head {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: 8px;
             padding: 10px 12px;
             cursor: pointer;
+            flex-wrap: wrap;
         }
         .owner-user-head:hover {
             background: rgba(255, 0, 127, 0.06);
         }
         .owner-user-name { font-weight: 700; font-size: 14px; }
-        .owner-user-meta { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+        .owner-user-meta {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 2px;
+            word-break: break-word;
+            line-height: 1.35;
+        }
         .owner-badge {
             font-size: 10px;
             font-weight: 800;
@@ -1500,17 +1507,20 @@
             gap: 6px;
             flex-shrink: 0;
             align-items: center;
+            flex-wrap: wrap;
+            margin-left: auto;
         }
         .owner-mini-btn {
             background: #282a2c;
             border: 1px solid #444746;
             color: #fff;
-            padding: 5px 10px;
+            padding: 6px 10px;
             border-radius: 10px;
             font-size: 11px;
             font-weight: 700;
             cursor: pointer;
             white-space: nowrap;
+            min-height: 28px;
         }
         body.light .owner-mini-btn {
             background: #eee;
@@ -1521,6 +1531,42 @@
             background: rgba(179, 51, 51, 0.25);
             border-color: #b33;
             color: #ff8a9a;
+        }
+        @media (max-width: 520px) {
+            .owner-user-head {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .owner-user-actions {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 6px;
+                justify-content: flex-start;
+            }
+            .owner-mini-btn {
+                flex: 1 1 auto;
+                text-align: center;
+            }
+            #owner-overlay .modal {
+                width: 100%;
+                max-width: 100%;
+                max-height: 100vh;
+                border-radius: 16px 16px 0 0;
+                margin: 0;
+            }
+            #owner-overlay {
+                padding-top: 4vh;
+                align-items: flex-end;
+            }
+            .owner-user-list {
+                max-height: min(48vh, 380px);
+            }
+            #owner-inspect-overlay .modal,
+            #owner-ban-overlay .modal {
+                width: 100%;
+                max-width: 100%;
+                max-height: 92vh;
+            }
         }
         .owner-chat-bubble {
             border-radius: 10px;
@@ -2250,9 +2296,11 @@
             if (ban && ban.permanent) {
                 bodyEl.textContent = 'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case.';
             } else {
-                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case. When the ban ends, log in again to continue.';
+                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case. When the ban ends, this screen will unlock automatically (or log in again).';
             }
         }
+        // Ensure we keep checking server for Unban / Delete / timer end
+        startBanPolling();
     }
 
     function hideBanScreen() {
@@ -4272,31 +4320,41 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
     async function enforceLiveBan(force) {
         if (!currentUser || !currentUser.username) return false;
-        if (document.body.classList.contains('banned')) return true;
         const now = Date.now();
-        if (!force && now - lastBanCheckAt < 2000) return false;
-        if (banCheckInFlight) return false;
+        // Allow faster checks while ban screen is up (detect unban/delete)
+        const minGap = document.body.classList.contains('banned') ? 1500 : 2000;
+        if (!force && now - lastBanCheckAt < minGap) return document.body.classList.contains('banned');
+        if (banCheckInFlight) return document.body.classList.contains('banned');
         banCheckInFlight = true;
         lastBanCheckAt = now;
         try {
             let ban = getBanRecord(currentUser.username);
             try {
                 const remote = await cloudCheckBan(currentUser.username);
-                if (remote) ban = remote;
-                else if (ban && !ban.permanent && ban.until && Date.now() >= ban.until) {
+                if (remote) {
+                    ban = remote;
+                } else {
+                    // Server says NOT banned (or account deleted / ban removed)
                     ban = null;
-                } else if (!remote) {
-                    // Server says not banned — clear stale local ban
-                    if (ban) {
-                        try {
-                            const bans = getBans();
+                    try {
+                        const bans = getBans();
+                        if (bans[userKey(currentUser.username)]) {
                             delete bans[userKey(currentUser.username)];
                             saveBans(bans);
-                        } catch (_) {}
-                        ban = null;
-                    }
+                        }
+                    } catch (_) {}
                 }
-            } catch (_) {}
+            } catch (_) {
+                // Network fail: still expire timed bans locally
+                if (ban && !ban.permanent && ban.until && Date.now() >= ban.until) {
+                    ban = null;
+                    try {
+                        const bans = getBans();
+                        delete bans[userKey(currentUser.username)];
+                        saveBans(bans);
+                    } catch (_) {}
+                }
+            }
             if (ban) {
                 try {
                     const bans = getBans();
@@ -4309,9 +4367,23 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                     }
                 } catch (_) {}
                 showBanScreen(ban);
-                stopBanPolling();
                 stopChatSyncPolling();
+                // Keep ban polling running so Unban/Delete unlocks live
                 return true;
+            }
+
+            // Not banned on server — unlock if ban screen was showing
+            if (document.body.classList.contains('banned')) {
+                hideBanScreen();
+                stopChatSyncPolling();
+                // Bring them back into the app without full reload
+                try {
+                    await enterApp(currentUser);
+                } catch (_) {
+                    document.body.classList.add('logged-in');
+                    startBanPolling();
+                    startChatSyncPolling();
+                }
             }
         } finally {
             banCheckInFlight = false;
@@ -4323,13 +4395,10 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         stopBanPolling();
         banPollTimer = setInterval(() => {
             if (!currentUser) return;
-            if (document.body.classList.contains('banned')) {
-                stopBanPolling();
-                return;
-            }
             if (document.hidden) return;
+            // Keep polling even while banned — so Unban / Delete unlocks without refresh
             enforceLiveBan(false).catch(() => {});
-        }, 4000);
+        }, 3000);
     }
 
     function stopBanPolling() {
