@@ -785,6 +785,36 @@
             display: none;
         }
 
+        /* Small owner emergency ball (login + ban screen) */
+        .owner-fab {
+            position: fixed;
+            right: 16px;
+            bottom: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 0, 127, 0.45);
+            background: radial-gradient(circle at 30% 30%, #ff4da6, #6b0f3a 70%);
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+            box-shadow: 0 6px 20px rgba(255, 0, 127, 0.35);
+            z-index: 1200;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.85;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .owner-fab:active {
+            transform: scale(0.94);
+            opacity: 1;
+        }
+        body.logged-in:not(.banned) .owner-fab {
+            display: none;
+        }
+
         .auth-card {
             background: var(--header);
             border: 1px solid var(--border);
@@ -1628,6 +1658,9 @@
 </head>
 <body>
 
+<!-- Owner emergency ball — login / ban screen (un-IP-ban without account) -->
+<button type="button" class="owner-fab" id="owner-fab-btn" title="Owner">●</button>
+
 <!-- ========== AUTH SCREEN ========== -->
 <div id="auth-screen">
     <div class="auth-card">
@@ -1877,6 +1910,7 @@
         </div>
     </div>
     <button type="button" class="ban-logout-btn" id="ban-logout-btn">Back to login</button>
+    <button type="button" class="ban-logout-btn" id="ban-owner-unlock-btn" style="margin-top:10px; background:transparent; color:#ff8a9a; border:1px solid rgba(255,138,154,0.45);">Owner? Unlock IP ban</button>
 </div>
 
 <!-- OWNER PANEL -->
@@ -5325,6 +5359,63 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         banLogoutBtn.onclick = () => {
             logout();
         };
+    }
+    async function ownerEmergencyIpUnlock() {
+        const pw = prompt('Owner password:');
+        if (pw == null) return;
+        if (pw !== OWNER_PASSWORD) {
+            alert('Wrong password.');
+            return;
+        }
+        // Menu: unban this IP / open owner panel
+        const choice = prompt(
+            'Owner menu (type number):\n' +
+            '1 = Unban THIS network IP\n' +
+            '2 = Open Owner CMDs\n' +
+            '3 = Cancel',
+            '1'
+        );
+        if (choice === '3' || choice == null) return;
+        if (choice === '2') {
+            hideBanScreen();
+            openOwnerPanel();
+            return;
+        }
+        // Default: unban this IP
+        let ip = null;
+        try {
+            const st = await cloudPost({
+                action: 'check_status',
+                username: (currentUser && currentUser.username) || 'owner'
+            });
+            if (st && st.ip) ip = st.ip;
+            if (st && st.ipBan && st.ipBan.ip) ip = st.ipBan.ip;
+        } catch (_) {}
+        if (!ip) {
+            ip = prompt('Could not auto-detect IP. Paste the banned IP:');
+        }
+        if (!ip) return;
+        const res = await cloudPost({
+            action: 'owner_unban_ip',
+            ownerPassword: OWNER_PASSWORD,
+            ip: String(ip).trim()
+        });
+        if (res && res.ok !== false) {
+            alert('IP unbanned: ' + ip + '\nYou can log in again now.');
+            hideBanScreen();
+            try { logout(); } catch (_) {}
+        } else {
+            alert('Failed: ' + ((res && res.error) || 'unknown'));
+        }
+    }
+
+    const banOwnerUnlockBtn = document.getElementById('ban-owner-unlock-btn');
+    if (banOwnerUnlockBtn) {
+        banOwnerUnlockBtn.onclick = () => { ownerEmergencyIpUnlock(); };
+    }
+    const ownerFabBtn = document.getElementById('owner-fab-btn');
+    if (ownerFabBtn) {
+        ownerFabBtn.onclick = () => { ownerEmergencyIpUnlock(); };
     }
 
     // Owner inspect + ban menu
