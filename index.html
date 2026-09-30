@@ -1261,6 +1261,271 @@
             opacity: 0.55;
             pointer-events: none;
         }
+
+        /* ========== OWNER / BAN ========== */
+        #ban-screen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 600;
+            background: #3b0008;
+            color: #fff;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 28px 20px;
+            text-align: center;
+            overflow-y: auto;
+        }
+        body.banned #ban-screen {
+            display: flex;
+        }
+        body.banned #auth-screen,
+        body.banned header,
+        body.banned #chat-container,
+        body.banned #input-wrapper {
+            display: none !important;
+        }
+        .ban-icon { font-size: 48px; margin-bottom: 12px; }
+        .ban-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #ff6b8a;
+            margin-bottom: 10px;
+        }
+        .ban-body {
+            max-width: 420px;
+            font-size: 14px;
+            line-height: 1.55;
+            opacity: 0.95;
+            margin-bottom: 14px;
+        }
+        .ban-reason-box {
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,107,138,0.45);
+            border-radius: 12px;
+            padding: 12px 14px;
+            max-width: 420px;
+            width: 100%;
+            font-size: 13px;
+            text-align: left;
+            margin-bottom: 16px;
+        }
+        .ban-reason-box strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #ff9bb0;
+        }
+        .ban-logout-btn {
+            background: #fff;
+            color: #3b0008;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 14px;
+            font-weight: 800;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .owner-btn {
+            width: 100%;
+            margin-top: 10px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #ffb347;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        body.light .owner-btn {
+            background: #fff8e8;
+            border-color: #e0c080;
+            color: #8a5a00;
+        }
+        #owner-overlay .modal {
+            max-width: 520px;
+            width: 96%;
+        }
+        .owner-gate, .owner-panel { display: none; }
+        .owner-gate.visible, .owner-panel.visible { display: block; }
+        .owner-user-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+        .owner-user-card {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--bubble-user);
+            overflow: hidden;
+        }
+        .owner-user-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+        }
+        .owner-user-head:hover {
+            background: rgba(255, 0, 127, 0.06);
+        }
+        .owner-user-name { font-weight: 700; font-size: 14px; }
+        .owner-user-meta { font-size: 11px; opacity: 0.6; margin-top: 2px; }
+        .owner-badge {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 999px;
+            flex-shrink: 0;
+        }
+        .owner-badge.ok { background: rgba(61,214,140,0.2); color: #3dd68c; }
+        .owner-badge.banned { background: rgba(255,80,100,0.25); color: #ff6b8a; }
+        .owner-user-body {
+            display: none;
+            border-top: 1px solid var(--border);
+            padding: 10px 12px 12px;
+        }
+        .owner-user-card.open .owner-user-body { display: block; }
+        .owner-ban-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .owner-ban-row .small-btn { font-size: 11px; }
+        .owner-ban-row .small-btn.danger {
+            background: #b33;
+            border-color: #b33;
+            color: #fff;
+        }
+        .owner-ban-row .small-btn.warn {
+            background: #a66b00;
+            border-color: #a66b00;
+            color: #fff;
+        }
+        .owner-chat-preview {
+            max-height: 180px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.25);
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 11px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin-top: 6px;
+        }
+        body.light .owner-chat-preview { background: rgba(0,0,0,0.06); }
+        .owner-section-label {
+            font-size: 12px;
+            font-weight: 700;
+            opacity: 0.75;
+            margin: 10px 0 4px;
+        }
+        .owner-empty {
+            font-size: 13px;
+            opacity: 0.6;
+            text-align: center;
+            padding: 16px 0;
+        }
+        .owner-note {
+            font-size: 11px;
+            opacity: 0.65;
+            line-height: 1.45;
+            margin-bottom: 12px;
+        }
+        .owner-timer-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .owner-timer-row input,
+        .owner-timer-row select {
+            width: auto;
+            margin: 0;
+            padding: 6px 8px;
+            font-size: 12px;
+            border-radius: 8px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .owner-reason-input {
+            width: 100%;
+            margin: 6px 0 0;
+            padding: 8px;
+            font-size: 12px;
+            border-radius: 8px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            box-sizing: border-box;
+        }
+
+        .owner-user-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            align-items: center;
+        }
+        .owner-mini-btn {
+            background: #282a2c;
+            border: 1px solid #444746;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        body.light .owner-mini-btn {
+            background: #eee;
+            border-color: #ccc;
+            color: #333;
+        }
+        .owner-mini-btn.ban {
+            background: rgba(179, 51, 51, 0.25);
+            border-color: #b33;
+            color: #ff8a9a;
+        }
+        .owner-chat-bubble {
+            border-radius: 10px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+        .owner-chat-bubble.user {
+            background: rgba(255, 0, 127, 0.12);
+            border: 1px solid rgba(255, 0, 127, 0.25);
+        }
+        .owner-chat-bubble.meta {
+            opacity: 0.55;
+            font-size: 10px;
+            margin-bottom: 2px;
+            padding: 0;
+            border: none;
+            background: transparent;
+        }
+        .owner-inspect-chat {
+            max-height: 45vh;
+            overflow-y: auto;
+            margin: 10px 0 12px;
+            padding: 4px;
+        }
+        #owner-ban-overlay .modal,
+        #owner-inspect-overlay .modal {
+            max-width: 480px;
+            width: 96%;
+        }
     </style>
 </head>
 <body>
@@ -1481,6 +1746,8 @@
 
             <button type="button" class="modal-btn danger-btn" id="logout-btn">Log out</button>
 
+            <button type="button" class="owner-btn" id="open-owner-btn">Owner CMDs</button>
+
             <div class="auth-legal" style="margin-top:12px;">
                 <button type="button" class="legal-link" id="settings-terms-btn">Terms of Service</button>
                 ·
@@ -1491,6 +1758,106 @@
         <div class="modal-buttons" style="margin-top:16px;">
             <button class="modal-btn cancel-btn" id="close-settings-btn">Cancel</button>
             <button class="modal-btn save-btn" id="save-settings-btn">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- BAN SCREEN (shown when account is banned) -->
+<div id="ban-screen">
+    <div class="ban-icon">🚫</div>
+    <div class="ban-title">You're banned</div>
+    <div class="ban-body" id="ban-body-text">
+        Your account has been suspended from Luba AI for breaking the rules.
+        You cannot use the chat while this ban is active.
+    </div>
+    <div class="ban-reason-box" id="ban-reason-box">
+        <strong>Reason</strong>
+        <span id="ban-reason-text">—</span>
+        <div style="margin-top:8px;" id="ban-until-wrap">
+            <strong>Ban ends</strong>
+            <span id="ban-until-text">—</span>
+        </div>
+    </div>
+    <button type="button" class="ban-logout-btn" id="ban-logout-btn">Back to login</button>
+</div>
+
+<!-- OWNER PANEL -->
+<div class="modal-overlay" id="owner-overlay">
+    <div class="modal">
+        <div class="modal-header-row">
+            <h3>Owner CMDs</h3>
+            <button class="lightbox-close saved-chats-close" id="close-owner-btn" title="Close">×</button>
+        </div>
+
+        <div class="owner-gate visible" id="owner-gate">
+            <p>Enter the owner password to open moderation tools.</p>
+            <input type="password" id="owner-password-input" placeholder="Owner password" autocomplete="off">
+            <div class="auth-error" id="owner-error"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel-btn" id="owner-cancel-btn">Cancel</button>
+                <button class="modal-btn save-btn" id="owner-unlock-btn">Unlock</button>
+            </div>
+        </div>
+
+        <div class="owner-panel" id="owner-panel">
+            <p class="owner-note">
+                Tap <strong>View</strong> to read a user’s messages. Tap <strong>Ban</strong> for permanent or timed ban (all devices).
+                People only appear here after they use the updated app and send a message (or sign up).
+                Older testers with the old HTML stay invisible until they update and chat once.
+            </p>
+            <div class="owner-section-label">Recent messages (all devices)</div>
+            <div class="owner-chat-preview" id="owner-mod-log" style="margin-bottom:12px; max-height:120px;"></div>
+            <div class="owner-section-label">Registered accounts</div>
+            <div class="owner-user-list" id="owner-user-list"></div>
+        </div>
+    </div>
+</div>
+
+<!-- OWNER: inspect one user -->
+<div class="modal-overlay" id="owner-inspect-overlay">
+    <div class="modal">
+        <div class="modal-header-row">
+            <h3 id="owner-inspect-title">User</h3>
+            <button class="lightbox-close saved-chats-close" id="close-owner-inspect-btn" title="Close">×</button>
+        </div>
+        <div class="owner-user-meta" id="owner-inspect-meta" style="margin-bottom:8px;"></div>
+        <div class="owner-ban-row">
+            <button type="button" class="small-btn danger" id="owner-inspect-ban-btn">Ban…</button>
+            <button type="button" class="small-btn" id="owner-inspect-unban-btn">Unban</button>
+            <button type="button" class="small-btn" id="owner-inspect-refresh-btn">Refresh</button>
+        </div>
+        <div class="owner-section-label">Messages (all devices)</div>
+        <div class="owner-inspect-chat" id="owner-inspect-cloud"></div>
+        <div class="owner-section-label">Chat on this phone (if any)</div>
+        <div class="owner-inspect-chat" id="owner-inspect-local"></div>
+        <div class="owner-section-label">Saved chats on this phone</div>
+        <div class="owner-chat-preview" id="owner-inspect-saved"></div>
+    </div>
+</div>
+
+<!-- OWNER: ban menu -->
+<div class="modal-overlay" id="owner-ban-overlay">
+    <div class="modal">
+        <div class="modal-header-row">
+            <h3 id="owner-ban-title">Ban user</h3>
+            <button class="lightbox-close saved-chats-close" id="close-owner-ban-btn" title="Close">×</button>
+        </div>
+        <p class="owner-note" id="owner-ban-subtitle">Choose permanent or timed ban.</p>
+        <label style="font-size:12px; font-weight:600; opacity:0.8;">Reason</label>
+        <input type="text" class="owner-reason-input" id="owner-ban-reason" placeholder="Why are they banned?">
+        <div class="owner-timer-row" style="margin-top:12px;">
+            <span style="font-size:12px; opacity:0.75;">Timer:</span>
+            <input type="number" min="1" value="24" id="owner-ban-timer-val" style="width:64px">
+            <select id="owner-ban-timer-unit">
+                <option value="h">hours</option>
+                <option value="d">days</option>
+                <option value="m">minutes</option>
+            </select>
+        </div>
+        <div class="modal-buttons" style="margin-top:16px; flex-wrap:wrap;">
+            <button class="modal-btn cancel-btn" id="owner-ban-cancel-btn">Cancel</button>
+            <button class="modal-btn" id="owner-ban-timed-btn" style="background:#a66b00; color:#fff;">Timed ban</button>
+            <button class="modal-btn save-btn" id="owner-ban-perm-btn" style="background:#b33;">Permanent ban</button>
         </div>
     </div>
 </div>
@@ -1582,6 +1949,505 @@
     const KOBI_CLAIM_REGEX = /\b(i'?m|i am|this is|it'?s|my name is)\s+kobi\b|\bkobi\s+here\b|\b(i'?m|i am|this is|it'?s)\s+(your|the)\s+(creator|maker|developer|dev|programmer|coder|owner|founder|admin|master|boss)\b|\bi\s+(created|made|built|programmed|coded|developed|own)\s+you\b/i;
     let isVerifiedKobi = false;
     let awaitingKobiPassword = false;
+
+    // ============================================================
+    // Owner moderation (password: kobitheowner)
+    // ============================================================
+    const OWNER_PASSWORD = "kobitheowner";
+    let ownerUnlocked = false;
+    // Cloud directory from worker (all devices). Local is fallback only.
+    let cloudUsersCache = [];
+    let cloudLogsCache = [];
+
+    async function cloudPost(body) {
+        if (!WORKER_URL || WORKER_URL.includes('YOUR-WORKER-NAME')) {
+            return { error: 'Worker URL not set' };
+        }
+        try {
+            const res = await fetch(WORKER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json().catch(() => null);
+            if (!data) return { error: 'Bad response from worker (' + res.status + ')' };
+            // Worker sometimes returns { ok:false, error:"..." }
+            if (data.ok === false && data.error) return { error: data.error, ...data };
+            return data;
+        } catch (err) {
+            return { error: (err && err.message) ? err.message : 'network' };
+        }
+    }
+
+    async function cloudSyncUser(user) {
+        if (!user || !user.username) return null;
+        return cloudPost({
+            action: 'sync_user',
+            user: {
+                username: user.username,
+                gender: user.gender || null,
+                dob: user.dob || null,
+                createdAt: user.createdAt || Date.now()
+            }
+        });
+    }
+
+    async function cloudCheckBan(username) {
+        if (!username) return null;
+        const data = await cloudPost({ action: 'check_ban', username });
+        if (data && data.ban) return data.ban;
+        return null;
+    }
+
+    async function cloudLogMessage(username, text, hasMedia) {
+        cloudPost({
+            action: 'log_message',
+            username: username || '?',
+            text: text || '',
+            hasMedia: !!hasMedia
+        }).catch(() => {});
+    }
+
+    async function cloudOwnerList() {
+        return cloudPost({
+            action: 'owner_list',
+            ownerPassword: OWNER_PASSWORD
+        });
+    }
+
+    async function cloudOwnerBan(username, opts) {
+        return cloudPost({
+            action: 'owner_ban',
+            ownerPassword: OWNER_PASSWORD,
+            username,
+            permanent: !!opts.permanent,
+            until: opts.until || null,
+            reason: opts.reason || 'Violation of Luba AI rules'
+        });
+    }
+
+    async function cloudOwnerUnban(username) {
+        return cloudPost({
+            action: 'owner_unban',
+            ownerPassword: OWNER_PASSWORD,
+            username
+        });
+    }
+
+    function getBans() {
+        try {
+            return JSON.parse(storageGet('luba_bans') || '{}') || {};
+        } catch {
+            return {};
+        }
+    }
+
+    function saveBans(map) {
+        storageSet('luba_bans', JSON.stringify(map || {}));
+    }
+
+    function getBanRecord(username) {
+        if (!username) return null;
+        const key = String(username).toLowerCase();
+        const bans = getBans();
+        let ban = bans[key] || null;
+        // Also check user object
+        try {
+            const users = getUsers();
+            const u = users[key];
+            if (u && u.ban) ban = u.ban;
+        } catch (_) {}
+        if (!ban) return null;
+        // Timed ban expired?
+        if (!ban.permanent && ban.until && Date.now() >= ban.until) {
+            clearBan(username);
+            return null;
+        }
+        return ban;
+    }
+
+    function isUserBanned(username) {
+        return !!getBanRecord(username);
+    }
+
+    function applyBan(username, opts) {
+        const key = String(username).toLowerCase();
+        const bans = getBans();
+        const entry = {
+            username: username,
+            permanent: !!opts.permanent,
+            until: opts.permanent ? null : (opts.until || null),
+            reason: (opts.reason || 'Violation of Luba AI rules').trim(),
+            bannedAt: Date.now()
+        };
+        bans[key] = entry;
+        saveBans(bans);
+        // Mirror onto user record (local)
+        try {
+            const users = getUsers();
+            if (users[key]) {
+                users[key].ban = entry;
+                saveUsers(users);
+            }
+        } catch (_) {}
+        // Push ban to ALL devices via Cloudflare Worker
+        cloudOwnerBan(username, {
+            permanent: entry.permanent,
+            until: entry.until,
+            reason: entry.reason
+        }).catch(() => {});
+        // If currently logged in as that user, show ban screen
+        if (currentUser && userKey(currentUser.username) === key) {
+            showBanScreen(entry);
+        }
+        return entry;
+    }
+
+    function clearBan(username) {
+        const key = String(username).toLowerCase();
+        const bans = getBans();
+        delete bans[key];
+        saveBans(bans);
+        try {
+            const users = getUsers();
+            if (users[key] && users[key].ban) {
+                delete users[key].ban;
+                saveUsers(users);
+            }
+        } catch (_) {}
+        cloudOwnerUnban(username).catch(() => {});
+        if (currentUser && userKey(currentUser.username) === key) {
+            hideBanScreen();
+        }
+    }
+
+    function formatBanUntil(ban) {
+        if (!ban) return '—';
+        if (ban.permanent) return 'Permanent (does not expire)';
+        if (!ban.until) return '—';
+        try {
+            return new Date(ban.until).toLocaleString();
+        } catch {
+            return String(ban.until);
+        }
+    }
+
+    function showBanScreen(ban) {
+        document.body.classList.add('banned');
+        document.body.classList.remove('logged-in');
+        const reasonEl = document.getElementById('ban-reason-text');
+        const untilEl = document.getElementById('ban-until-text');
+        const bodyEl = document.getElementById('ban-body-text');
+        if (reasonEl) reasonEl.textContent = (ban && ban.reason) || 'Violation of Luba AI rules';
+        if (untilEl) untilEl.textContent = formatBanUntil(ban);
+        if (bodyEl) {
+            if (ban && ban.permanent) {
+                bodyEl.textContent = 'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this is a mistake, contact the owner.';
+            } else {
+                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. When the timer is over, log in again to continue.';
+            }
+        }
+    }
+
+    function hideBanScreen() {
+        document.body.classList.remove('banned');
+    }
+
+    function appendModLog(entry) {
+        try {
+            let log = [];
+            try { log = JSON.parse(storageGet('luba_mod_log') || '[]') || []; } catch (_) { log = []; }
+            log.push(entry);
+            if (log.length > 200) log = log.slice(-200);
+            storageSet('luba_mod_log', JSON.stringify(log));
+        } catch (_) {}
+    }
+
+    function getUserSavedChatsForOwner(username) {
+        try {
+            const key = 'luba_saved_' + userKey(username);
+            let raw = localStorage.getItem(key);
+            if (!raw) {
+                const old = localStorage.getItem('luba_saved_' + username);
+                if (old) raw = old;
+            }
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function previewChatText(history, maxMsgs) {
+        if (!history || !history.length) return '(no messages yet)';
+        const slice = history.slice(-(maxMsgs || 12));
+        return slice.map(m => {
+            const who = m.role === 'user' ? 'User' : 'Luba';
+            let c = String(m.content || '');
+            if (c.length > 180) c = c.slice(0, 180) + '…';
+            return who + ': ' + c;
+        }).join('\n\n');
+    }
+
+    async function renderOwnerUserList() {
+        const logEl = document.getElementById('owner-mod-log');
+        const listEl = document.getElementById('owner-user-list');
+        if (listEl) listEl.innerHTML = '<div class="owner-empty">Loading accounts from server…</div>';
+        if (logEl) logEl.textContent = 'Loading…';
+
+        // Prefer cloud (all devices). Fall back to local if worker not ready.
+        let cloud = await cloudOwnerList();
+        const cloudOk = cloud && cloud.ok && Array.isArray(cloud.users);
+        if (cloudOk) {
+            cloudUsersCache = cloud.users;
+            cloudLogsCache = cloud.logs || [];
+        } else {
+            cloudUsersCache = [];
+            cloudLogsCache = [];
+        }
+
+        if (logEl) {
+            if (cloudOk && cloudLogsCache.length) {
+                logEl.textContent = '✅ Server connected (all devices)\n\n' + cloudLogsCache.slice(0, 40).map(e => {
+                    const when = e.at ? new Date(e.at).toLocaleString() : '';
+                    const t = String(e.text || '').slice(0, 140);
+                    return '[' + when + '] ' + (e.username || '?') + ': ' + t;
+                }).join('\n\n');
+            } else if (cloudOk) {
+                let localLog = [];
+                try { localLog = JSON.parse(storageGet('luba_mod_log') || '[]') || []; } catch (_) { localLog = []; }
+                if (localLog.length) {
+                    logEl.textContent = '✅ Server connected — no cloud messages yet.\nSend a new message (with this updated HTML) so it logs for all devices.\n\nLocal on this phone:\n' + localLog.slice(-20).reverse().map(e => {
+                        const when = e.at ? new Date(e.at).toLocaleString() : '';
+                        const t = String(e.text || '').slice(0, 120);
+                        return '[' + when + '] ' + (e.username || '?') + ': ' + t;
+                    }).join('\n\n');
+                } else {
+                    logEl.textContent = '✅ Server connected.\nNo messages logged yet — send a chat message to appear here.';
+                }
+            } else {
+                let localLog = [];
+                try { localLog = JSON.parse(storageGet('luba_mod_log') || '[]') || []; } catch (_) { localLog = []; }
+                const err = (cloud && cloud.error) ? cloud.error : 'could not reach worker';
+                logEl.textContent = '❌ Server not ready: ' + err +
+                    '\n\nMake sure you Deployed luba-worker-merged.js and USERS_KV is bound.' +
+                    (localLog.length ? ('\n\nLocal only:\n' + localLog.slice(-15).reverse().map(e => {
+                        const when = e.at ? new Date(e.at).toLocaleString() : '';
+                        return '[' + when + '] ' + (e.username || '?') + ': ' + String(e.text || '').slice(0, 100);
+                    }).join('\n\n')) : '');
+            }
+        }
+
+        if (!listEl) return;
+
+        // Merge cloud users + local users
+        const byKey = {};
+        if (cloudOk) {
+            cloudUsersCache.forEach(u => {
+                if (u && u.username) byKey[String(u.username).toLowerCase()] = { ...u, _source: 'cloud' };
+            });
+        }
+        const localUsers = getUsers();
+        Object.keys(localUsers).forEach(key => {
+            const u = localUsers[key];
+            if (!u || !u.username) return;
+            const k = String(u.username).toLowerCase();
+            if (!byKey[k]) {
+                byKey[k] = {
+                    username: u.username,
+                    gender: u.gender,
+                    dob: u.dob,
+                    createdAt: u.createdAt,
+                    ban: getBanRecord(u.username),
+                    _source: 'local'
+                };
+            } else if (!byKey[k].ban) {
+                byKey[k].ban = getBanRecord(u.username) || byKey[k].ban;
+            }
+        });
+
+        const keys = Object.keys(byKey).sort((a, b) =>
+            String(byKey[a].username).localeCompare(String(byKey[b].username))
+        );
+
+        if (keys.length === 0) {
+            listEl.innerHTML = '<div class="owner-empty">No accounts yet. After the worker is set up, users appear here when they sign up or send a message.</div>';
+            return;
+        }
+
+        listEl.innerHTML = keys.map(key => {
+            const u = byKey[key];
+            const name = u.username || key;
+            const ban = u.ban || getBanRecord(name);
+            const safeName = escapeHtml(name);
+            const jsName = String(name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const badge = ban
+                ? `<span class="owner-badge banned">${ban.permanent ? 'PERM BAN' : 'TIMED BAN'}</span>`
+                : `<span class="owner-badge ok">OK</span>`;
+            const created = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—';
+            const lastSeen = u.lastSeen ? new Date(u.lastSeen).toLocaleString() : '—';
+            const source = u._source === 'cloud'
+                ? (u.activityOnly ? 'seen on server' : 'all devices')
+                : 'this phone only';
+            return `<div class="owner-user-card" data-user="${safeName}">
+                <div class="owner-user-head">
+                    <div style="min-width:0; flex:1;" onclick="window.ownerInspectUser && window.ownerInspectUser('${jsName}')">
+                        <div class="owner-user-name">${safeName}</div>
+                        <div class="owner-user-meta">${source} · joined ${created} · last ${lastSeen}${u.gender ? ' · ' + escapeHtml(u.gender) : ''}</div>
+                    </div>
+                    <div class="owner-user-actions">
+                        ${badge}
+                        <button type="button" class="owner-mini-btn" onclick="event.stopPropagation(); window.ownerInspectUser && window.ownerInspectUser('${jsName}')">View</button>
+                        <button type="button" class="owner-mini-btn ban" onclick="event.stopPropagation(); window.ownerOpenBanMenu && window.ownerOpenBanMenu('${jsName}')">Ban</button>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    let ownerInspectUsername = null;
+    let ownerBanTarget = null;
+
+    function renderBubblesFromCloudLogs(logs) {
+        if (!logs || !logs.length) {
+            return '<div class="owner-empty">No messages from this user on the server yet.</div>';
+        }
+        return logs.slice().reverse().map(e => {
+            const when = e.at ? new Date(e.at).toLocaleString() : '';
+            const text = escapeHtml(String(e.text || ''));
+            const media = e.hasMedia ? ' 📎' : '';
+            return `<div class="owner-chat-bubble meta">${escapeHtml(when)}</div>
+                <div class="owner-chat-bubble user">${text}${media}</div>`;
+        }).join('');
+    }
+
+    function renderBubblesFromLocalHistory(hist) {
+        if (!hist || !hist.length) {
+            return '<div class="owner-empty">No chat for this user stored on this phone. Full back-and-forth only exists on their device; the server keeps what they sent.</div>';
+        }
+        return hist.slice(-40).map(m => {
+            const who = m.role === 'user' ? 'User' : 'Luba';
+            const when = m.time ? escapeHtml(String(m.time)) : '';
+            const text = escapeHtml(String(m.content || '').slice(0, 800));
+            return `<div class="owner-chat-bubble meta">${who}${when ? ' · ' + when : ''}</div>
+                <div class="owner-chat-bubble user">${text}</div>`;
+        }).join('');
+    }
+
+    window.ownerInspectUser = async function (username) {
+        ownerInspectUsername = username;
+        const title = document.getElementById('owner-inspect-title');
+        const meta = document.getElementById('owner-inspect-meta');
+        const cloudEl = document.getElementById('owner-inspect-cloud');
+        const localEl = document.getElementById('owner-inspect-local');
+        const savedEl = document.getElementById('owner-inspect-saved');
+        const overlay = document.getElementById('owner-inspect-overlay');
+        if (title) title.textContent = '@' + username;
+        if (cloudEl) cloudEl.innerHTML = '<div class="owner-empty">Loading…</div>';
+        if (localEl) localEl.innerHTML = '';
+        if (savedEl) savedEl.textContent = '';
+        if (overlay) overlay.style.display = 'flex';
+
+        const ban = getBanRecord(username);
+        if (meta) {
+            meta.innerHTML = ban
+                ? `<span class="owner-badge banned">${ban.permanent ? 'PERM BAN' : 'TIMED BAN'}</span> · ${escapeHtml(formatBanUntil(ban))}<br>Reason: ${escapeHtml(ban.reason || '—')}`
+                : `<span class="owner-badge ok">OK</span> · not banned`;
+        }
+
+        // Cloud messages for this user
+        let logs = (cloudLogsCache || []).filter(e => String(e.username || '').toLowerCase() === String(username).toLowerCase());
+        try {
+            const extra = await cloudOwnerUserLogs(username);
+            if (extra && extra.ok && Array.isArray(extra.logs) && extra.logs.length) {
+                logs = extra.logs;
+            }
+        } catch (_) {}
+        if (cloudEl) cloudEl.innerHTML = renderBubblesFromCloudLogs(logs);
+
+        // Local full chat only if this phone has their history
+        const hist = loadUserChatHistory(username) || [];
+        if (localEl) localEl.innerHTML = renderBubblesFromLocalHistory(hist);
+
+        const saved = getUserSavedChatsForOwner(username) || [];
+        if (savedEl) {
+            if (!saved.length) {
+                savedEl.textContent = '(none on this phone — saved chats stay on each phone’s storage)';
+            } else {
+                savedEl.textContent = saved.map(s => {
+                    const msgs = s.messages || [];
+                    const preview = msgs.slice(-6).map(m => {
+                        const who = m.role === 'user' ? 'User' : 'Luba';
+                        return who + ': ' + String(m.content || '').slice(0, 100);
+                    }).join('\n');
+                    return '• ' + (s.name || 'Untitled') + ' (' + msgs.length + ' msgs)\n' + preview;
+                }).join('\n\n');
+            }
+        }
+    };
+
+    window.ownerOpenBanMenu = function (username) {
+        ownerBanTarget = username;
+        const title = document.getElementById('owner-ban-title');
+        const sub = document.getElementById('owner-ban-subtitle');
+        const reason = document.getElementById('owner-ban-reason');
+        const overlay = document.getElementById('owner-ban-overlay');
+        if (title) title.textContent = 'Ban @' + username;
+        if (sub) sub.textContent = 'Permanent blocks forever. Timed ban unlocks automatically when the timer ends.';
+        if (reason) reason.value = '';
+        if (overlay) overlay.style.display = 'flex';
+    };
+
+    window.ownerUnban = function (username) {
+        if (!confirm('Unban "' + username + '"?')) return;
+        clearBan(username);
+        renderOwnerUserList();
+        if (ownerInspectUsername === username) window.ownerInspectUser(username);
+        alert('Unbanned: ' + username);
+    };
+
+    async function cloudOwnerUserLogs(username) {
+        return cloudPost({
+            action: 'owner_user_logs',
+            ownerPassword: OWNER_PASSWORD,
+            username
+        });
+    }
+
+    function openOwnerPanel() {
+        ownerUnlocked = false;
+        const gate = document.getElementById('owner-gate');
+        const panel = document.getElementById('owner-panel');
+        const err = document.getElementById('owner-error');
+        const pw = document.getElementById('owner-password-input');
+        if (gate) gate.classList.add('visible');
+        if (panel) panel.classList.remove('visible');
+        if (err) err.textContent = '';
+        if (pw) pw.value = '';
+        const overlay = document.getElementById('owner-overlay');
+        if (overlay) overlay.style.display = 'flex';
+        if (pw) setTimeout(() => pw.focus(), 50);
+    }
+
+    function closeOwnerPanel() {
+        const overlay = document.getElementById('owner-overlay');
+        if (overlay) overlay.style.display = 'none';
+        ownerUnlocked = false;
+    }
+
+    function unlockOwnerPanel() {
+        const pw = document.getElementById('owner-password-input');
+        const err = document.getElementById('owner-error');
+        const val = pw ? pw.value : '';
+        if (val !== OWNER_PASSWORD) {
+            if (err) err.textContent = 'Wrong password.';
+            return;
+        }
+        ownerUnlocked = true;
+        if (err) err.textContent = '';
+        document.getElementById('owner-gate').classList.remove('visible');
+        document.getElementById('owner-panel').classList.add('visible');
+        renderOwnerUserList();
+    }
 
     // ============================================================
     // Account / storage helpers
@@ -2101,9 +2967,27 @@
             loginError.textContent = 'Wrong password.';
             return;
         }
+        // Ban check: local first, then cloud (all devices)
+        let ban = getBanRecord(user.username);
+        if (!ban) {
+            try { ban = await cloudCheckBan(user.username); } catch (_) {}
+        }
+        if (ban) {
+            setCurrentUsername(user.username);
+            currentUser = user;
+            // mirror cloud ban locally
+            try {
+                const bans = getBans();
+                bans[userKey(user.username)] = ban;
+                saveBans(bans);
+            } catch (_) {}
+            showBanScreen(ban);
+            return;
+        }
         // success
         setCurrentUsername(user.username);
         rememberDeviceAccount(user.username);
+        cloudSyncUser(user).catch(() => {});
         enterApp(user);
     };
 
@@ -2155,10 +3039,30 @@
         saveUsers(users);
         setCurrentUsername(newUser.username);
         rememberDeviceAccount(newUser.username);
+        // Register on central server so owner can see this account on any device
+        cloudSyncUser(newUser).catch(() => {});
         enterApp(newUser);
     };
 
-    function enterApp(user) {
+    async function enterApp(user) {
+        // Ban gate — local + cloud
+        let ban = getBanRecord(user.username);
+        if (!ban) {
+            try { ban = await cloudCheckBan(user.username); } catch (_) {}
+        }
+        if (ban) {
+            currentUser = user;
+            setCurrentUsername(user.username);
+            try {
+                const bans = getBans();
+                bans[userKey(user.username)] = ban;
+                saveBans(bans);
+            } catch (_) {}
+            showBanScreen(ban);
+            return;
+        }
+        hideBanScreen();
+
         currentUser = user;
         document.body.classList.add('logged-in');
         // Keep session sticky across reloads / app switches
@@ -2168,6 +3072,7 @@
         const users = getUsers();
         users[userKey(user.username)] = user;
         saveUsers(users);
+        cloudSyncUser(user).catch(() => {});
 
         // restore prefs
         const prefs = loadUserPrefs(user.username);
@@ -2193,8 +3098,10 @@
         currentUser = null;
         chatHistory = [];
         document.body.classList.remove('logged-in');
+        hideBanScreen();
         chatContainer.innerHTML = '';
         modalOverlay.style.display = 'none';
+        closeOwnerPanel();
         // clear forms a bit
         const lp = document.getElementById('login-password');
         const sp = document.getElementById('signup-password');
@@ -3363,6 +4270,133 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         }
     };
 
+    // ---- Owner CMDs ----
+    const openOwnerBtn = document.getElementById('open-owner-btn');
+    const closeOwnerBtn = document.getElementById('close-owner-btn');
+    const ownerUnlockBtn = document.getElementById('owner-unlock-btn');
+    const ownerCancelBtn = document.getElementById('owner-cancel-btn');
+    const ownerPasswordInput = document.getElementById('owner-password-input');
+    const banLogoutBtn = document.getElementById('ban-logout-btn');
+    const ownerOverlay = document.getElementById('owner-overlay');
+
+    if (openOwnerBtn) {
+        openOwnerBtn.onclick = () => {
+            modalOverlay.style.display = 'none';
+            openOwnerPanel();
+        };
+    }
+    if (closeOwnerBtn) closeOwnerBtn.onclick = closeOwnerPanel;
+    if (ownerCancelBtn) ownerCancelBtn.onclick = closeOwnerPanel;
+    if (ownerUnlockBtn) ownerUnlockBtn.onclick = unlockOwnerPanel;
+    if (ownerPasswordInput) {
+        ownerPasswordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                unlockOwnerPanel();
+            }
+        });
+    }
+    if (ownerOverlay) {
+        ownerOverlay.onclick = (e) => {
+            if (e.target === ownerOverlay) closeOwnerPanel();
+        };
+    }
+    if (banLogoutBtn) {
+        banLogoutBtn.onclick = () => {
+            logout();
+        };
+    }
+
+    // Owner inspect + ban menu
+    const ownerInspectOverlay = document.getElementById('owner-inspect-overlay');
+    const ownerBanOverlay = document.getElementById('owner-ban-overlay');
+    const closeOwnerInspectBtn = document.getElementById('close-owner-inspect-btn');
+    const closeOwnerBanBtn = document.getElementById('close-owner-ban-btn');
+    const ownerInspectBanBtn = document.getElementById('owner-inspect-ban-btn');
+    const ownerInspectUnbanBtn = document.getElementById('owner-inspect-unban-btn');
+    const ownerInspectRefreshBtn = document.getElementById('owner-inspect-refresh-btn');
+    const ownerBanCancelBtn = document.getElementById('owner-ban-cancel-btn');
+    const ownerBanTimedBtn = document.getElementById('owner-ban-timed-btn');
+    const ownerBanPermBtn = document.getElementById('owner-ban-perm-btn');
+
+    if (closeOwnerInspectBtn) {
+        closeOwnerInspectBtn.onclick = () => {
+            if (ownerInspectOverlay) ownerInspectOverlay.style.display = 'none';
+        };
+    }
+    if (ownerInspectOverlay) {
+        ownerInspectOverlay.onclick = (e) => {
+            if (e.target === ownerInspectOverlay) ownerInspectOverlay.style.display = 'none';
+        };
+    }
+    if (closeOwnerBanBtn) {
+        closeOwnerBanBtn.onclick = () => {
+            if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
+        };
+    }
+    if (ownerBanCancelBtn) {
+        ownerBanCancelBtn.onclick = () => {
+            if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
+        };
+    }
+    if (ownerBanOverlay) {
+        ownerBanOverlay.onclick = (e) => {
+            if (e.target === ownerBanOverlay) ownerBanOverlay.style.display = 'none';
+        };
+    }
+    if (ownerInspectBanBtn) {
+        ownerInspectBanBtn.onclick = () => {
+            if (ownerInspectUsername) window.ownerOpenBanMenu(ownerInspectUsername);
+        };
+    }
+    if (ownerInspectUnbanBtn) {
+        ownerInspectUnbanBtn.onclick = () => {
+            if (ownerInspectUsername) window.ownerUnban(ownerInspectUsername);
+        };
+    }
+    if (ownerInspectRefreshBtn) {
+        ownerInspectRefreshBtn.onclick = () => {
+            if (ownerInspectUsername) window.ownerInspectUser(ownerInspectUsername);
+        };
+    }
+    if (ownerBanPermBtn) {
+        ownerBanPermBtn.onclick = () => {
+            const name = ownerBanTarget;
+            if (!name) return;
+            const reasonEl = document.getElementById('owner-ban-reason');
+            const reason = (reasonEl && reasonEl.value.trim()) || 'Permanent ban by owner';
+            if (!confirm('Permanently ban "' + name + '" on all devices?')) return;
+            applyBan(name, { permanent: true, reason });
+            if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
+            renderOwnerUserList();
+            if (ownerInspectUsername === name) window.ownerInspectUser(name);
+            alert('Banned permanently: ' + name);
+        };
+    }
+    if (ownerBanTimedBtn) {
+        ownerBanTimedBtn.onclick = () => {
+            const name = ownerBanTarget;
+            if (!name) return;
+            const reasonEl = document.getElementById('owner-ban-reason');
+            const valEl = document.getElementById('owner-ban-timer-val');
+            const unitEl = document.getElementById('owner-ban-timer-unit');
+            const reason = (reasonEl && reasonEl.value.trim()) || 'Temporary ban by owner';
+            let amount = parseInt(valEl && valEl.value, 10);
+            if (!amount || amount < 1) amount = 24;
+            const unit = (unitEl && unitEl.value) || 'h';
+            let ms = amount * 60 * 60 * 1000;
+            if (unit === 'd') ms = amount * 24 * 60 * 60 * 1000;
+            if (unit === 'm') ms = amount * 60 * 1000;
+            const until = Date.now() + ms;
+            if (!confirm('Ban "' + name + '" until ' + new Date(until).toLocaleString() + '?')) return;
+            applyBan(name, { permanent: false, until, reason });
+            if (ownerBanOverlay) ownerBanOverlay.style.display = 'none';
+            renderOwnerUserList();
+            if (ownerInspectUsername === name) window.ownerInspectUser(name);
+            alert('Timed ban applied for ' + name);
+        };
+    }
+
     clearChatBtn.onclick = () => {
         if (!currentUser) return;
         if (confirm("Clear all messages?")) {
@@ -3581,6 +4615,19 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         }
         // Remember this turn for Retry if the API fails
         lastFailedRequest = { text: text || '', mediaBase64: imageToSend || null };
+
+        // Moderation log — local + cloud (all devices)
+        try {
+            const logText = text || (imageToSend ? (mediaIsVideo ? '[video]' : '[photo]') : '');
+            appendModLog({
+                at: Date.now(),
+                username: currentUser ? currentUser.username : '?',
+                text: logText,
+                hasMedia: !!imageToSend
+            });
+            cloudLogMessage(currentUser ? currentUser.username : '?', logText, !!imageToSend);
+        } catch (_) {}
+
         isGenerating = true;
         abortController = new AbortController();
         setSendButtonMode('stop');
