@@ -1922,6 +1922,7 @@
         <div class="owner-ban-row">
             <button type="button" class="small-btn danger" id="owner-inspect-ban-btn">Ban…</button>
             <button type="button" class="small-btn" id="owner-inspect-unban-btn">Unban</button>
+            <button type="button" class="small-btn danger" id="owner-inspect-ipban-btn" style="background:#6b1a00;">Ban IP</button>
             <button type="button" class="small-btn danger" id="owner-inspect-delete-btn" style="background:#5c1010;">Delete account</button>
             <button type="button" class="small-btn" id="owner-inspect-refresh-btn">Refresh</button>
         </div>
@@ -1961,9 +1962,12 @@
             <span style="font-size:12px; opacity:0.75;">Timer:</span>
             <input type="number" min="1" value="24" id="owner-ban-timer-val" style="width:64px">
             <select id="owner-ban-timer-unit">
+                <option value="m">minutes</option>
                 <option value="h">hours</option>
                 <option value="d">days</option>
-                <option value="m">minutes</option>
+                <option value="w">weeks</option>
+                <option value="mo">months</option>
+                <option value="y">years</option>
             </select>
         </div>
         <div class="modal-buttons" style="margin-top:16px; flex-wrap:wrap;">
@@ -2467,11 +2471,12 @@
             const source = u._source === 'cloud'
                 ? (u.activityOnly ? 'seen on server' : 'all devices')
                 : 'this phone only';
+            const ipLine = u.lastIp ? (' · IP ' + escapeHtml(String(u.lastIp))) : '';
             return `<div class="owner-user-card" data-user="${safeName}">
                 <div class="owner-user-head">
                     <div style="min-width:0; flex:1;" onclick="window.ownerInspectUser && window.ownerInspectUser('${jsName}')">
                         <div class="owner-user-name">${safeName}</div>
-                        <div class="owner-user-meta">${source} · joined ${created} · last ${lastSeen}${u.gender ? ' · ' + escapeHtml(u.gender) : ''}</div>
+                        <div class="owner-user-meta">${source} · joined ${created} · last ${lastSeen}${u.gender ? ' · ' + escapeHtml(u.gender) : ''}${ipLine}</div>
                     </div>
                     <div class="owner-user-actions">
                         ${badge}
@@ -2592,10 +2597,18 @@
                 } catch (_) {}
             }
         } catch (_) {}
+        let lastIp = null;
+        try {
+            const cu = (cloudUsersCache || []).find(
+                (x) => x && String(x.username || '').toLowerCase() === String(username).toLowerCase()
+            );
+            if (cu && cu.lastIp) lastIp = cu.lastIp;
+        } catch (_) {}
         if (meta) {
-            meta.innerHTML = ban
+            meta.innerHTML = (ban
                 ? `<span class="owner-badge banned">${ban.permanent ? 'PERM BAN' : 'TIMED BAN'}</span> · ${escapeHtml(formatBanUntil(ban))}<br>Reason: ${escapeHtml(ban.reason || '—')}`
-                : `<span class="owner-badge ok">OK</span> · not banned`;
+                : `<span class="owner-badge ok">OK</span> · not banned`) +
+                (lastIp ? `<br>Last IP: <code>${escapeHtml(lastIp)}</code>` : '<br><span style="opacity:0.6">Last IP: not recorded yet</span>');
         }
 
         // Cloud messages for this user
@@ -2686,7 +2699,7 @@
         const warn2 =
             'Final warning.\n\n' +
             'You are about to permanently delete @' + username + '.\n' +
-            'This cannot be undone. Type OK in your mind and press OK only if you are sure.';
+            'This cannot be undone. Press OK only if you are sure.';
         if (!confirm(warn2)) return;
 
         try {
@@ -2717,6 +2730,16 @@
             localStorage.removeItem('luba_prefs_' + String(username).toLowerCase());
         } catch (_) {}
 
+        // Drop from in-memory owner list so UI removes them immediately
+        try {
+            cloudUsersCache = (cloudUsersCache || []).filter(
+                (u) => String(u.username || '').toLowerCase() !== String(username).toLowerCase()
+            );
+            cloudLogsCache = (cloudLogsCache || []).filter(
+                (e) => String(e.username || '').toLowerCase() !== String(username).toLowerCase()
+            );
+        } catch (_) {}
+
         if (ownerInspectUsername === username) {
             const overlay = document.getElementById('owner-inspect-overlay');
             if (overlay) overlay.style.display = 'none';
@@ -2727,9 +2750,44 @@
             'Account @' + username + ' has been permanently deleted.\n\n' +
             '• Profile, server chat, and saved chats are gone\n' +
             '• Username is free to register again\n' +
-            '• Unban will not restore this account\n' +
+            '• Ban is cleared (delete removes the ban too)\n' +
             '• If they still have the app open, they will be locked out on the next action'
         );
+    };
+
+    window.ownerBanIp = async function (username) {
+        // Find last known IP from cloud cache
+        let ip = null;
+        try {
+            const u = (cloudUsersCache || []).find(
+                (x) => x && String(x.username || '').toLowerCase() === String(username).toLowerCase()
+            );
+            if (u && u.lastIp) ip = u.lastIp;
+        } catch (_) {}
+        if (!ip) {
+            alert('No IP on file for @' + username + ' yet.\nThey need to send a message (or log in) once with the updated worker so we can record their IP.');
+            return;
+        }
+        const reason =
+            prompt(
+                'Ban IP ' + ip + ' (from @' + username + ')?\n\nThis blocks signup/login/chat from that network/phone.\n\nReason:',
+                'Multiple accounts / abuse from same network'
+            );
+        if (reason === null) return;
+        if (!confirm('Ban IP ' + ip + ' permanently?\n\nAnyone on that network will be blocked.')) return;
+        const res = await cloudPost({
+            action: 'owner_ban_ip',
+            ownerPassword: OWNER_PASSWORD,
+            ip,
+            permanent: true,
+            reason: reason || 'IP banned by owner',
+            fromUsername: username
+        });
+        if (!res || res.ok === false) {
+            alert('IP ban failed: ' + ((res && res.error) || 'error'));
+            return;
+        }
+        alert('IP banned: ' + ip + '\nSignup, login, and chat from that network are blocked.');
     };
 
     async function cloudOwnerUserLogs(username) {
@@ -5181,6 +5239,12 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (ownerInspectUsername) window.ownerDeleteAccount(ownerInspectUsername);
         };
     }
+    const ownerInspectIpBanBtn = document.getElementById('owner-inspect-ipban-btn');
+    if (ownerInspectIpBanBtn) {
+        ownerInspectIpBanBtn.onclick = () => {
+            if (ownerInspectUsername) window.ownerBanIp(ownerInspectUsername);
+        };
+    }
     if (ownerInspectRefreshBtn) {
         ownerInspectRefreshBtn.onclick = () => {
             if (ownerInspectUsername) window.ownerInspectUser(ownerInspectUsername);
@@ -5238,9 +5302,15 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             let amount = parseInt(valEl && valEl.value, 10);
             if (!amount || amount < 1) amount = 24;
             const unit = (unitEl && unitEl.value) || 'h';
-            let ms = amount * 60 * 60 * 1000;
-            if (unit === 'd') ms = amount * 24 * 60 * 60 * 1000;
-            if (unit === 'm') ms = amount * 60 * 1000;
+            const unitMs = {
+                m: 60 * 1000,
+                h: 60 * 60 * 1000,
+                d: 24 * 60 * 60 * 1000,
+                w: 7 * 24 * 60 * 60 * 1000,
+                mo: 30 * 24 * 60 * 60 * 1000,
+                y: 365 * 24 * 60 * 60 * 1000
+            };
+            const ms = amount * (unitMs[unit] || unitMs.h);
             const until = Date.now() + ms;
             if (!confirm('Ban "' + name + '" until ' + new Date(until).toLocaleString() + '?\n\nReason they will see:\n' + reason)) return;
             ownerBanTimedBtn.disabled = true;
