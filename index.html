@@ -1860,19 +1860,19 @@
     </div>
 </div>
 
-<!-- BAN SCREEN (shown when account is banned) -->
+<!-- BAN / LOCK SCREEN (account ban, IP ban, or deleted account) -->
 <div id="ban-screen">
-    <div class="ban-icon">🚫</div>
-    <div class="ban-title">You're banned</div>
+    <div class="ban-icon" id="ban-icon">🚫</div>
+    <div class="ban-title" id="ban-title">You're banned</div>
     <div class="ban-body" id="ban-body-text">
         Your account has been suspended from Luba AI for breaking the rules.
         You cannot use the chat while this ban is active.
     </div>
     <div class="ban-reason-box" id="ban-reason-box">
-        <strong>Reason</strong>
+        <strong id="ban-reason-label">Reason</strong>
         <span id="ban-reason-text">—</span>
         <div style="margin-top:8px;" id="ban-until-wrap">
-            <strong>Ban ends</strong>
+            <strong id="ban-until-label">Ban ends</strong>
             <span id="ban-until-text">—</span>
         </div>
     </div>
@@ -1923,6 +1923,7 @@
             <button type="button" class="small-btn danger" id="owner-inspect-ban-btn">Ban…</button>
             <button type="button" class="small-btn" id="owner-inspect-unban-btn">Unban</button>
             <button type="button" class="small-btn danger" id="owner-inspect-ipban-btn" style="background:#6b1a00;">Ban IP</button>
+            <button type="button" class="small-btn" id="owner-inspect-unban-ip-btn">Unban IP</button>
             <button type="button" class="small-btn danger" id="owner-inspect-delete-btn" style="background:#5c1010;">Delete account</button>
             <button type="button" class="small-btn" id="owner-inspect-refresh-btn">Refresh</button>
         </div>
@@ -2116,12 +2117,24 @@
     }
 
     async function cloudLogMessage(username, text, hasMedia) {
-        cloudPost({
-            action: 'log_message',
-            username: username || '?',
-            text: text || '',
-            hasMedia: !!hasMedia
-        }).catch(() => {});
+        try {
+            const data = await cloudPost({
+                action: 'log_message',
+                username: username || '?',
+                text: text || '',
+                hasMedia: !!hasMedia
+            });
+            if (data && data.ipBan) {
+                showBanScreen(data.ipBan, { kind: 'ip' });
+                stopChatSyncPolling();
+            } else if (data && data.ban && !data.ok) {
+                showBanScreen(data.ban, { kind: 'ban' });
+                stopChatSyncPolling();
+            }
+            return data;
+        } catch (_) {
+            return null;
+        }
     }
 
     async function cloudOwnerList() {
@@ -2288,22 +2301,66 @@
         }
     }
 
-    function showBanScreen(ban) {
+    function showBanScreen(ban, opts) {
+        opts = opts || {};
         document.body.classList.add('banned');
         document.body.classList.remove('logged-in');
+        const titleEl = document.getElementById('ban-title');
+        const iconEl = document.getElementById('ban-icon');
         const reasonEl = document.getElementById('ban-reason-text');
+        const reasonLabel = document.getElementById('ban-reason-label');
         const untilEl = document.getElementById('ban-until-text');
+        const untilLabel = document.getElementById('ban-until-label');
+        const untilWrap = document.getElementById('ban-until-wrap');
         const bodyEl = document.getElementById('ban-body-text');
-        if (reasonEl) reasonEl.textContent = (ban && ban.reason) || 'Violation of Luba AI rules';
-        if (untilEl) untilEl.textContent = formatBanUntil(ban);
-        if (bodyEl) {
-            if (ban && ban.permanent) {
-                bodyEl.textContent = 'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case.';
-            } else {
-                bodyEl.textContent = 'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case. When the ban ends, this screen will unlock automatically (or log in again).';
+        const kind = opts.kind || (ban && ban.ip ? 'ip' : 'ban');
+
+        if (kind === 'deleted') {
+            if (iconEl) iconEl.textContent = '🗑️';
+            if (titleEl) titleEl.textContent = 'Account deleted';
+            if (bodyEl) {
+                bodyEl.textContent =
+                    'Your Luba AI account has been permanently deleted by the owner. ' +
+                    'You can no longer use this account. The username may be registered again by someone else. ' +
+                    'If you believe this was a mistake, contact us at lubaai.official@gmail.com.';
+            }
+            if (reasonLabel) reasonLabel.textContent = 'Status';
+            if (reasonEl) reasonEl.textContent = 'Account permanently removed';
+            if (untilWrap) untilWrap.style.display = 'none';
+        } else if (kind === 'ip') {
+            if (iconEl) iconEl.textContent = '🌐';
+            if (titleEl) titleEl.textContent = "You're IP banned";
+            if (bodyEl) {
+                bodyEl.textContent =
+                    'This device or network has been banned from Luba AI. ' +
+                    'You cannot sign up, log in, or chat from this connection. ' +
+                    'Creating another account on the same phone/Wi‑Fi will not work. ' +
+                    'If you believe this was a mistake, contact us at lubaai.official@gmail.com.';
+            }
+            if (reasonLabel) reasonLabel.textContent = 'Reason';
+            if (reasonEl) reasonEl.textContent = (ban && ban.reason) || 'IP banned by owner';
+            if (untilWrap) untilWrap.style.display = '';
+            if (untilLabel) untilLabel.textContent = 'Ban ends';
+            if (untilEl) untilEl.textContent = formatBanUntil(ban) || 'Permanent (does not expire)';
+        } else {
+            if (iconEl) iconEl.textContent = '🚫';
+            if (titleEl) titleEl.textContent = "You're banned";
+            if (reasonLabel) reasonLabel.textContent = 'Reason';
+            if (reasonEl) reasonEl.textContent = (ban && ban.reason) || 'Violation of Luba AI rules';
+            if (untilWrap) untilWrap.style.display = '';
+            if (untilLabel) untilLabel.textContent = 'Ban ends';
+            if (untilEl) untilEl.textContent = formatBanUntil(ban);
+            if (bodyEl) {
+                if (ban && ban.permanent) {
+                    bodyEl.textContent =
+                        'Your account has been permanently banned from Luba AI. You cannot use the chat on this device. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case.';
+                } else {
+                    bodyEl.textContent =
+                        'Your account is temporarily suspended from Luba AI. You cannot use the chat until the ban ends. If you believe this was a mistake, please contact us at lubaai.official@gmail.com and we will review your case. When the ban ends, this screen will unlock automatically (or log in again).';
+                }
             }
         }
-        // Ensure we keep checking server for Unban / Delete / timer end
+        // Keep polling so Unban / IP unban / mistakes can unlock live
         startBanPolling();
     }
 
@@ -2675,7 +2732,29 @@
     window.ownerUnban = async function (username) {
         if (!confirm('Unban "' + username + '" on all devices?')) return;
         const result = await clearBan(username);
-        // Force refresh from server
+
+        // Also unban their last IP if we have it (so IP ban can be recovered via Unban)
+        let ip = null;
+        try {
+            const u = (cloudUsersCache || []).find(
+                (x) => x && String(x.username || '').toLowerCase() === String(username).toLowerCase()
+            );
+            if (u && u.lastIp) ip = u.lastIp;
+        } catch (_) {}
+        if (ip) {
+            const alsoIp = confirm(
+                'Also unban IP ' + ip + '?\n\n' +
+                'Press OK to clear the IP ban too, or Cancel to only unban the account.'
+            );
+            if (alsoIp) {
+                await cloudPost({
+                    action: 'owner_unban_ip',
+                    ownerPassword: OWNER_PASSWORD,
+                    ip
+                });
+            }
+        }
+
         cloudUsersCache = [];
         cloudLogsCache = [];
         await renderOwnerUserList();
@@ -2685,6 +2764,31 @@
         } else {
             alert('Unbanned: ' + username + '\nThey can use Luba again on all devices (may take a few seconds if the app is open).');
         }
+    };
+
+    window.ownerUnbanIp = async function (username) {
+        let ip = null;
+        try {
+            const u = (cloudUsersCache || []).find(
+                (x) => x && String(x.username || '').toLowerCase() === String(username).toLowerCase()
+            );
+            if (u && u.lastIp) ip = u.lastIp;
+        } catch (_) {}
+        if (!ip) {
+            alert('No IP on file for @' + username + '.');
+            return;
+        }
+        if (!confirm('Unban IP ' + ip + '?')) return;
+        const res = await cloudPost({
+            action: 'owner_unban_ip',
+            ownerPassword: OWNER_PASSWORD,
+            ip
+        });
+        if (!res || res.ok === false) {
+            alert('IP unban failed: ' + ((res && res.error) || 'error'));
+            return;
+        }
+        alert('IP unbanned: ' + ip);
     };
 
     window.ownerDeleteAccount = async function (username) {
@@ -3444,16 +3548,18 @@
                 password: pw
             });
 
-            if (cloud && cloud.ban) {
-                const ban = cloud.ban;
-                try {
-                    const bans = getBans();
-                    bans[String(uname).toLowerCase()] = ban;
-                    saveBans(bans);
-                } catch (_) {}
+            if (cloud && (cloud.ipBan || cloud.ban)) {
+                const ban = cloud.ipBan || cloud.ban;
+                if (!cloud.ipBan) {
+                    try {
+                        const bans = getBans();
+                        bans[String(uname).toLowerCase()] = ban;
+                        saveBans(bans);
+                    } catch (_) {}
+                }
                 currentUser = { username: uname };
                 setCurrentUsername(uname);
-                showBanScreen(ban);
+                showBanScreen(ban, { kind: cloud.ipBan ? 'ip' : 'ban' });
                 return;
             }
 
@@ -3549,8 +3655,10 @@
                 dob: dob
             });
 
-            if (cloud && cloud.ban) {
-                showBanScreen(cloud.ban);
+            if (cloud && (cloud.ipBan || cloud.ban)) {
+                showBanScreen(cloud.ipBan || cloud.ban, {
+                    kind: cloud.ipBan ? 'ip' : 'ban'
+                });
                 return;
             }
 
@@ -4379,62 +4487,95 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     async function enforceLiveBan(force) {
         if (!currentUser || !currentUser.username) return false;
         const now = Date.now();
-        // Allow faster checks while ban screen is up (detect unban/delete)
         const minGap = document.body.classList.contains('banned') ? 1500 : 2000;
         if (!force && now - lastBanCheckAt < minGap) return document.body.classList.contains('banned');
         if (banCheckInFlight) return document.body.classList.contains('banned');
         banCheckInFlight = true;
         lastBanCheckAt = now;
         try {
-            let ban = getBanRecord(currentUser.username);
+            const token = getAuthToken();
+            let status = null;
             try {
-                const remote = await cloudCheckBan(currentUser.username);
-                if (remote) {
-                    ban = remote;
-                } else {
-                    // Server says NOT banned (or account deleted / ban removed)
-                    ban = null;
-                    try {
-                        const bans = getBans();
-                        if (bans[userKey(currentUser.username)]) {
-                            delete bans[userKey(currentUser.username)];
-                            saveBans(bans);
-                        }
-                    } catch (_) {}
-                }
+                status = await cloudPost({
+                    action: 'check_status',
+                    token: token || undefined,
+                    username: currentUser.username
+                });
             } catch (_) {
-                // Network fail: still expire timed bans locally
-                if (ban && !ban.permanent && ban.until && Date.now() >= ban.until) {
-                    ban = null;
-                    try {
-                        const bans = getBans();
-                        delete bans[userKey(currentUser.username)];
-                        saveBans(bans);
-                    } catch (_) {}
+                status = null;
+            }
+
+            // Fallback if worker not updated yet
+            if (!status || status.error) {
+                try {
+                    const remote = await cloudCheckBan(currentUser.username);
+                    status = {
+                        ok: true,
+                        ban: remote || null,
+                        ipBan: (remote && remote.ip) ? remote : null,
+                        accountGone: false
+                    };
+                } catch (_) {
+                    status = null;
                 }
             }
-            if (ban) {
+
+            if (status && status.ipBan) {
+                try {
+                    if (typeof abortController !== 'undefined' && abortController) abortController.abort();
+                } catch (_) {}
+                showBanScreen(status.ipBan, { kind: 'ip' });
+                stopChatSyncPolling();
+                return true;
+            }
+
+            if (status && status.accountGone) {
+                try {
+                    if (typeof abortController !== 'undefined' && abortController) abortController.abort();
+                } catch (_) {}
+                // Clear local session so they can't keep using offline cache
+                try {
+                    setAuthToken(null);
+                    const bans = getBans();
+                    delete bans[userKey(currentUser.username)];
+                    saveBans(bans);
+                } catch (_) {}
+                showBanScreen(null, { kind: 'deleted' });
+                stopChatSyncPolling();
+                return true;
+            }
+
+            let ban = (status && status.ban) || null;
+            if (!ban) {
+                // clear stale local
+                try {
+                    const bans = getBans();
+                    if (bans[userKey(currentUser.username)]) {
+                        delete bans[userKey(currentUser.username)];
+                        saveBans(bans);
+                    }
+                } catch (_) {}
+            } else {
                 try {
                     const bans = getBans();
                     bans[userKey(currentUser.username)] = ban;
                     saveBans(bans);
                 } catch (_) {}
+            }
+
+            if (ban) {
                 try {
-                    if (typeof abortController !== 'undefined' && abortController) {
-                        abortController.abort();
-                    }
+                    if (typeof abortController !== 'undefined' && abortController) abortController.abort();
                 } catch (_) {}
-                showBanScreen(ban);
+                showBanScreen(ban, { kind: 'ban' });
                 stopChatSyncPolling();
-                // Keep ban polling running so Unban/Delete unlocks live
                 return true;
             }
 
-            // Not banned on server — unlock if ban screen was showing
+            // All clear — unlock if lock screen was showing (unban / IP unban)
             if (document.body.classList.contains('banned')) {
                 hideBanScreen();
                 stopChatSyncPolling();
-                // Bring them back into the app without full reload
                 try {
                     await enterApp(currentUser);
                 } catch (_) {
@@ -5243,6 +5384,12 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     if (ownerInspectIpBanBtn) {
         ownerInspectIpBanBtn.onclick = () => {
             if (ownerInspectUsername) window.ownerBanIp(ownerInspectUsername);
+        };
+    }
+    const ownerInspectUnbanIpBtn = document.getElementById('owner-inspect-unban-ip-btn');
+    if (ownerInspectUnbanIpBtn) {
+        ownerInspectUnbanIpBtn.onclick = () => {
+            if (ownerInspectUsername) window.ownerUnbanIp(ownerInspectUsername);
         };
     }
     if (ownerInspectRefreshBtn) {
