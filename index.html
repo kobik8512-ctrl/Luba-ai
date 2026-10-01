@@ -1375,12 +1375,12 @@
         }
         #owner-overlay {
             align-items: flex-start;
-            padding-top: 8vh;
+            padding-top: 4vh;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
         }
         #owner-overlay .modal {
-            max-height: 88vh;
+            max-height: 92vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -1393,40 +1393,85 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
-            flex: 1;
+            flex: 1 1 auto;
             overflow: hidden;
+        }
+        .owner-panel .owner-note,
+        .owner-panel .owner-section-label {
+            flex-shrink: 0;
+        }
+        .owner-search-wrap {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin: 0 0 10px;
+            flex-shrink: 0;
+        }
+        .owner-search-wrap input {
+            flex: 1;
+            min-width: 0;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+        }
+        .owner-search-wrap input::placeholder {
+            opacity: 0.45;
+        }
+        .owner-search-count {
+            font-size: 11px;
+            opacity: 0.55;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         .owner-user-list {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            max-height: min(50vh, 420px);
-            overflow-y: auto;
+            gap: 12px;
+            /* Fixed scroll area so many accounts never squeeze */
+            height: min(52vh, 480px);
+            max-height: min(52vh, 480px);
+            overflow-y: scroll !important;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
-            padding-bottom: 12px;
-            flex: 1;
-            min-height: 120px;
+            padding: 4px 6px 24px 2px;
+            flex: 1 1 auto;
+            min-height: 180px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 0, 127, 0.45) transparent;
+            touch-action: pan-y;
+        }
+        .owner-user-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .owner-user-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 0, 127, 0.45);
+            border-radius: 999px;
         }
         #owner-mod-log {
-            max-height: 140px !important;
+            max-height: 100px !important;
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch;
+            flex-shrink: 0;
         }
         .owner-user-card {
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 14px;
             background: var(--bubble-user);
-            overflow: hidden;
+            overflow: visible;
+            flex: 0 0 auto;
+            min-height: 88px;
         }
         .owner-user-head {
             display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 8px;
-            padding: 10px 12px;
+            align-items: stretch;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 10px;
+            padding: 14px 14px 12px;
             cursor: pointer;
-            flex-wrap: wrap;
         }
         .owner-user-head:hover {
             background: rgba(255, 0, 127, 0.06);
@@ -1534,23 +1579,24 @@
 
         .owner-user-actions {
             display: flex;
-            gap: 6px;
+            gap: 8px;
             flex-shrink: 0;
             align-items: center;
             flex-wrap: wrap;
-            margin-left: auto;
+            width: 100%;
+            margin-top: 2px;
         }
         .owner-mini-btn {
             background: #282a2c;
             border: 1px solid #444746;
             color: #fff;
-            padding: 6px 10px;
+            padding: 8px 12px;
             border-radius: 10px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             cursor: pointer;
             white-space: nowrap;
-            min-height: 28px;
+            min-height: 34px;
         }
         body.light .owner-mini-btn {
             background: #eee;
@@ -1589,7 +1635,17 @@
                 align-items: flex-end;
             }
             .owner-user-list {
-                max-height: min(48vh, 380px);
+                height: 48vh;
+                max-height: 48vh;
+                gap: 12px;
+                overflow-y: scroll !important;
+            }
+            .owner-user-card {
+                min-height: 90px;
+            }
+            .owner-mini-btn {
+                flex: 1 1 auto;
+                min-width: 56px;
             }
             #owner-inspect-overlay .modal,
             #owner-ban-overlay .modal {
@@ -1939,7 +1995,11 @@
             <div class="owner-section-label">Recent messages (all devices)</div>
             <div class="owner-chat-preview" id="owner-mod-log" style="margin-bottom:12px; max-height:120px;"></div>
             <div class="owner-section-label">Registered accounts</div>
-            <div class="owner-user-list" id="owner-user-list"></div>
+            <div class="owner-search-wrap">
+                <input type="search" id="owner-user-search" placeholder="Search users…" autocomplete="off" enterkeyhint="search">
+                <span class="owner-search-count" id="owner-user-count"></span>
+            </div>
+            <div class="owner-user-list" id="owner-user-list" role="list"></div>
         </div>
     </div>
 </div>
@@ -2537,19 +2597,57 @@
             // Do NOT overlay local ban onto cloud users — that broke Unban
         });
 
-        const keys = Object.keys(byKey).sort((a, b) =>
-            String(byKey[a].username).localeCompare(String(byKey[b].username))
+        // Cache full list for search filter
+        ownerUsersByKey = byKey;
+        paintOwnerUserList();
+    }
+
+    let ownerUsersByKey = {};
+
+    function paintOwnerUserList() {
+        const listEl = document.getElementById('owner-user-list');
+        const countEl = document.getElementById('owner-user-count');
+        if (!listEl) return;
+
+        const q = String((document.getElementById('owner-user-search') || {}).value || '')
+            .trim()
+            .toLowerCase();
+
+        let keys = Object.keys(ownerUsersByKey || {}).sort((a, b) =>
+            String(ownerUsersByKey[a].username || a).localeCompare(
+                String(ownerUsersByKey[b].username || b)
+            )
         );
 
-        if (keys.length === 0) {
+        if (q) {
+            keys = keys.filter((k) => {
+                const u = ownerUsersByKey[k];
+                const name = String((u && u.username) || k).toLowerCase();
+                const ip = String((u && u.lastIp) || '').toLowerCase();
+                return name.includes(q) || ip.includes(q);
+            });
+        }
+
+        if (countEl) {
+            const total = Object.keys(ownerUsersByKey || {}).length;
+            countEl.textContent = q
+                ? (keys.length + ' / ' + total)
+                : (total ? total + ' users' : '');
+        }
+
+        if (Object.keys(ownerUsersByKey || {}).length === 0) {
             listEl.innerHTML = '<div class="owner-empty">No accounts yet. After the worker is set up, users appear here when they sign up or send a message.</div>';
             return;
         }
 
-        listEl.innerHTML = keys.map(key => {
-            const u = byKey[key];
+        if (keys.length === 0) {
+            listEl.innerHTML = '<div class="owner-empty">No users match “' + escapeHtml(q) + '”.</div>';
+            return;
+        }
+
+        listEl.innerHTML = keys.map((key) => {
+            const u = ownerUsersByKey[key];
             const name = u.username || key;
-            // Cloud source of truth when available (fixes Unban not updating badge)
             const ban = (u._source === 'cloud')
                 ? (u.ban || null)
                 : (u.ban || getBanRecord(name));
@@ -2566,7 +2664,7 @@
             const ipLine = u.lastIp ? (' · IP ' + escapeHtml(String(u.lastIp))) : '';
             return `<div class="owner-user-card" data-user="${safeName}">
                 <div class="owner-user-head">
-                    <div style="min-width:0; flex:1;" onclick="window.ownerInspectUser && window.ownerInspectUser('${jsName}')">
+                    <div style="min-width:0; width:100%;" onclick="window.ownerInspectUser && window.ownerInspectUser('${jsName}')">
                         <div class="owner-user-name">${safeName}</div>
                         <div class="owner-user-meta">${source} · joined ${created} · last ${lastSeen}${u.gender ? ' · ' + escapeHtml(u.gender) : ''}${ipLine}</div>
                     </div>
@@ -5538,6 +5636,17 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     if (closeOwnerBtn) closeOwnerBtn.onclick = closeOwnerPanel;
     if (ownerCancelBtn) ownerCancelBtn.onclick = closeOwnerPanel;
     if (ownerUnlockBtn) ownerUnlockBtn.onclick = unlockOwnerPanel;
+
+    // Live search filter for registered accounts
+    const ownerUserSearch = document.getElementById('owner-user-search');
+    if (ownerUserSearch) {
+        ownerUserSearch.addEventListener('input', () => {
+            try { paintOwnerUserList(); } catch (_) {}
+        });
+        ownerUserSearch.addEventListener('search', () => {
+            try { paintOwnerUserList(); } catch (_) {}
+        });
+    }
     if (ownerPasswordInput) {
         ownerPasswordInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
