@@ -2852,22 +2852,8 @@
             return;
         }
 
-        // Clean local caches too
-        try {
-            const users = getUsers();
-            delete users[String(username).toLowerCase()];
-            saveUsers(users);
-        } catch (_) {}
-        try {
-            const bans = getBans();
-            delete bans[String(username).toLowerCase()];
-            saveBans(bans);
-        } catch (_) {}
-        try {
-            localStorage.removeItem('luba_chat_' + String(username).toLowerCase());
-            localStorage.removeItem('luba_saved_' + String(username).toLowerCase());
-            localStorage.removeItem('luba_prefs_' + String(username).toLowerCase());
-        } catch (_) {}
+        // Wipe every local copy on this owner phone too
+        purgeLocalAccount(username);
 
         // Drop from in-memory owner list so UI removes them immediately
         try {
@@ -3114,7 +3100,7 @@
             </div>`;
         }).join('');
 
-        function openDeviceUser(uname) {
+        async function openDeviceUser(uname) {
             const usersNow = getUsers();
             let user = usersNow[(uname || '').toLowerCase()];
             if (!user) {
@@ -3129,8 +3115,65 @@
                 if (err) err.textContent = 'Account data missing — please log in with password.';
                 return;
             }
+            // Must still exist on server — deleted accounts cannot open from this list
+            try {
+                const st = await cloudPost({
+                    action: 'check_status',
+                    token: getAuthToken() || undefined,
+                    username: user.username
+                });
+                if (st && st.accountGone) {
+                    purgeLocalAccount(user.username);
+                    renderDeviceAccounts();
+                    const err = document.getElementById('login-error');
+                    if (err) {
+                        err.textContent =
+                            'That account was deleted. The username is free — sign up again if you want a new one.';
+                    }
+                    return;
+                }
+                if (st && st.ipBan) {
+                    showBanScreen(st.ipBan, { kind: 'ip' });
+                    return;
+                }
+                if (st && st.ban) {
+                    showBanScreen(st.ban, { kind: 'ban' });
+                    return;
+                }
+            } catch (_) {
+                // network fail: still try token profile
+            }
+            const token = getAuthToken();
+            if (token) {
+                const prof = await cloudPost({ action: 'get_profile', token });
+                if (prof && (prof.error || prof.ok === false)) {
+                    const msg = String(prof.error || '').toLowerCase();
+                    if (msg.includes('not found') || msg.includes('expired') || msg.includes('session')) {
+                        purgeLocalAccount(user.username);
+                        setAuthToken(null);
+                        renderDeviceAccounts();
+                        const err = document.getElementById('login-error');
+                        if (err) err.textContent = 'That account was deleted or the session expired. Log in or sign up.';
+                        return;
+                    }
+                }
+                if (prof && prof.ok && prof.profile) {
+                    user = profileToLocalUser(prof.profile, { cloud: true });
+                    cacheLocalUser(user);
+                }
+            } else if (user.cloud === true) {
+                // Cloud account but no token — must use password login
+                const err = document.getElementById('login-error');
+                if (err) {
+                    err.textContent = 'Please log in with your password for @' + user.username + '.';
+                }
+                const lu = document.getElementById('login-username');
+                if (lu) lu.value = user.username;
+                return;
+            }
             rememberDeviceAccount(user.username);
-            enterApp(user);
+            storageRemove('luba_manual_logout');
+            await enterApp(user);
         }
 
         listEl.querySelectorAll('.device-account-open').forEach(el => {
@@ -3538,9 +3581,51 @@
         saveUsers(users);
     }
 
+    /** Wipe every local trace of an account (after server delete / not found) */
+    function purgeLocalAccount(username) {
+        if (!username) return;
+        const key = String(username).toLowerCase();
+        try {
+            const users = getUsers();
+            delete users[key];
+            saveUsers(users);
+        } catch (_) {}
+        try {
+            const bans = getBans();
+            delete bans[key];
+            saveBans(bans);
+        } catch (_) {}
+        try {
+            removeDeviceAccount(username);
+        } catch (_) {}
+        try {
+            storageRemove('luba_user_' + key);
+            storageRemove('luba_chat_' + key);
+            storageRemove('luba_saved_' + key);
+            storageRemove('luba_prefs_' + key);
+            // legacy keys
+            localStorage.removeItem('luba_chat_' + key);
+            localStorage.removeItem('luba_saved_' + key);
+            localStorage.removeItem('luba_prefs_' + key);
+        } catch (_) {}
+        try {
+            if (getCurrentUsername() && userKey(getCurrentUsername()) === key) {
+                setCurrentUsername(null);
+            }
+        } catch (_) {}
+        try {
+            if (currentUser && userKey(currentUser.username) === key) {
+                currentUser = null;
+            }
+        } catch (_) {}
+    }
+
     async function tryMigrateLocalToCloud(localUser, password) {
-        // Old phone-only account → register on server so other phones can log in
+        // Only for true phone-only legacy accounts that never existed on server.
+        // NEVER use this when server said "no account" after a delete — that would
+        // recreate the banned/deleted user with the old password.
         if (!localUser || !password) return null;
+        if (localUser.cloud === true) return null;
         const data = await cloudPost({
             action: 'signup',
             username: localUser.username,
@@ -3555,10 +3640,10 @@
                 passwordHash: localUser.passwordHash,
                 dob: localUser.dob,
                 profilePic: localUser.profilePic,
-                createdAt: localUser.createdAt
+                createdAt: localUser.createdAt,
+                cloud: true
             });
         }
-        // Username might already exist on server with different password
         return null;
     }
 
@@ -3600,9 +3685,62 @@
 
             if (cloud && cloud.ok && cloud.token && cloud.profile) {
                 setAuthToken(cloud.token);
-                const user = profileToLocalUser(cloud.profile);
-                // keep a local password hash cache so device quick-open still works offline-ish
+                const user = profileToLocalUser(cloud.profile, { cloud: true });
                 try { user.passwordHash = await hashPassword(pw); } catch (_) {}
+                cacheLocalUser(user);
+                setCurrentUsername(user.username);
+                rememberDeviceAccount(user.username);
+                storageRemove('luba_manual_logout');
+                await enterApp(user);
+                return;
+            }
+
+            // Server reachable and says account is gone → wipe local cache, never log in
+            const cloudErr = cloud && (cloud.error || cloud.message)
+                ? String(cloud.error || cloud.message)
+                : '';
+            const noAccount =
+                cloud &&
+                cloud.ok === false &&
+                /no account|not found|doesn'?t exist|unknown user/i.test(cloudErr);
+
+            if (noAccount || (cloud && cloud.ok === false && /no account/i.test(cloudErr))) {
+                purgeLocalAccount(uname);
+                renderDeviceAccounts();
+                loginError.textContent =
+                    'No account with that username. It may have been deleted. Sign up again if you want a new account.';
+                return;
+            }
+
+            // Any other server error (wrong password, etc.) — do not use local bypass
+            if (cloud && cloud.ok === false && cloudErr) {
+                // Wrong password still valid message
+                loginError.textContent = cloudErr;
+                // If wrong password, keep local; if banned handled above
+                return;
+            }
+
+            // 2) Offline only: server unreachable — allow local cache with migration
+            if (cloud == null || (cloud && cloud.error && /network|fetch|failed/i.test(String(cloud.error)))) {
+                const users = getUsers();
+                const localUser = users[uname.toLowerCase()];
+                if (!localUser) {
+                    loginError.textContent =
+                        'Cannot reach server and no account saved on this phone. Check internet and try again.';
+                    return;
+                }
+                if (!(await passwordMatches(pw, localUser.passwordHash))) {
+                    loginError.textContent = 'Wrong password.';
+                    return;
+                }
+                // Do not recreate a deleted cloud account while offline
+                if (localUser.cloud === true) {
+                    loginError.textContent =
+                        'Cannot reach server. Your account needs the internet to log in.';
+                    return;
+                }
+                const migrated = await tryMigrateLocalToCloud(localUser, pw);
+                const user = migrated || localUser;
                 cacheLocalUser(user);
                 setCurrentUsername(user.username);
                 rememberDeviceAccount(user.username);
@@ -3610,52 +3748,7 @@
                 return;
             }
 
-            // 2) Fallback: old local-only account on this phone
-            const users = getUsers();
-            const localUser = users[uname.toLowerCase()];
-            if (!localUser) {
-                loginError.textContent = (cloud && cloud.error)
-                    ? String(cloud.error)
-                    : 'No account with that username. Sign up first (accounts now work on all phones).';
-                return;
-            }
-            if (!(await passwordMatches(pw, localUser.passwordHash))) {
-                loginError.textContent = 'Wrong password.';
-                return;
-            }
-
-            let ban = getBanRecord(localUser.username);
-            if (!ban) {
-                try {
-                    const remote = await cloudCheckBan(localUser.username);
-                    if (remote && remote._ipBan) {
-                        currentUser = localUser;
-                        setCurrentUsername(localUser.username);
-                        showBanScreen(remote, { kind: 'ip' });
-                        return;
-                    }
-                    ban = remote || null;
-                } catch (_) {}
-            }
-            if (ban) {
-                try {
-                    const bans = getBans();
-                    bans[userKey(localUser.username)] = ban;
-                    saveBans(bans);
-                } catch (_) {}
-                currentUser = localUser;
-                setCurrentUsername(localUser.username);
-                showBanScreen(ban, { kind: 'ban' });
-                return;
-            }
-
-            // Migrate phone-only account to the server (so other phones can log in next time)
-            const migrated = await tryMigrateLocalToCloud(localUser, pw);
-            const user = migrated || localUser;
-            cacheLocalUser(user);
-            setCurrentUsername(user.username);
-            rememberDeviceAccount(user.username);
-            await enterApp(user);
+            loginError.textContent = cloudErr || 'Login failed. Try again.';
         } finally {
             if (loginBtn) loginBtn.disabled = false;
         }
@@ -3916,26 +4009,35 @@
                 return false;
             }
 
-            // 1) Cloud session token
+            // 1) Cloud session token — source of truth
             const token = getAuthToken();
             if (token) {
                 const data = await cloudPost({ action: 'get_profile', token });
+                if (data && data.ipBan) {
+                    showBanScreen(data.ipBan || data.ban, { kind: 'ip' });
+                    return true;
+                }
                 if (data && data.ban) {
-                    showBanScreen(data.ban);
+                    showBanScreen(data.ban, { kind: 'ban' });
                     return true;
                 }
                 if (data && data.ok && data.profile) {
-                    const user = profileToLocalUser(data.profile);
+                    const user = profileToLocalUser(data.profile, { cloud: true });
                     cacheLocalUser(user);
                     rememberDeviceAccount(user.username);
                     await enterApp(user);
                     return true;
                 }
-                // token dead
+                // Token dead or account deleted
+                const msg = String((data && data.error) || '').toLowerCase();
+                if (msg.includes('not found') || msg.includes('deleted') || msg.includes('expired')) {
+                    const deadName = getCurrentUsername();
+                    if (deadName) purgeLocalAccount(deadName);
+                }
                 setAuthToken(null);
             }
 
-            // 2) Local session name (same phone)
+            // 2) Local session — only if server still has the account
             let name = getCurrentUsername();
             if (!name) {
                 try {
@@ -3951,6 +4053,36 @@
             }
 
             if (user) {
+                try {
+                    const st = await cloudPost({
+                        action: 'check_status',
+                        username: user.username
+                    });
+                    if (st && st.accountGone) {
+                        purgeLocalAccount(user.username);
+                        setCurrentUsername(null);
+                        return false;
+                    }
+                    if (st && st.ipBan) {
+                        showBanScreen(st.ipBan, { kind: 'ip' });
+                        return true;
+                    }
+                    if (st && st.ban) {
+                        showBanScreen(st.ban, { kind: 'ban' });
+                        return true;
+                    }
+                    // Cloud account without token cannot silent-login
+                    if (user.cloud === true && !getAuthToken()) {
+                        setCurrentUsername(null);
+                        return false;
+                    }
+                } catch (_) {
+                    // offline: allow only non-cloud legacy local users
+                    if (user.cloud === true) {
+                        setCurrentUsername(null);
+                        return false;
+                    }
+                }
                 rememberDeviceAccount(user.username);
                 await enterApp(user);
                 return true;
@@ -4631,16 +4763,13 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 try {
                     if (typeof abortController !== 'undefined' && abortController) abortController.abort();
                 } catch (_) {}
+                const goneName = currentUser.username;
                 try {
                     setAuthToken(null);
-                    const bans = getBans();
-                    delete bans[userKey(currentUser.username)];
-                    saveBans(bans);
-                    // Remove local copy of deleted account
-                    const users = getUsers();
-                    delete users[userKey(currentUser.username)];
-                    saveUsers(users);
+                    purgeLocalAccount(goneName);
                 } catch (_) {}
+                // Keep a stub so ban screen / logout still have a name
+                currentUser = { username: goneName };
                 showBanScreen(null, { kind: 'deleted' });
                 stopChatSyncPolling();
                 return true;
