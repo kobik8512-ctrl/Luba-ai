@@ -40,12 +40,21 @@
         }
 
         body {
-            background-color: var(--bg);
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -10%, rgba(155, 81, 224, 0.12), transparent 55%),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(255, 0, 127, 0.06), transparent 50%);
             color: var(--text);
             display: flex;
             flex-direction: column;
             height: 100vh;
+            height: 100dvh;
             transition: background 0.3s, color 0.3s;
+        }
+        body.light {
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -10%, rgba(155, 81, 224, 0.08), transparent 55%),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(255, 0, 127, 0.04), transparent 50%);
         }
 
         /* Hide main app until logged in */
@@ -77,18 +86,21 @@
         }
 
         .logo-icon {
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
             flex-shrink: 0;
-            filter: drop-shadow(0 0 8px rgba(255, 0, 127, 0.45));
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        body.light .logo-icon {
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.12);
         }
 
         .logo {
-            font-size: 1.1rem;
-            font-weight: bold;
-            background: linear-gradient(75deg, #ff007f, #9b51e0, #00d2ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 1.12rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: var(--text);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -170,10 +182,11 @@
         #chat-container {
             flex: 1;
             overflow-y: auto;
-            padding: 16px;
+            -webkit-overflow-scrolling: touch;
+            padding: 20px 14px 12px;
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 14px;
             max-width: 800px;
             width: 100%;
             margin: 0 auto;
@@ -181,14 +194,30 @@
 
         .message {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             line-height: 1.55;
             position: relative;
+            animation: msgIn 0.22s ease-out;
+        }
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+            align-self: flex-end;
+            width: 100%;
+            justify-content: flex-start;
+        }
+        .message.ai {
+            align-self: flex-start;
+            width: 100%;
         }
 
         .avatar {
-            width: 32px;
-            height: 32px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -208,30 +237,44 @@
         }
 
         .user .avatar {
-            background-color: #444746;
+            background: linear-gradient(135deg, #3a3d42, #555);
             color: #fff;
         }
 
         .ai .avatar {
             background: linear-gradient(135deg, #ff007f, #9b51e0);
-            box-shadow: 0 0 10px rgba(255, 0, 127, 0.3);
+            box-shadow: 0 0 12px rgba(255, 0, 127, 0.35);
         }
 
         .message-body {
-            max-width: 85%;
+            max-width: min(88%, 520px);
+        }
+        .message.user .message-body {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
         }
 
         .content {
             background: var(--bubble-ai);
-            padding: 11px 15px;
-            border-radius: 14px;
+            padding: 12px 16px;
+            border-radius: 18px 18px 18px 6px;
             white-space: pre-wrap;
             word-break: break-word;
             position: relative;
+            border: 1px solid rgba(255,255,255,0.04);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.18);
         }
 
         .user .content {
-            background: var(--bubble-user);
+            background: linear-gradient(135deg, #ff007f 0%, #c2185b 55%, #9b51e0 100%);
+            color: #fff;
+            border: none;
+            border-radius: 18px 18px 6px 18px;
+            box-shadow: 0 4px 16px rgba(255, 0, 127, 0.22);
+        }
+        body.light .user .content {
+            color: #fff;
         }
 
         .content img {
@@ -355,9 +398,14 @@
 
         .timestamp {
             font-size: 11px;
-            opacity: 0.55;
-            margin-top: 4px;
+            opacity: 0.5;
+            margin-top: 5px;
             padding-left: 4px;
+        }
+        .message.user .timestamp {
+            text-align: right;
+            padding-right: 4px;
+            padding-left: 0;
         }
 
         .copy-btn {
@@ -381,10 +429,13 @@
             max-width: 800px;
             width: 100%;
             margin: 0 auto;
-            padding: 10px 16px 18px;
+            /* Extra bottom space so AppsGeyser / system bars don't cover the bar */
+            padding: 10px 14px calc(18px + env(safe-area-inset-bottom, 0px));
             display: flex;
             flex-direction: column;
             gap: 8px;
+            background: linear-gradient(to top, var(--bg) 70%, transparent);
+            flex-shrink: 0;
         }
 
         #image-preview {
@@ -431,31 +482,43 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 6px 8px 6px 6px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.28);
         }
 
         textarea {
             flex: 1;
-            background-color: var(--input-bg);
-            border: 1px solid var(--border);
+            background: transparent;
+            border: none;
             color: var(--text);
-            padding: 13px 15px;
-            border-radius: 24px;
+            padding: 10px 8px;
+            border-radius: 20px;
             outline: none;
             resize: none;
-            height: 50px;
+            height: 42px;
             font-size: 1rem;
+            min-width: 0;
         }
 
         textarea:focus {
-            border-color: var(--accent);
+            border: none;
+            outline: none;
+        }
+
+        #input-container:focus-within {
+            border-color: rgba(255, 0, 127, 0.55);
+            box-shadow: 0 8px 28px rgba(255, 0, 127, 0.12);
         }
 
         .action-btn {
-            background: #282a2c;
-            border: 1px solid #444746;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid transparent;
             color: #fff;
-            width: 46px;
-            height: 46px;
+            width: 42px;
+            height: 42px;
             border-radius: 50%;
             font-size: 18px;
             cursor: pointer;
@@ -476,20 +539,21 @@
         }
 
         .action-btn:hover {
-            background: #3c4043;
+            background: rgba(255,255,255,0.12);
         }
 
         .send-btn {
-            background: var(--accent);
+            background: linear-gradient(135deg, #ff007f, #e00070);
             color: #fff;
             border: none;
             padding: 0 18px;
-            height: 46px;
-            border-radius: 24px;
+            height: 42px;
+            border-radius: 22px;
             font-weight: bold;
             cursor: pointer;
-            min-width: 80px;
-            transition: background 0.2s;
+            min-width: 72px;
+            transition: transform 0.15s, box-shadow 0.2s;
+            box-shadow: 0 4px 14px rgba(255, 0, 127, 0.35);
         }
 
         .send-btn:hover {
@@ -1721,25 +1785,9 @@
 <div id="auth-screen">
     <div class="auth-card">
         <div class="auth-logo-row">
-            <svg class="logo-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <linearGradient id="lubaGradAuth" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ff007f"/>
-                        <stop offset="50%" stop-color="#9b51e0"/>
-                        <stop offset="100%" stop-color="#00d2ff"/>
-                    </linearGradient>
-                    <filter id="glowAuth">
-                        <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
-                        <feMerge>
-                            <feMergeNode in="coloredBlur"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                </defs>
-                <circle cx="50" cy="50" r="38" stroke="url(#lubaGradAuth)" stroke-width="3.5" fill="none" opacity="0.7"/>
-                <path d="M32 28 L32 68 Q32 74 38 74 L62 74 Q68 74 68 68 L68 58 Q68 52 62 52 L48 52 L48 28 Q48 22 42 22 L38 22 Q32 22 32 28 Z"
-                      fill="url(#lubaGradAuth)" filter="url(#glowAuth)"/>
-                <circle cx="50" cy="50" r="7" fill="url(#lubaGradAuth)" filter="url(#glowAuth)"/>
+            <svg class="logo-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Luba">
+                <rect width="64" height="64" rx="14" fill="#0a0a0a"/>
+                <path fill="#ffffff" d="M14 50h36V42H42V34H34V26H26V18H14v32z"/>
             </svg>
             <div class="logo">Luba AI</div>
         </div>
@@ -1801,25 +1849,9 @@
 
 <header>
     <div class="brand-container">
-        <svg class="logo-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="lubaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#ff007f"/>
-                    <stop offset="50%" stop-color="#9b51e0"/>
-                    <stop offset="100%" stop-color="#00d2ff"/>
-                </linearGradient>
-                <filter id="glow">
-                    <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
-                    <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                </filter>
-            </defs>
-            <circle cx="50" cy="50" r="38" stroke="url(#lubaGrad)" stroke-width="3.5" fill="none" opacity="0.7"/>
-            <path d="M32 28 L32 68 Q32 74 38 74 L62 74 Q68 74 68 68 L68 58 Q68 52 62 52 L48 52 L48 28 Q48 22 42 22 L38 22 Q32 22 32 28 Z"
-                  fill="url(#lubaGrad)" filter="url(#glow)"/>
-            <circle cx="50" cy="50" r="7" fill="url(#lubaGrad)" filter="url(#glow)"/>
+        <svg class="logo-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Luba">
+            <rect width="64" height="64" rx="14" fill="#0a0a0a"/>
+            <path fill="#ffffff" d="M14 50h36V42H42V34H34V26H26V18H14v32z"/>
         </svg>
         <div class="logo">Luba AI</div>
     </div>
