@@ -5897,7 +5897,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 const messages = {
                     normal: 'Normal mode — regular helpful answers.',
                     study: 'Study mode ON — I will teach step by step, not only give the answer.',
-                    html: 'HTML mode ON — I will focus on complete single-file HTML you can run and preview.',
+                    html: 'HTML mode ON — I will focus on complete single-file HTML you can run and preview. (Big projects may take longer; if the AI is busy, hit Retry.)',
                     code: 'Code mode ON — complete working programs, not half-finished snippets.',
                     creative: 'Creative mode ON — stories, ideas, and more imaginative writing.'
                 };
@@ -7048,26 +7048,29 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         contents.push({ role: "user", parts: currentParts });
 
         const usingVision = !!imageToSend;
-        // Current models — Google blocks 2.0/2.5 flash for many new API keys
+        const isHtmlMode = activeMode === 'html';
+        // Prefer lite models first — less "high demand" than big flash for long HTML
         const DEFAULT_MODELS = [
-            "gemini-3.6-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-flash-latest",
+            "gemini-2.5-flash-lite-preview",
             "gemini-3.1-flash-lite",
             "gemini-3.5-flash-lite",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash"
+            "gemini-3.6-flash"
         ];
         let modelChain = DEFAULT_MODELS.slice();
         try {
             const lastGood = storageGet('luba_last_good_model');
-            // Forget old models that return "no longer available to new users"
-            if (lastGood && /gemini-2\.0-flash|gemini-2\.5-flash$/.test(lastGood)) {
-                storageRemove('luba_last_good_model');
-            } else if (lastGood && modelChain.includes(lastGood)) {
+            if (lastGood && modelChain.includes(lastGood)) {
                 modelChain = [lastGood].concat(modelChain.filter(m => m !== lastGood));
             }
         } catch (_) {}
-        if (isSimpleChat) {
-            modelChain = modelChain.slice(0, 3);
+        // Simple chat: try fewer models fast. HTML: try the full list (high demand is common)
+        if (isSimpleChat && !isHtmlMode) {
+            modelChain = modelChain.slice(0, 4);
         }
         let modelIndex = 0;
         let model = modelChain[modelIndex];
@@ -7094,10 +7097,10 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             let accumulatedText = "";
             let guard = 0;
             let continueCount = 0;
-            const MAX_CONTINUES = isSimpleChat ? 1 : 6;
+            const MAX_CONTINUES = isSimpleChat ? 1 : (isHtmlMode ? 8 : 6);
             const generatedImageUrls = [];
-            // Simple "hi" should fail over fast — not wait 28s per model
-            const ATTEMPT_TIMEOUT_MS = isSimpleChat ? 12000 : 25000;
+            // HTML needs longer; simple stays fast
+            const ATTEMPT_TIMEOUT_MS = isSimpleChat ? 12000 : (isHtmlMode ? 45000 : 28000);
 
             while (guard < 16) {
                 if (abortController.signal.aborted) {
@@ -7110,8 +7113,8 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                     contents,
                     systemInstruction: { parts: [{ text: systemPrompt }] },
                     generationConfig: {
-                        temperature: isSimpleChat ? 0.6 : 0.4,
-                        maxOutputTokens: isSimpleChat ? 512 : 4096
+                        temperature: isHtmlMode ? 0.35 : (isSimpleChat ? 0.6 : 0.4),
+                        maxOutputTokens: isSimpleChat ? 512 : (isHtmlMode ? 8192 : 4096)
                     }
                 };
                 // Tools only when needed — tool routing slows easy replies a lot
@@ -7144,15 +7147,23 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
                 if (data.error) {
                     const msg = data.error.message || "";
-                    const isModelIssue = /not found|not supported|invalid model|does not exist|no longer available/i.test(msg);
-                    const isQuotaIssue = /quota|RESOURCE_EXHAUSTED|rate limit/i.test(msg);
+                    const isModelIssue = /not found|not supported|invalid model|does not exist|no longer available|not available/i.test(msg);
+                    const isBusyIssue = /high demand|overloaded|unavailable|try again later|temporarily|RESOURCE_EXHAUSTED|quota|rate limit|503|429|capacity|spikes in demand/i.test(msg);
 
-                    if ((isModelIssue || isQuotaIssue) && modelIndex < modelChain.length - 1) {
+                    if ((isModelIssue || isBusyIssue) && modelIndex < modelChain.length - 1) {
                         modelIndex++;
                         model = modelChain[modelIndex];
+                        // brief pause before next model when overloaded
+                        if (isBusyIssue) {
+                            try { await new Promise(r => setTimeout(r, 600 + modelIndex * 200)); } catch (_) {}
+                        }
                         continue;
                     }
-                    reply = "Error: " + msg;
+                    if (isBusyIssue) {
+                        reply = "Luba is busy generating that right now (the AI service is overloaded). Tap Retry — HTML projects are longer so this happens more often than normal chat.";
+                    } else {
+                        reply = "Error: " + msg;
+                    }
                     break;
                 }
 
