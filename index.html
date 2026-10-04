@@ -419,21 +419,100 @@
             padding-left: 0;
         }
 
-        .copy-btn {
+        .msg-tools {
             position: absolute;
             top: 6px;
-            right: 8px;
-            background: transparent;
-            border: none;
-            color: #aaa;
+            right: 6px;
+            display: flex;
+            gap: 4px;
+            z-index: 2;
+        }
+        .copy-btn, .speak-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #ccc;
             cursor: pointer;
             font-size: 13px;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .ai .content:hover .copy-btn {
             opacity: 1;
+            transition: background 0.15s, color 0.15s;
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body.light .copy-btn, body.light .speak-btn {
+            background: rgba(0,0,0,0.05);
+            border-color: rgba(0,0,0,0.1);
+            color: #555;
+        }
+        .copy-btn:active, .speak-btn:active,
+        .copy-btn.speaking {
+            background: rgba(255, 0, 127, 0.25);
+            color: #ff7ab8;
+            border-color: rgba(255, 0, 127, 0.4);
+        }
+        .ai .content {
+            padding-right: 76px; /* room for copy + speak */
+        }
+        .coins-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            margin-bottom: 14px;
+        }
+        body.light .coins-card {
+            background: rgba(0, 0, 0, 0.03);
+        }
+        .coins-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 30% 30%, #ffe566, #e6a800 55%, #b8860b);
+            box-shadow: 0 2px 8px rgba(230, 168, 0, 0.35);
+        }
+        .coins-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+        .coins-card.unlimited .coins-icon {
+            background: radial-gradient(circle at 30% 30%, #7dffb2, #1faa5c 60%, #0d7a40);
+            box-shadow: 0 2px 8px rgba(61, 214, 140, 0.35);
+        }
+        .coins-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .coins-info-title {
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .coins-info-sub {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 2px;
+            line-height: 1.35;
+        }
+        .coins-count {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #ffd56a;
+            flex-shrink: 0;
+        }
+        .coins-card.unlimited .coins-count {
+            color: #3dd68c;
         }
 
         #input-wrapper {
@@ -2036,6 +2115,21 @@
                 </span>
             </div>
 
+            <div class="coins-card" id="coins-card">
+                <div class="coins-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="9" fill="rgba(0,0,0,0.15)"/>
+                        <circle cx="12" cy="12" r="7.5" stroke="rgba(0,0,0,0.25)" stroke-width="1.2" fill="none"/>
+                        <path d="M12 7.2v9.6M9.2 9.5c.6-1 1.6-1.5 2.8-1.5 1.7 0 2.8 1 2.8 2.3 0 1.2-.9 2-2.6 2.4l-1.4.3c-1.5.3-2.3.9-2.3 2 0 1.3 1.2 2.2 3.1 2.2 1.3 0 2.3-.5 2.9-1.4" stroke="#3a2800" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="coins-info">
+                    <div class="coins-info-title" id="coins-info-title">Daily messages</div>
+                    <div class="coins-info-sub" id="coins-info-sub">Resets every 24 hours</div>
+                </div>
+                <div class="coins-count" id="coins-count">—</div>
+            </div>
+
             <div class="profile-pic-row">
                 <img class="profile-pic-preview" id="settings-avatar-preview" src="" alt="Profile">
                 <div class="profile-pic-actions">
@@ -2146,6 +2240,14 @@
             <button type="button" class="small-btn" id="owner-inspect-unban-ip-btn">Unban IP</button>
             <button type="button" class="small-btn danger" id="owner-inspect-delete-btn" style="background:#5c1010;">Delete account</button>
             <button type="button" class="small-btn" id="owner-inspect-refresh-btn">Refresh</button>
+        </div>
+        <div class="owner-section-label">Messages (coins)</div>
+        <div id="owner-inspect-coins" class="owner-user-meta" style="margin-bottom:8px;">—</div>
+        <div class="owner-ban-row" id="owner-coins-row">
+            <button type="button" class="small-btn" id="owner-coins-add-btn" style="background:#1a6b3a;">+ Add</button>
+            <button type="button" class="small-btn" id="owner-coins-remove-btn" style="background:#6b4a00;">− Remove</button>
+            <button type="button" class="small-btn" id="owner-coins-set-btn">Set left</button>
+            <button type="button" class="small-btn" id="owner-coins-reset-btn">Reset 24h</button>
         </div>
         <div class="owner-section-label">Messages (all devices)</div>
         <div class="owner-inspect-chat" id="owner-inspect-cloud"></div>
@@ -2288,6 +2390,305 @@
         return String(user.username).toLowerCase() === OWNER_USERNAME;
     }
 
+
+    // ============================================================
+    // Daily coins (message limit) — owner unlimited
+    // ============================================================
+    const DAILY_COINS = 50; // messages per rolling 24 hours (normal users)
+    const COIN_COST_NORMAL = 1;
+    const COIN_COST_HEAVY = 2; // image generation request or HTML mode
+    const COINS_WINDOW_MS = 24 * 60 * 60 * 1000;
+    // Cache from server (source of truth when online)
+    let coinsCache = null; // { left, used, bonus, limit, windowStart, resetsInMs, unlimited }
+
+    function todayKey() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+
+    function getCoinsState(username) {
+        if (!username) return { windowStart: Date.now(), used: 0, bonus: 0 };
+        try {
+            const raw = storageGet('luba_coins_' + userKey(username));
+            const o = raw ? JSON.parse(raw) : null;
+            if (!o) return { windowStart: Date.now(), used: 0, bonus: 0 };
+            let start = parseInt(o.windowStart, 10);
+            if (!start || isNaN(start)) return { windowStart: Date.now(), used: 0, bonus: 0 };
+            if (Date.now() - start >= COINS_WINDOW_MS) {
+                return { windowStart: Date.now(), used: 0, bonus: 0 };
+            }
+            return {
+                windowStart: start,
+                used: Math.max(0, parseInt(o.used, 10) || 0),
+                bonus: parseInt(o.bonus, 10) || 0
+            };
+        } catch {
+            return { windowStart: Date.now(), used: 0, bonus: 0 };
+        }
+    }
+
+    function saveCoinsState(username, state) {
+        if (!username) return;
+        storageSet('luba_coins_' + userKey(username), JSON.stringify({
+            windowStart: state.windowStart || Date.now(),
+            used: Math.max(0, parseInt(state.used, 10) || 0),
+            bonus: parseInt(state.bonus, 10) || 0
+        }));
+    }
+
+    function applyCoinsServerData(data) {
+        if (!data || !data.ok) return;
+        if (data.unlimited) {
+            coinsCache = { unlimited: true, left: Infinity };
+            return;
+        }
+        coinsCache = {
+            unlimited: false,
+            left: data.left,
+            used: data.used,
+            bonus: data.bonus || 0,
+            limit: data.limit || DAILY_COINS,
+            windowStart: data.windowStart,
+            resetsInMs: data.resetsInMs
+        };
+        if (currentUser && !isOwnerAccount(currentUser)) {
+            saveCoinsState(currentUser.username, {
+                windowStart: data.windowStart || Date.now(),
+                used: data.used || 0,
+                bonus: data.bonus || 0
+            });
+        }
+        updateCoinsUI();
+    }
+
+    async function pullCoinsFromServer() {
+        if (!currentUser) return null;
+        if (isOwnerAccount(currentUser)) {
+            coinsCache = { unlimited: true, left: Infinity };
+            updateCoinsUI();
+            return coinsCache;
+        }
+        const token = getAuthToken();
+        const data = await cloudPost({
+            action: 'get_coins',
+            token: token || undefined,
+            username: currentUser.username
+        });
+        if (data && data.ok) applyCoinsServerData(data);
+        return data;
+    }
+
+    function coinsLeft(username) {
+        if (isOwnerAccount({ username: username })) return Infinity;
+        if (coinsCache && !coinsCache.unlimited && currentUser && userKey(currentUser.username) === userKey(username)) {
+            if (typeof coinsCache.left === 'number') return Math.max(0, coinsCache.left);
+        }
+        const st = getCoinsState(username);
+        const limit = DAILY_COINS + (st.bonus || 0);
+        return Math.max(0, limit - st.used);
+    }
+
+    function coinsResetInMs(username) {
+        if (isOwnerAccount({ username: username })) return 0;
+        if (coinsCache && typeof coinsCache.resetsInMs === 'number' && currentUser && userKey(currentUser.username) === userKey(username)) {
+            return Math.max(0, coinsCache.resetsInMs);
+        }
+        const st = getCoinsState(username);
+        return Math.max(0, (st.windowStart + COINS_WINDOW_MS) - Date.now());
+    }
+
+    function formatResetIn(ms) {
+        if (ms <= 0) return 'soon';
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        if (h > 0) return h + 'h ' + m + 'm';
+        return Math.max(1, m) + 'm';
+    }
+
+    function messageCoinCost(text, mode) {
+        const msg = String(text || '');
+        const wantsImage = /\b(draw|generate|create|make|paint|show)\b.{0,40}\b(image|picture|photo|art|artwork|illustration|wallpaper|logo)\b|\b(image|picture|photo)\b.{0,20}\b(of|for)\b/i.test(msg);
+        if (mode === 'html' || wantsImage) return COIN_COST_HEAVY;
+        return COIN_COST_NORMAL;
+    }
+
+    async function spendCoin(username, cost) {
+        if (isOwnerAccount({ username: username })) return true;
+        cost = Math.max(1, parseInt(cost, 10) || 1);
+        const token = getAuthToken();
+        if (token) {
+            const data = await cloudPost({ action: 'spend_coins', token, cost });
+            if (data && data.ok) {
+                applyCoinsServerData(data);
+                return true;
+            }
+            if (data && data.ok === false) {
+                if (typeof data.left === 'number') {
+                    coinsCache = Object.assign({}, coinsCache || {}, {
+                        left: data.left,
+                        resetsInMs: data.resetsInMs
+                    });
+                    updateCoinsUI();
+                }
+                return false;
+            }
+        }
+        // Offline fallback — local only
+        const st = getCoinsState(username);
+        const limit = DAILY_COINS + (st.bonus || 0);
+        if (st.used + cost > limit) return false;
+        st.used += cost;
+        saveCoinsState(username, st);
+        coinsCache = {
+            unlimited: false,
+            left: limit - st.used,
+            used: st.used,
+            bonus: st.bonus || 0,
+            limit,
+            windowStart: st.windowStart,
+            resetsInMs: Math.max(0, st.windowStart + COINS_WINDOW_MS - Date.now())
+        };
+        updateCoinsUI();
+        return true;
+    }
+
+    function updateCoinsUI() {
+        const card = document.getElementById('coins-card');
+        const count = document.getElementById('coins-count');
+        const title = document.getElementById('coins-info-title');
+        const sub = document.getElementById('coins-info-sub');
+        if (!count) return;
+        if (!currentUser) {
+            count.textContent = '—';
+            if (card) card.classList.remove('unlimited');
+            if (title) title.textContent = 'Daily messages';
+            if (sub) sub.textContent = 'Log in to see your limit';
+            return;
+        }
+        if (isOwnerAccount(currentUser)) {
+            if (card) card.classList.add('unlimited');
+            count.textContent = '∞';
+            if (title) title.textContent = 'Unlimited';
+            if (sub) sub.textContent = 'Owner account — no daily limit';
+            return;
+        }
+        if (card) card.classList.remove('unlimited');
+        const left = coinsLeft(currentUser.username);
+        const st = getCoinsState(currentUser.username);
+        const limit = (coinsCache && coinsCache.limit) ? coinsCache.limit : (DAILY_COINS + (st.bonus || 0));
+        count.textContent = String(left);
+        if (title) title.textContent = 'Messages left';
+        const resetMs = coinsResetInMs(currentUser.username);
+        if (sub) {
+            sub.textContent = left + ' of ' + limit + ' · resets in ' + formatResetIn(resetMs) +
+                ' · Normal 1 · HTML/image 2';
+        }
+    }
+
+    // ============================================================
+    // Luba talks (text-to-speech)
+    // ============================================================
+    let currentUtterance = null;
+
+    function stopSpeaking() {
+        try {
+            if (window.speechSynthesis) speechSynthesis.cancel();
+        } catch (_) {}
+        currentUtterance = null;
+        document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+    }
+
+    function speakText(text, btn) {
+        if (!window.speechSynthesis) {
+            alert('Voice is not supported on this device/browser.');
+            return;
+        }
+        const plain = String(text || '')
+            .replace(/```[\s\S]*?```/g, ' ')
+            .replace(/[#*_>`]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 1200);
+        if (!plain) return;
+
+        // Toggle off if same button already speaking
+        if (btn && btn.classList.contains('speaking')) {
+            stopSpeaking();
+            return;
+        }
+        stopSpeaking();
+        const u = new SpeechSynthesisUtterance(plain);
+        u.rate = 1.02;
+        u.pitch = 1.05;
+        u.lang = 'en-US';
+        // Prefer a female-ish English voice if available
+        try {
+            const voices = speechSynthesis.getVoices() || [];
+            const pick = voices.find(v => /en(-|_)US/i.test(v.lang) && /female|samantha|victoria|google us english/i.test(v.name))
+                || voices.find(v => /en(-|_)US/i.test(v.lang))
+                || voices.find(v => /^en/i.test(v.lang));
+            if (pick) u.voice = pick;
+        } catch (_) {}
+        currentUtterance = u;
+        if (btn) btn.classList.add('speaking');
+        u.onend = u.onerror = () => {
+            if (btn) btn.classList.remove('speaking');
+            currentUtterance = null;
+        };
+        speechSynthesis.speak(u);
+    }
+
+    // Warm up voices list (Chrome loads async)
+    try {
+        if (window.speechSynthesis) {
+            speechSynthesis.getVoices();
+            speechSynthesis.onvoiceschanged = () => { try { speechSynthesis.getVoices(); } catch (_) {} };
+        }
+    } catch (_) {}
+
+    const WELCOME_BACK_LINES = [
+        (n) => `Welcome back, ${n}! Ready when you are.`,
+        (n) => `Hey ${n} — good to see you again. What are we doing today?`,
+        (n) => `You're back! I kept our chat. What's next, ${n}?`,
+        (n) => `Hi again, ${n} 👋 Jump in whenever.`,
+        (n) => `Welcome back! Missed a beat? Just ask, ${n}.`
+    ];
+    const WELCOME_BACK_OWNER = [
+        (n) => `Welcome back, Kobi 💙 Everything's ready for you.`,
+        (n) => `Hey Kobi — good to have you here. What are we building?`,
+        (n) => `You're back, creator. Say the word.`
+    ];
+
+    function maybeWelcomeBack() {
+        if (!currentUser || !chatHistory || chatHistory.length === 0) return;
+        // Only for returning users who already chatted — never on first signup
+        // (avoids double hello: default greeting + welcome back)
+        const userMsgs = chatHistory.filter(m => m && m.role === 'user');
+        if (userMsgs.length < 1) return;
+        // Need a real conversation, not just the starter AI line
+        if (chatHistory.length < 2) return;
+
+        const key = 'luba_welcomed_' + userKey(currentUser.username) + '_' + todayKey();
+        if (storageGet(key) === '1') return;
+
+        // Don't welcome if they only opened the app seconds after signup
+        try {
+            const users = getUsers();
+            const u = users[userKey(currentUser.username)];
+            if (u && u.createdAt && (Date.now() - u.createdAt) < 2 * 60 * 1000) return;
+        } catch (_) {}
+
+        storageSet(key, '1');
+        const name = currentUser.username;
+        const lines = isOwnerAccount(currentUser) ? WELCOME_BACK_OWNER : WELCOME_BACK_LINES;
+        const msg = lines[Math.floor(Math.random() * lines.length)](name);
+        const tm = getTime();
+        appendMessage('ai', msg, tm);
+        chatHistory.push({ role: 'assistant', content: msg, time: tm });
+        saveChat();
+    }
+
+
     function updateOwnerBadgeUI() {
         const show = isOwnerAccount(currentUser);
         const hb = document.getElementById('header-owner-badge');
@@ -2296,6 +2697,7 @@
         const nameEl = document.getElementById('settings-owner-name');
         if (row) row.style.display = show ? 'flex' : 'none';
         if (nameEl && currentUser) nameEl.textContent = '@' + currentUser.username;
+        updateCoinsUI();
     }
 
 
@@ -3003,7 +3405,82 @@
                 }).join('\n\n');
             }
         }
+
+        // Coins panel
+        await refreshOwnerInspectCoins(username);
     };
+
+    async function refreshOwnerInspectCoins(username) {
+        const el = document.getElementById('owner-inspect-coins');
+        const row = document.getElementById('owner-coins-row');
+        if (!el) return;
+        if (String(username || '').toLowerCase() === OWNER_USERNAME) {
+            el.innerHTML = '<span class="owner-badge ok">∞ Unlimited (owner)</span>';
+            if (row) row.style.display = 'none';
+            return;
+        }
+        if (row) row.style.display = 'flex';
+        el.textContent = 'Loading coins…';
+        const data = await cloudPost({
+            action: 'get_coins',
+            ownerPassword: OWNER_PASSWORD,
+            username
+        });
+        if (!data || !data.ok) {
+            el.textContent = 'Could not load coins (' + ((data && data.error) || 'error') + ')';
+            return;
+        }
+        if (data.unlimited) {
+            el.innerHTML = '<span class="owner-badge ok">∞ Unlimited</span>';
+            return;
+        }
+        el.innerHTML =
+            '<strong>' + data.left + '</strong> left of <strong>' + data.limit + '</strong>' +
+            ' (used ' + data.used + (data.bonus ? ', bonus +' + data.bonus : '') + ')' +
+            ' · resets in ' + formatResetIn(data.resetsInMs || 0);
+    }
+
+    window.ownerAdjustCoins = async function (mode) {
+        const username = ownerInspectUsername;
+        if (!username) return;
+        if (String(username).toLowerCase() === OWNER_USERNAME) {
+            alert('Owner has unlimited messages.');
+            return;
+        }
+        let amount = 0;
+        if (mode === 'reset') {
+            if (!confirm('Reset @' + username + ' 24h window and usage to full ' + DAILY_COINS + '?')) return;
+        } else if (mode === 'add') {
+            const v = prompt('Add how many messages to @' + username + '?', '10');
+            if (v === null) return;
+            amount = parseInt(v, 10);
+            if (!amount || amount < 1) { alert('Enter a positive number'); return; }
+        } else if (mode === 'remove') {
+            const v = prompt('Remove how many messages from @' + username + '?', '5');
+            if (v === null) return;
+            amount = parseInt(v, 10);
+            if (!amount || amount < 1) { alert('Enter a positive number'); return; }
+        } else if (mode === 'set_left') {
+            const v = prompt('Set messages left for @' + username + ' to:', '50');
+            if (v === null) return;
+            amount = parseInt(v, 10);
+            if (isNaN(amount) || amount < 0) { alert('Enter 0 or more'); return; }
+        }
+        const res = await cloudPost({
+            action: 'owner_set_coins',
+            ownerPassword: OWNER_PASSWORD,
+            username,
+            mode,
+            amount
+        });
+        if (!res || res.ok === false) {
+            alert('Failed: ' + ((res && res.error) || 'error'));
+            return;
+        }
+        await refreshOwnerInspectCoins(username);
+        alert('Updated @' + username + ': ' + res.left + ' left (limit ' + res.limit + ')');
+    };
+
 
     window.ownerOpenBanMenu = function (username) {
         if (String(username || '').toLowerCase() === OWNER_USERNAME) {
@@ -4208,6 +4685,8 @@
         // renderSavedMessages already shows the welcome message if history is empty
         // (do NOT call initDefaultChat again — that was causing the double greeting)
         renderSavedMessages();
+        updateCoinsUI();
+        pullCoinsFromServer().catch(() => {});
 
         // Pull cloud chat + prefs + saved chats
         lastCloudChatUpdatedAt = null;
@@ -4228,7 +4707,11 @@
                     messages: chatHistory
                 }).catch(() => {});
             }
-        }).catch(() => {});
+            // After history is loaded — welcome only if they already had real chats
+            try { maybeWelcomeBack(); } catch (_) {}
+        }).catch(() => {
+            try { maybeWelcomeBack(); } catch (_) {}
+        });
         pullNamedSavedChats().catch(() => {});
         startChatSyncPolling();
         startBanPolling();
@@ -4237,6 +4720,7 @@
     }
 
     function logout() {
+        stopSpeaking();
         stopChatSyncPolling();
         stopBanPolling();
         const token = getAuthToken();
@@ -4403,46 +4887,49 @@
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-    const TERMS_TEXT = `Last updated: October 3, 2026
+    const TERMS_TEXT = `Last updated: October 4, 2026
 
 1. Who we are
 Luba AI is a chat assistant created by Kobi. By creating an account or using the app, you agree to these Terms of Service.
 
 2. The service
-Luba AI lets you chat with an AI assistant, send images and short videos, generate images, use optional modes (Study, HTML, Code, Creative), save conversations, and sync some data across your devices when you are logged in. Features may change, improve, or temporarily go offline without notice.
+Luba AI lets you chat with an AI assistant, send images and short videos, generate images, use optional modes (Study, HTML, Code, Creative), hear spoken replies on supported devices, save conversations, and sync some data across your devices when you are logged in. Features may change, improve, or temporarily go offline without notice.
 
 3. Your account
 You are responsible for keeping your username and password private. Do not share your password. You must be old enough to use the app under the laws where you live, or use it only with a parent or guardian's permission. You may only have accounts you are allowed to use. We may suspend or permanently remove accounts that break these Terms.
 
-4. Acceptable use
+4. Daily message limits (coins)
+To keep the service stable and fair, most accounts have a limited number of AI messages per rolling 24-hour window (currently 50). Normal messages usually cost 1 unit. More demanding requests — such as HTML mode or asking Luba to generate an image — may cost 2 units. When your limit is reached, you must wait until the window resets (or use older chats). Limits, costs, and the window length may change. The owner account is not subject to these limits. Attempting to bypass limits (multiple fake accounts, automation abuse, etc.) may lead to enforcement under section 5.
+
+5. Acceptable use
 You agree not to use Luba AI to:
 • Break the law or encourage others to break the law
 • Harass, threaten, abuse, or target people
 • Spam, flood, or overload the service
-• Try to hack, bypass security, or abuse other users' accounts
+• Try to hack, bypass security, abuse limits, or abuse other users' accounts
 • Upload or request highly illegal or severely harmful content
 • Impersonate the owner, staff, or other users in a deceptive way
 
-The owner may review reports of abuse and may apply temporary or permanent bans (including by account or network/IP when needed to stop repeated abuse). If you believe a ban was a mistake, contact lubaai.official@gmail.com.
+The owner may review abuse and may apply temporary or permanent bans (including by account or network/IP when needed). If you believe a ban was a mistake, contact lubaai.official@gmail.com.
 
-5. AI answers
-Luba can make mistakes. Replies are not professional medical, legal, financial, or safety advice. Always double-check important information yourself.
+6. AI answers
+Luba can make mistakes. Replies are not professional medical, legal, financial, or safety advice. Always double-check important information yourself. Spoken playback uses your device's text-to-speech and may vary by browser.
 
-6. Content you send
-You keep rights to what you type and upload. You give permission for that content to be processed so the AI can reply, and — when you are logged in — for limited copies to be stored on our backend so your chats and settings can sync across devices and so moderation tools can work. Do not send content you are not allowed to share.
+7. Content you send
+You keep rights to what you type and upload. You give permission for that content to be processed so the AI can reply, and — when you are logged in — for limited copies to be stored on our backend so your chats, settings, and message-limit usage can sync across devices and so moderation tools can work. Do not send content you are not allowed to share.
 
-7. Availability and liability
-The app is provided "as is." It may go offline, lose data in some situations, or change. To the fullest extent allowed by law, we are not liable for lost chats, interruptions, or decisions you make based on AI replies.
+8. Availability and liability
+The app is provided "as is." It may go offline, lose data in some situations, or change. Hosting or third-party AI providers may rate-limit or interrupt service. To the fullest extent allowed by law, we are not liable for lost chats, interruptions, or decisions you make based on AI replies.
 
-8. Contact
+9. Contact
 Questions about these Terms: lubaai.official@gmail.com (creator: Kobi).
 
-9. Changes
+10. Changes
 We may update these Terms. Continued use after changes means you accept the updated version.
 
 Made on Earth by humans.`;
 
-    const PRIVACY_TEXT = `Last updated: October 3, 2026
+    const PRIVACY_TEXT = `Last updated: October 4, 2026
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data is stored on our cloud backend when you create an account and use the service while logged in.
@@ -4450,19 +4937,21 @@ This Privacy Policy explains what Luba AI collects, stores, and uses. Some data 
 2. Account data
 When you sign up we store your username, a hashed password (not plain text), gender, date of birth, and optional profile photo. Account records live on our Cloudflare Worker / KV backend so you can log in from more than one phone. A limited local cache may also be kept on each device for offline convenience.
 
-3. Chat and settings on your devices and in the cloud
+3. Chat, settings, and message limits
 • Active chat history and named "Saved chats" can be stored on your device and, when you are logged in, synced to our backend so the same account can see them on other devices.
 • Preferences such as theme, mode, and custom personality text may also sync when logged in.
-• Clearing chat or deleting a saved chat on one device is intended to update the synced copy as well when the server is reachable.
+• Message-limit usage (how many AI messages you have used in the current 24-hour window, plus any adjustments) may be stored on the backend and cached on your device so limits work across phones.
+• Clearing chat or deleting a saved chat on one device is intended to update the synced copy when the server is reachable.
 
 4. What is sent to make the AI work
-When you send a message (and optional image or short video), that content is sent through our secure proxy to an AI provider so Luba can reply. Generated-image requests send a text description to an image service. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
+When you send a message (and optional image or short video), that content is sent through our secure proxy to an AI provider so Luba can reply. Generated-image requests send a text description to an image service. If you use "speak," your device may convert on-screen text to audio locally. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
 
 5. Moderation and safety
 To run the service and enforce the rules, the backend may store:
 • Recent message logs (for Owner moderation tools)
 • Ban records (account and, when needed, IP/network bans for abuse)
 • Basic connection metadata such as approximate last IP used with an account
+• Message-limit records for fair use
 
 These are used only to operate Luba AI, stop abuse, and respond to support requests — not to sell advertising profiles.
 
@@ -4473,6 +4962,7 @@ We do not sell your personal information.
 • Log out anytime
 • Clear chat history from the app
 • Change password and profile photo in Settings
+• See your remaining message allowance in Settings
 • Contact lubaai.official@gmail.com about account deletion or privacy questions
 • Clear site/app data on a device to wipe local caches on that device
 
@@ -4824,16 +5314,47 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         if (sender === 'ai') {
             const COPY_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
             const CHECK_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+            const SPEAK_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+            const tools = document.createElement('div');
+            tools.className = 'msg-tools';
             const copyBtn = document.createElement('button');
             copyBtn.className = 'copy-btn';
+            copyBtn.type = 'button';
             copyBtn.innerHTML = COPY_ICON;
             copyBtn.title = 'Copy';
-            copyBtn.onclick = () => {
-                navigator.clipboard.writeText(content.innerText);
-                copyBtn.innerHTML = CHECK_ICON;
-                setTimeout(() => copyBtn.innerHTML = COPY_ICON, 1500);
+            copyBtn.onclick = (e) => {
+                e.stopPropagation();
+                const txt = content.innerText || '';
+                const done = () => {
+                    copyBtn.innerHTML = CHECK_ICON;
+                    setTimeout(() => copyBtn.innerHTML = COPY_ICON, 1500);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(txt).then(done).catch(() => {
+                        const ta = document.createElement('textarea');
+                        ta.value = txt; document.body.appendChild(ta); ta.select();
+                        try { document.execCommand('copy'); } catch (_) {}
+                        ta.remove(); done();
+                    });
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = txt; document.body.appendChild(ta); ta.select();
+                    try { document.execCommand('copy'); } catch (_) {}
+                    ta.remove(); done();
+                }
             };
-            content.appendChild(copyBtn);
+            const speakBtn = document.createElement('button');
+            speakBtn.className = 'speak-btn';
+            speakBtn.type = 'button';
+            speakBtn.innerHTML = SPEAK_ICON;
+            speakBtn.title = 'Luba speaks';
+            speakBtn.onclick = (e) => {
+                e.stopPropagation();
+                speakText(content.innerText || '', speakBtn);
+            };
+            tools.appendChild(copyBtn);
+            tools.appendChild(speakBtn);
+            content.appendChild(tools);
         }
 
         body.appendChild(content);
@@ -6027,6 +6548,16 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (ownerInspectUsername) window.ownerInspectUser(ownerInspectUsername);
         };
     }
+
+    const ownerCoinsAddBtn = document.getElementById('owner-coins-add-btn');
+    const ownerCoinsRemoveBtn = document.getElementById('owner-coins-remove-btn');
+    const ownerCoinsSetBtn = document.getElementById('owner-coins-set-btn');
+    const ownerCoinsResetBtn = document.getElementById('owner-coins-reset-btn');
+    if (ownerCoinsAddBtn) ownerCoinsAddBtn.onclick = () => window.ownerAdjustCoins && window.ownerAdjustCoins('add');
+    if (ownerCoinsRemoveBtn) ownerCoinsRemoveBtn.onclick = () => window.ownerAdjustCoins && window.ownerAdjustCoins('remove');
+    if (ownerCoinsSetBtn) ownerCoinsSetBtn.onclick = () => window.ownerAdjustCoins && window.ownerAdjustCoins('set_left');
+    if (ownerCoinsResetBtn) ownerCoinsResetBtn.onclick = () => window.ownerAdjustCoins && window.ownerAdjustCoins('reset');
+
     // Show custom reason field only when "Other" is selected
     (function wireBanReasonSelect() {
         const sel = document.getElementById('owner-ban-reason-select');
@@ -6299,6 +6830,26 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         if (!WORKER_URL || WORKER_URL.includes('YOUR-WORKER-NAME')) {
             alert("Luba isn't fully set up yet — the developer needs to finish the backend setup (WORKER_URL) before this app can talk to the AI.");
             return;
+        }
+
+        // Daily coins (rolling 24h) — owner unlimited
+        if (!isRetry) {
+            const cost = messageCoinCost(text, activeMode);
+            const left = coinsLeft(currentUser.username);
+            if (left < cost) {
+                const t0 = getTime();
+                const resetMs = coinsResetInMs(currentUser.username);
+                const msg = left <= 0
+                    ? ("You're out of messages for now.\n\nYou get " + DAILY_COINS + " every 24 hours. Resets in " + formatResetIn(resetMs) + ". HTML mode and image requests use 2 each.")
+                    : ("Not enough messages left.\n\nThis action needs " + cost + " (you have " + left + "). HTML / image = 2, normal = 1. Resets in " + formatResetIn(resetMs) + ".");
+                appendMessage('ai', msg, t0);
+                return;
+            }
+            if (!(await spendCoin(currentUser.username, cost))) {
+                const t0 = getTime();
+                appendMessage('ai', "Not enough messages left. They reset every 24 hours — check Settings for the timer.", t0);
+                return;
+            }
         }
 
         const time = getTime();
