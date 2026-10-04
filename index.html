@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Luba AI</title>
-    <!-- KaTeX renders LaTeX math (the $...$ / $$...$$ style output Gemini
+    <!-- KaTeX renders LaTeX math (the $...$ / $$...$$ style output the AI
          writes) as real math symbols instead of raw text with backslashes
          and dollar signs. -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -6802,6 +6802,22 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     // ============================================================
     // Tools + sendMessage (mostly original)
     // ============================================================
+
+    /** Never show provider brand names (Gemini, Google, etc.) to users */
+    function sanitizeAiError(msg) {
+        let s = String(msg || 'Something went wrong.');
+        s = s.replace(/\bGoogle\s*Generative\s*AI\b/gi, 'the AI service');
+        s = s.replace(/\bGenerative\s*Language\s*API\b/gi, 'the AI service');
+        s = s.replace(/\bGemini(\s*[\w.-]+)?\b/gi, 'Luba');
+        s = s.replace(/\bGoogle\b/gi, 'the service');
+        s = s.replace(/\bOpenAI\b/gi, 'the AI service');
+        s = s.replace(/\bmodels\/[\w.-]+/gi, 'the model');
+        s = s.replace(/^Error:\s*/i, '');
+        s = s.trim();
+        if (!s) s = 'Something went wrong. Please try again.';
+        return s;
+    }
+
     const geminiTools = [{
         functionDeclarations: [
             {
@@ -7162,7 +7178,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                     if (isBusyIssue) {
                         reply = "Luba is busy generating that right now (the AI service is overloaded). Tap Retry — HTML projects are longer so this happens more often than normal chat.";
                     } else {
-                        reply = "Error: " + msg;
+                        reply = sanitizeAiError(msg);
                     }
                     break;
                 }
@@ -7172,8 +7188,21 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
                 const candidate = data.candidates?.[0];
                 const parts = candidate?.content?.parts;
-                if (!parts) {
-                    reply = "Unexpected response from Gemini.";
+                if (!parts || !parts.length) {
+                    // Empty / blocked / weird payload — try another model before giving up
+                    const blockReason = (data.promptFeedback && data.promptFeedback.blockReason) ||
+                        (candidate && candidate.finishReason) || '';
+                    if (modelIndex < modelChain.length - 1) {
+                        modelIndex++;
+                        model = modelChain[modelIndex];
+                        try { await new Promise(r => setTimeout(r, 400)); } catch (_) {}
+                        continue;
+                    }
+                    if (/SAFETY|BLOCK/i.test(String(blockReason))) {
+                        reply = "Luba couldn't generate that reply (it was blocked). Try rephrasing your request.";
+                    } else {
+                        reply = "Luba got an empty reply that time. Tap Retry — HTML builds sometimes need a second try.";
+                    }
                     break;
                 }
 
@@ -7233,7 +7262,9 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 saveChat();
             } else {
                 if (reply == null) reply = "Sorry, something went wrong.";
-                const isApiError = /^Error:/i.test(reply) || /high demand|try again later|RESOURCE_EXHAUSTED|rate limit|quota/i.test(reply);
+                reply = sanitizeAiError(reply);
+                const isApiError = /^Error:/i.test(reply) ||
+                    /high demand|try again later|overloaded|busy generating|empty reply|couldn't generate|RESOURCE_EXHAUSTED|rate limit|quota|tap retry/i.test(reply);
 
                 if (isApiError) {
                     showErrorWithRetry(reply);
