@@ -5582,7 +5582,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 RULES (follow exactly):
 1) Reply with a short 1-line intro, then ONE markdown fence labeled html containing a COMPLETE single-file HTML document.
 2) The document MUST start with <!DOCTYPE html> and include <html>, <head>, and <body>.
-3) Put ALL CSS and JS inside that same file. Use HTTPS CDN links when needed (e.g. https://unpkg.com/three@0.160.0/build/three.min.js).
+3) Put ALL CSS and JS inside that same file. CDN tags MUST be complete: script src="https://unpkg.com/three@0.160.0/build/three.min.js" with a full opening and closing script tag (never leave src empty or cut off). If you use THREE, that CDN script is required BEFORE your own script.
 4) The visual MUST fill the viewport: use width/height 100% on html, body, canvas/container. Give canvas an explicit size (e.g. canvas { width:100%; height:100%; display:block; } and html,body{margin:0;height:100%;overflow:hidden;background:#111}).
 5) Interactive demos must work immediately on load (animation loop, drag, click). For 3D: one connected Group, orbit-style drag rotate, scroll zoom, visible lighting so objects are not black.
 6) NEVER answer with only description text when the user asked to make/build/show something — always include the full HTML fence.
@@ -5723,7 +5723,49 @@ RULES (follow exactly):
         return false;
     }
 
+
+    // Repair common AI HTML mistakes so previews actually run
+    function fixHtmlDemo(code) {
+        let c = String(code || '');
+        if (!c.trim()) return c;
+        const closeScr = '<' + '/script>';
+
+        // Broken/empty script src tags
+        c = c.replace(/<script\s+src\s*=\s*(["'])\s*\1\s*>\s*<\s*\/\s*script\s*>/gi, '');
+        c = c.replace(/<script\s+src\s*=\s*(["'])\s*\1[^>]*>/gi, '');
+        c = c.replace(/<script\s+src\s*=\s*["'][^"'>]*$/gim, '');
+        c = c.replace(/<script\s+src\s*=\s*["']\s*(?=<)/gi, '');
+        c = c.replace(/<script\s+src\s*=\s*["'][^"']*$/gim, '<!-- broken script src removed -->');
+        c = c.replace(/<script\s+src\s*=\s*["'][^"'>]{0,200}(?=\n\s*<script)/gi, '');
+
+        const needsThree = /\bTHREE\./.test(c) || /\bnew\s+THREE\b/.test(c);
+        const hasThreeCdn = /three(\.min)?\.js/i.test(c) || /from\s+['"]three['"]/.test(c);
+        if (needsThree && !hasThreeCdn) {
+            const inject = '<script src="https://unpkg.com/three@0.160.0/build/three.min.js">' + closeScr + '\n';
+            if (/<\/head>/i.test(c)) {
+                c = c.replace(/<\/head>/i, inject + '</head>');
+            } else if (/<body[^>]*>/i.test(c)) {
+                c = c.replace(/<body([^>]*)>/i, '<body$1>\n' + inject);
+            } else {
+                c = inject + c;
+            }
+        }
+
+        if (!/<!DOCTYPE\s+html/i.test(c) && /<body[\s>]/i.test(c) && !/<html[\s>]/i.test(c)) {
+            c = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>' + c + '</html>';
+        }
+
+        if (needsThree && !/canvas\s*\{[^}]*height/i.test(c)) {
+            const style = '<style>html,body{margin:0;height:100%;overflow:hidden;background:#111}canvas{display:block;width:100%;height:100%}</style>';
+            if (/<\/head>/i.test(c)) c = c.replace(/<\/head>/i, style + '</head>');
+            else c = style + c;
+        }
+
+        return c;
+    }
+
     function buildPreviewBlock(code) {
+        code = fixHtmlDemo(code);
         const codeId = storeCodeBlock(code);
         // data-srcdoc holds base64 to avoid attribute breakage; hydrate sets real srcdoc
         let b64 = '';
