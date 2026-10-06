@@ -2161,6 +2161,89 @@
             cursor: pointer;
         }
     
+    
+        .legal-agree-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 12px 0 4px;
+            font-size: 13px;
+            line-height: 1.4;
+            opacity: 0.9;
+            cursor: pointer;
+            user-select: none;
+        }
+        .legal-agree-row input {
+            margin-top: 2px;
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            min-height: 20px;
+            flex-shrink: 0;
+            accent-color: #ff007f;
+            pointer-events: auto;
+            z-index: 2;
+            position: relative;
+        }
+        .legal-agree-row span {
+            pointer-events: auto;
+        }
+        .legal-link.inline-legal {
+            display: inline;
+            padding: 0;
+            margin: 0;
+            font-size: inherit;
+            background: none;
+            border: none;
+            color: #ff7ab8;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        #close-legal-btn2:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .legal-countdown-hint {
+            font-size: 12px;
+            opacity: 0.65;
+            text-align: center;
+            margin: 0 0 8px;
+        }
+
+    
+        #legal-overlay {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 10050 !important;
+            background: rgba(0,0,0,0.78) !important;
+            display: none;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        #legal-overlay.is-open {
+            display: flex !important;
+        }
+        #legal-overlay .modal {
+            max-height: 88vh;
+            width: 94%;
+            max-width: 440px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10051;
+        }
+        #legal-overlay .legal-body {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            flex: 1 1 auto;
+            max-height: 50vh;
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.45;
+        }
     </style>
 </head>
 <body>
@@ -2223,6 +2306,10 @@
             <label for="signup-dob">Date of birth</label>
             <input type="date" id="signup-dob" required>
             <div class="auth-error" id="signup-error"></div>
+            <div class="legal-agree-row" id="signup-agree-row">
+                <input type="checkbox" id="signup-agree" />
+                <span>I agree to the <button type="button" class="legal-link inline-legal" id="signup-open-terms">Terms</button> and <button type="button" class="legal-link inline-legal" id="signup-open-privacy">Privacy Policy</button></span>
+            </div>
             <button type="submit" class="auth-submit" id="signup-submit">Create account</button>
         </form>
 
@@ -2553,6 +2640,7 @@
             <button class="lightbox-close saved-chats-close" id="close-legal-btn" title="Close">×</button>
         </div>
         <div class="legal-body" id="legal-body"></div>
+        <p class="legal-countdown-hint" id="legal-countdown-hint" style="display:none;"></p>
         <div class="modal-buttons">
             <button class="modal-btn save-btn" id="close-legal-btn2">Got it</button>
         </div>
@@ -5023,6 +5111,32 @@
         const pw2 = document.getElementById('signup-password2').value;
         const dob = document.getElementById('signup-dob').value;
 
+        // Soft legal gate — must agree (after 10s read) before creating account
+        const agreeBox = document.getElementById('signup-agree');
+        if (!(agreeBox && agreeBox.checked && signupLegalAccepted)) {
+            signupError.textContent = 'Please read and agree to the Terms & Privacy Policy first.';
+            try {
+                openLegal('terms', {
+                    forceRead: true,
+                    seconds: 10,
+                    onAccept: () => {
+                        signupLegalAccepted = true;
+                        if (agreeBox) agreeBox.checked = true;
+                        if (signupError) signupError.textContent = '';
+                        setTimeout(() => {
+                            try { signupForm.requestSubmit(); } catch (_) {
+                                try { signupForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); } catch (__) {}
+                            }
+                        }, 50);
+                    }
+                });
+            } catch (err) {
+                console.error(err);
+                signupError.textContent = 'Could not open Terms. Tap the Terms link above, then try again.';
+            }
+            return;
+        }
+
         const nameCheck = isValidUsername(unameRaw);
         if (!nameCheck.ok) {
             signupError.textContent = nameCheck.msg;
@@ -5390,73 +5504,98 @@
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-    const TERMS_TEXT = `Last updated: October 4, 2026
+        const TERMS_TEXT = `Last updated: October 6, 2026
 
 1. Who we are
-Luba AI is a chat assistant created by Kobi. By creating an account or using the app, you agree to these Terms of Service.
+Luba AI is a chat assistant created by Kobi. By creating an account or using the app, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant, send images and short videos, generate images, use optional modes (Study, HTML, Code, Creative), hear spoken replies on supported devices, save conversations, and sync some data across your devices when you are logged in. Features may change, improve, or temporarily go offline without notice.
+Luba AI lets you:
+• Chat with an AI assistant and send images or short videos
+• Use modes such as Study, HTML, Code, and Creative
+• Generate images when the feature is available
+• Hear spoken replies on supported devices
+• Save chats and sync some data across devices when logged in
+• Request a Verified badge (reviewed by the owner)
+
+Features may change, improve, or temporarily go offline without notice.
 
 3. Your account
-You are responsible for keeping your username and password private. Do not share your password. You must be old enough to use the app under the laws where you live, or use it only with a parent or guardian's permission. You may only have accounts you are allowed to use. We may suspend or permanently remove accounts that break these Terms.
+You are responsible for keeping your username and password private. Do not share your password. You must be old enough to use the app under the laws where you live, or use it only with a parent or guardian's permission. You may only use accounts you are allowed to use. We may suspend or permanently remove accounts that break these Terms.
 
-4. Daily message limits (coins)
-To keep the service stable and fair, most accounts have a limited number of AI messages per rolling 24-hour window (currently 50). Normal messages usually cost 1 unit. More demanding requests — such as HTML mode or asking Luba to generate an image — may cost 2 units. When your limit is reached, you must wait until the window resets (or use older chats). Limits, costs, and the window length may change. The owner account is not subject to these limits. Attempting to bypass limits (multiple fake accounts, automation abuse, etc.) may lead to enforcement under section 5.
+4. Daily message limits
+To keep the service stable and fair:
+• Most accounts get a limited number of AI messages per rolling 24-hour window (currently 50)
+• Verified accounts get a higher limit (currently 500 messages per 24 hours)
+• Normal messages usually cost 1 unit
+• Demanding requests (HTML mode demos, image generation, and similar) may cost 2 units
+• When your limit is reached, wait until the window resets
+• The official owner account is not subject to these limits
 
-5. Acceptable use
+Limits, costs, and window length may change. Trying to bypass limits (fake accounts, automation abuse, etc.) may lead to bans under section 6.
+
+5. Verified badge
+• Anyone can request verification from Settings and explain why
+• Only one pending request is allowed until the owner accepts or declines
+• If declined, you may request again later
+• Verified users get a badge next to their name, a higher daily message limit, and VIP-style treatment from Luba
+• Verification is a privilege, not a right — the owner may grant or remove it at any time for fairness or safety
+
+6. Acceptable use
 You agree not to use Luba AI to:
 • Break the law or encourage others to break the law
 • Harass, threaten, abuse, or target people
 • Spam, flood, or overload the service
-• Try to hack, bypass security, abuse limits, or abuse other users' accounts
+• Hack, bypass security, abuse limits, or use other people's accounts
 • Upload or request highly illegal or severely harmful content
 • Impersonate the owner, staff, or other users in a deceptive way
+• Try to force the AI into harmful or policy-breaking behavior
 
-The owner may review abuse and may apply temporary or permanent bans (including by account or network/IP when needed). If you believe a ban was a mistake, contact lubaai.official@gmail.com.
+The owner may review chats for abuse and may apply temporary or permanent bans (including by account or network/IP when needed). If you believe a ban was a mistake, contact lubaai.official@gmail.com.
 
-6. AI answers
-Luba can make mistakes. Replies are not professional medical, legal, financial, or safety advice. Always double-check important information yourself. Spoken playback uses your device's text-to-speech and may vary by browser.
+7. AI answers
+Luba can make mistakes. Replies are not professional medical, legal, financial, or safety advice. Always double-check important information yourself. Spoken playback uses your device's text-to-speech and may vary by browser or phone.
 
-7. Content you send
-You keep rights to what you type and upload. You give permission for that content to be processed so the AI can reply, and — when you are logged in — for limited copies to be stored on our backend so your chats, settings, and message-limit usage can sync across devices and so moderation tools can work. Do not send content you are not allowed to share.
+8. Content you send
+You keep rights to what you type and upload. You give permission for that content to be processed so the AI can reply, and — when you are logged in — for limited copies to be stored on our backend so chats, settings, verification status, and message limits can sync across devices and so moderation can work. Do not send content you are not allowed to share.
 
-8. Availability and liability
+9. Availability and liability
 The app is provided "as is." It may go offline, lose data in some situations, or change. Hosting or third-party AI providers may rate-limit or interrupt service. To the fullest extent allowed by law, we are not liable for lost chats, interruptions, or decisions you make based on AI replies.
 
-9. Contact
+10. Contact
 Questions about these Terms: lubaai.official@gmail.com (creator: Kobi).
 
-10. Changes
+11. Changes
 We may update these Terms. Continued use after changes means you accept the updated version.
 
 Made on Earth by humans.`;
 
-    const PRIVACY_TEXT = `Last updated: October 4, 2026
+    const PRIVACY_TEXT = `Last updated: October 6, 2026
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data is stored on our cloud backend when you create an account and use the service while logged in.
 
 2. Account data
-When you sign up we store your username, a hashed password (not plain text), gender, date of birth, and optional profile photo. Account records live on our Cloudflare Worker / KV backend so you can log in from more than one phone. A limited local cache may also be kept on each device for offline convenience.
+When you sign up we store your username, a hashed password (not plain text), gender, date of birth, and optional profile photo. We may also store verification status (whether your account is Verified), verification requests you submit, and notices about approve/decline decisions. Account records live on our Cloudflare Worker / KV backend so you can log in from more than one phone. A limited local cache may also be kept on each device for offline convenience.
 
-3. Chat, settings, and message limits
-• Active chat history and named "Saved chats" can be stored on your device and, when you are logged in, synced to our backend so the same account can see them on other devices.
-• Preferences such as theme, mode, and custom personality text may also sync when logged in.
-• Message-limit usage (how many AI messages you have used in the current 24-hour window, plus any adjustments) may be stored on the backend and cached on your device so limits work across phones.
-• Clearing chat or deleting a saved chat on one device is intended to update the synced copy when the server is reachable.
+3. Chat, settings, modes, and message limits
+• Active chat history and named "Saved chats" can be stored on your device and, when you are logged in, synced to our backend so the same account can see them on other devices
+• Preferences such as theme, mode (Normal, Study, HTML, Code, Creative), and custom personality text may also sync when logged in
+• Message-limit usage (how many AI messages you have used in the current 24-hour window, bonuses, and verified higher limits) may be stored on the backend and cached on your device
+• Clearing chat or deleting a saved chat on one device is intended to update the synced copy when the server is reachable
 
 4. What is sent to make the AI work
-When you send a message (and optional image or short video), that content is sent through our secure proxy to an AI provider so Luba can reply. Generated-image requests send a text description to an image service. If you use "speak," your device may convert on-screen text to audio locally. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
+When you send a message (and optional image or short video), that content is sent through our secure proxy to an AI provider so Luba can reply. HTML-mode demos run in a sandboxed preview on your device. Generated-image requests send a text description to an image service. If you use "speak," your device may convert on-screen text to audio locally. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
 
 5. Moderation and safety
 To run the service and enforce the rules, the backend may store:
 • Recent message logs (for Owner moderation tools)
 • Ban records (account and, when needed, IP/network bans for abuse)
 • Basic connection metadata such as approximate last IP used with an account
-• Message-limit records for fair use
+• Message-limit and verification records
+• Verification request text you submit
 
-These are used only to operate Luba AI, stop abuse, and respond to support requests — not to sell advertising profiles.
+These are used only to operate Luba AI, stop abuse, handle verification, and respond to support requests — not to sell advertising profiles.
 
 6. What we do not sell
 We do not sell your personal information.
@@ -5465,7 +5604,8 @@ We do not sell your personal information.
 • Log out anytime
 • Clear chat history from the app
 • Change password and profile photo in Settings
-• See your remaining message allowance in Settings
+• See your remaining message allowance and verification status in Settings
+• Request verification or cancel by waiting for a decision and requesting again later if declined
 • Contact lubaai.official@gmail.com about account deletion or privacy questions
 • Clear site/app data on a device to wipe local caches on that device
 
@@ -5478,9 +5618,10 @@ If you are under the age required in your country, use the app only with a paren
 Passwords are stored as hashes. Sessions use tokens. No system is perfect — use a unique password and do not reuse it on other sites.
 
 10. Contact
-Privacy questions: lubaai.official@gmail.com (creator: Kobi).
+Privacy questions: lubaai.official@gmail.com
 
 Made on Earth by humans.`;
+
 
     const legalOverlay = document.getElementById('legal-overlay');
     const legalTitle = document.getElementById('legal-title');
@@ -5490,20 +5631,109 @@ Made on Earth by humans.`;
     const closeLegalBtn = document.getElementById('close-legal-btn');
     const closeLegalBtn2 = document.getElementById('close-legal-btn2');
 
-    function openLegal(kind) {
-        if (!legalOverlay || !legalTitle || !legalBody) return;
-        if (kind === 'privacy') {
-            legalTitle.textContent = 'Privacy Policy';
-            legalBody.textContent = PRIVACY_TEXT;
-        } else {
-            legalTitle.textContent = 'Terms of Service';
-            legalBody.textContent = TERMS_TEXT;
+    let legalCountdownTimer = null;
+    let legalForceRead = false;
+    let legalOnAccept = null;
+    let signupLegalAccepted = false;
+
+    function clearLegalCountdown() {
+        if (legalCountdownTimer) {
+            clearInterval(legalCountdownTimer);
+            legalCountdownTimer = null;
         }
-        legalOverlay.style.display = 'flex';
+        legalForceRead = false;
+        const hint = document.getElementById('legal-countdown-hint');
+        if (hint) {
+            hint.style.display = 'none';
+            hint.textContent = '';
+        }
+        if (closeLegalBtn2) {
+            closeLegalBtn2.disabled = false;
+            closeLegalBtn2.textContent = 'Got it';
+        }
     }
 
-    function closeLegal() {
-        if (legalOverlay) legalOverlay.style.display = 'none';
+    function openLegal(kind, opts) {
+        opts = opts || {};
+        const overlay = document.getElementById('legal-overlay');
+        const titleEl = document.getElementById('legal-title');
+        const bodyEl = document.getElementById('legal-body');
+        const agreeBtn = document.getElementById('close-legal-btn2');
+        const hint = document.getElementById('legal-countdown-hint');
+        if (!overlay || !titleEl || !bodyEl) {
+            console.error('Legal modal missing');
+            if (typeof opts.onAccept === 'function') opts.onAccept();
+            return;
+        }
+        // Keep on top of auth screen
+        try { document.body.appendChild(overlay); } catch (_) {}
+
+        clearLegalCountdown();
+        legalOnAccept = typeof opts.onAccept === 'function' ? opts.onAccept : null;
+        if (kind === 'privacy') {
+            titleEl.textContent = 'Privacy Policy';
+            bodyEl.textContent = PRIVACY_TEXT;
+        } else {
+            titleEl.textContent = 'Terms of Service';
+            bodyEl.textContent = TERMS_TEXT;
+        }
+        overlay.classList.add('is-open');
+        overlay.style.display = 'flex';
+        overlay.style.zIndex = '10050';
+        try { bodyEl.scrollTop = 0; } catch (_) {}
+
+        if (opts.forceRead) {
+            legalForceRead = true;
+            const secs = Math.max(5, parseInt(opts.seconds, 10) || 10);
+            let left = secs;
+            if (agreeBtn) {
+                agreeBtn.disabled = true;
+                agreeBtn.textContent = 'Please read (' + left + 's)';
+            }
+            if (hint) {
+                hint.style.display = 'block';
+                hint.textContent = 'Quick skim — Agree unlocks in ' + left + 's. X closes anytime.';
+            }
+            legalCountdownTimer = setInterval(() => {
+                left -= 1;
+                const btn = document.getElementById('close-legal-btn2');
+                const h = document.getElementById('legal-countdown-hint');
+                if (left <= 0) {
+                    clearInterval(legalCountdownTimer);
+                    legalCountdownTimer = null;
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = legalOnAccept ? 'I agree' : 'Got it';
+                    }
+                    if (h) h.textContent = 'Thanks — tap I agree to continue.';
+                } else if (btn) {
+                    btn.textContent = 'Please read (' + left + 's)';
+                }
+            }, 1000);
+        } else {
+            if (agreeBtn) {
+                agreeBtn.disabled = false;
+                agreeBtn.textContent = 'Got it';
+            }
+            if (hint) {
+                hint.style.display = 'none';
+                hint.textContent = '';
+            }
+        }
+    }
+
+    function closeLegal(fromAccept) {
+        const acceptCb = legalOnAccept;
+        clearLegalCountdown();
+        legalOnAccept = null;
+        const overlay = document.getElementById('legal-overlay');
+        if (overlay) {
+            overlay.classList.remove('is-open');
+            overlay.style.display = 'none';
+        }
+        if (fromAccept && acceptCb) {
+            try { acceptCb(); } catch (_) {}
+        }
     }
 
     if (openTermsBtn) openTermsBtn.onclick = () => openLegal('terms');
@@ -5512,13 +5742,74 @@ Made on Earth by humans.`;
     const settingsPrivacyBtn = document.getElementById('settings-privacy-btn');
     if (settingsTermsBtn) settingsTermsBtn.onclick = () => openLegal('terms');
     if (settingsPrivacyBtn) settingsPrivacyBtn.onclick = () => openLegal('privacy');
-    if (closeLegalBtn) closeLegalBtn.onclick = closeLegal;
-    if (closeLegalBtn2) closeLegalBtn2.onclick = closeLegal;
+    if (closeLegalBtn) closeLegalBtn.onclick = () => closeLegal(false);
+    if (closeLegalBtn2) closeLegalBtn2.onclick = () => {
+        if (closeLegalBtn2.disabled) return;
+        closeLegal(true);
+    };
     if (legalOverlay) {
         legalOverlay.onclick = (e) => {
-            if (e.target === legalOverlay) closeLegal();
+            if (e.target === legalOverlay) closeLegal(false);
         };
     }
+
+    // Signup legal helpers
+    function markSignupLegalAccepted() {
+        signupLegalAccepted = true;
+        const box = document.getElementById('signup-agree');
+        if (box) box.checked = true;
+        const err = document.getElementById('signup-error');
+        if (err) err.textContent = '';
+    }
+
+    function openSignupLegal(kind) {
+        openLegal(kind || 'terms', {
+            forceRead: true,
+            seconds: 10,
+            onAccept: markSignupLegalAccepted
+        });
+    }
+
+    // Wire after DOM ready pieces exist
+    (function wireSignupLegal() {
+        const termsBtn = document.getElementById('signup-open-terms');
+        const privacyBtn = document.getElementById('signup-open-privacy');
+        const agreeBox = document.getElementById('signup-agree');
+        const agreeRow = document.getElementById('signup-agree-row');
+
+        if (termsBtn) termsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openSignupLegal('terms');
+        });
+        if (privacyBtn) privacyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openSignupLegal('privacy');
+        });
+
+        // Tap checkbox → open Terms (modal). After I agree, box is checked.
+        if (agreeBox) {
+            agreeBox.addEventListener('click', (e) => {
+                if (signupLegalAccepted) {
+                    // allow normal uncheck
+                    return;
+                }
+                e.preventDefault();
+                openSignupLegal('terms');
+            });
+        }
+        // Tap the text row (not the pink links) also opens Terms
+        if (agreeRow) {
+            agreeRow.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                if (e.target === agreeBox || (agreeBox && e.target === agreeBox)) return;
+                if (signupLegalAccepted) return;
+                e.preventDefault();
+                openSignupLegal('terms');
+            });
+        }
+    })();
 
     // ============================================================
     // Core identity + prompts (mostly original, plus username)
