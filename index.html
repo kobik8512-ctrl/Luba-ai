@@ -667,8 +667,16 @@
         .send-btn.stop-mode:disabled {
             background: #c62828;
             color: #fff;
-            opacity: 0.9;
+            opacity: 1;
             cursor: pointer;
+            pointer-events: auto !important;
+        }
+        .send-btn.stop-mode {
+            pointer-events: auto !important;
+            -webkit-tap-highlight-color: rgba(255,255,255,0.2);
+            touch-action: manipulation;
+            z-index: 5;
+            position: relative;
         }
 
         /* --- Thinking indicator: bubble hugs the text, no empty space --- */
@@ -2008,6 +2016,128 @@
             border-radius: 12px;
         }
 
+    
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            line-height: 0;
+            margin: 0;
+            padding: 0;
+            vertical-align: middle;
+        }
+        .verified-badge svg { width: 16px; height: 16px; display: block; filter: drop-shadow(0 1px 2px rgba(32,213,236,0.35)); }
+        .header-verified-badge { margin: 0 2px 0 4px; }
+        .settings-identity {
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            gap: 0;
+            margin-bottom: 6px;
+            line-height: 1;
+        }
+        .settings-identity #settings-display-username {
+            font-size: 15px;
+            font-weight: 700;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+        .settings-identity .verified-badge {
+            width: 15px; height: 15px; margin: 0 3px;
+        }
+        .settings-identity .verified-badge svg { width: 15px; height: 15px; }
+        .settings-identity .owner-crown-badge {
+            margin: 0 0 0 2px;
+            padding: 2px 7px 2px 4px;
+            font-size: 9px;
+            height: 20px;
+            box-sizing: border-box;
+            gap: 2px;
+        }
+        .settings-identity .owner-crown-badge svg { width: 10px; height: 10px; }
+        .verify-request-box {
+            background: rgba(32, 213, 236, 0.06);
+            border: 1px solid rgba(32, 213, 236, 0.25);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+        .verify-request-box h5 {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            margin: 0 0 6px;
+        }
+        .verify-request-box p {
+            font-size: 12px;
+            opacity: 0.75;
+            margin: 0 0 8px;
+            line-height: 1.4;
+        }
+        .verify-request-box textarea {
+            width: 100%;
+            min-height: 64px;
+            margin-bottom: 8px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 13px;
+            resize: vertical;
+        }
+        .msg-name-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin: 0 2px 3px 2px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text);
+            opacity: 0.9;
+            line-height: 1.2;
+        }
+        .message.user .msg-name-row { justify-content: flex-end; }
+        .message.ai .msg-name-row { justify-content: flex-start; }
+        .msg-name-row .msg-name { font-weight: 700; }
+        .msg-name-row .msg-name-verified {
+            width: 14px; height: 14px;
+            display: inline-flex;
+            flex-shrink: 0;
+        }
+        .msg-name-row .msg-name-verified svg { width: 14px; height: 14px; display: block; }
+        #owner-verify-requests {
+            max-height: 280px !important;
+            min-height: 80px;
+            font-size: 13px !important;
+            line-height: 1.45;
+            padding: 12px !important;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: auto;
+            margin-bottom: 14px;
+        }
+        #owner-verify-requests .owner-mini-btn {
+            min-height: 34px;
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+        .owner-mini-btn {
+            background: #282a2c;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 10px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    
     </style>
 </head>
 <body>
@@ -2180,12 +2310,21 @@
         <!-- ACCOUNT CUSTOMIZATION -->
         <div class="account-section">
             <h4>Your Account</h4>
-            <div class="settings-owner-row" id="settings-owner-row" style="display:none;">
-                <span class="settings-owner-name" id="settings-owner-name"></span>
-                <span class="owner-crown-badge" title="Official owner account">
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 19h18v2H3v-2zm2.5-6.5L3 7l4.5 2L12 4l4.5 5L21 7l-2.5 5.5V17H5.5v-4.5z"/></svg>
-                    Owner
-                </span>
+            <div class="settings-identity" id="settings-identity">
+                <span id="settings-display-username">@user</span><span class="verified-badge" id="settings-name-verified" style="display:none;" title="Verified"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="owner-crown-badge" id="settings-owner-badge-inline" style="display:none;" title="Official owner account"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 19h18v2H3v-2zm2.5-6.5L3 7l4.5 2L12 4l4.5 5L21 7l-2.5 5.5V17H5.5v-4.5z"/></svg> Owner</span>
+            </div>
+            <div id="settings-verified-note" style="display:none;font-size:12px;opacity:0.7;margin:-2px 0 10px;">Verified · 500 messages / 24h · VIP</div>
+
+            <div class="verify-request-box" id="verify-request-box">
+                <h5>
+                    <span class="verified-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    Get Verified
+                </h5>
+                <p>Verified users get a blue check, VIP treatment from Luba, and <strong>500 messages every 24 hours</strong> (instead of 50).<br>
+                Explain why you want the badge. The owner reviews requests in Owner CMDs.</p>
+                <textarea id="verify-reason-input" placeholder="Why should you be verified? (min 10 characters)" maxlength="500"></textarea>
+                <button type="button" class="small-btn" id="verify-request-btn" style="background:#0a8a9a;">Request verification</button>
+                <div class="username-status empty" id="verify-request-status" style="margin-top:6px;"></div>
             </div>
 
             <div class="coins-card" id="coins-card">
@@ -2283,9 +2422,12 @@
         <div class="owner-panel" id="owner-panel">
             <p class="owner-note">
                 Tap <strong>View</strong> to read a user’s messages. Tap <strong>Ban</strong> for permanent or timed ban (all devices).
-                People only appear here after they use the updated app and send a message (or sign up).
-                Older testers with the old HTML stay invisible until they update and chat once.
             </p>
+            <div class="owner-section-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <span>Verification requests</span>
+                <button type="button" class="owner-mini-btn" id="owner-refresh-requests-btn">Refresh</button>
+            </div>
+            <div id="owner-verify-requests">Loading…</div>
             <div class="owner-section-label">Recent messages (all devices)</div>
             <div class="owner-chat-preview" id="owner-mod-log" style="margin-bottom:12px; max-height:120px;"></div>
             <div class="owner-section-label">Registered accounts</div>
@@ -2321,6 +2463,12 @@
             <button type="button" class="small-btn" id="owner-coins-remove-btn" style="background:#6b4a00;">− Remove</button>
             <button type="button" class="small-btn" id="owner-coins-set-btn">Set left</button>
             <button type="button" class="small-btn" id="owner-coins-reset-btn">Reset 24h</button>
+        </div>
+        <div class="owner-section-label">Verified</div>
+        <div id="owner-inspect-verified" class="owner-user-meta" style="margin-bottom:8px;">—</div>
+        <div class="owner-ban-row" id="owner-verified-row">
+            <button type="button" class="small-btn" id="owner-verify-grant-btn" style="background:#0a6a75;">Give verified</button>
+            <button type="button" class="small-btn" id="owner-verify-remove-btn" style="background:#444;">Remove verified</button>
         </div>
         <div class="owner-section-label">Messages (all devices)</div>
         <div class="owner-inspect-chat" id="owner-inspect-cloud"></div>
@@ -2468,6 +2616,21 @@
     // Daily coins (message limit) — owner unlimited
     // ============================================================
     const DAILY_COINS = 50; // messages per rolling 24 hours (normal users)
+    const DAILY_COINS_VERIFIED = 500;
+    const VERIFIED_BADGE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function isUserVerified(user) {
+        if (!user) return false;
+        if (isOwnerAccount(user)) return true;
+        return !!(user.verified);
+    }
+
+    function dailyLimitForUser(user) {
+        if (isOwnerAccount(user)) return Infinity;
+        if (isUserVerified(user)) return DAILY_COINS_VERIFIED;
+        return DAILY_COINS;
+    }
+
     const COIN_COST_NORMAL = 1;
     const COIN_COST_HEAVY = 2; // image generation request or HTML mode
     const COINS_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -2557,7 +2720,9 @@
             if (typeof coinsCache.left === 'number') return Math.max(0, coinsCache.left);
         }
         const st = getCoinsState(username);
-        const limit = DAILY_COINS + (st.bonus || 0);
+        const base = (currentUser && userKey(currentUser.username) === userKey(username) && isUserVerified(currentUser))
+            ? DAILY_COINS_VERIFIED : DAILY_COINS;
+        const limit = base + (st.bonus || 0);
         return Math.max(0, limit - st.used);
     }
 
@@ -2608,7 +2773,8 @@
         }
         // Offline fallback — local only
         const st = getCoinsState(username);
-        const limit = DAILY_COINS + (st.bonus || 0);
+        const base = isUserVerified(currentUser) ? DAILY_COINS_VERIFIED : DAILY_COINS;
+        const limit = base + (st.bonus || 0);
         if (st.used + cost > limit) return false;
         st.used += cost;
         saveCoinsState(username, st);
@@ -2648,12 +2814,14 @@
         if (card) card.classList.remove('unlimited');
         const left = coinsLeft(currentUser.username);
         const st = getCoinsState(currentUser.username);
-        const limit = (coinsCache && coinsCache.limit) ? coinsCache.limit : (DAILY_COINS + (st.bonus || 0));
+        const baseLim = isUserVerified(currentUser) ? DAILY_COINS_VERIFIED : DAILY_COINS;
+        const limit = (coinsCache && coinsCache.limit) ? coinsCache.limit : (baseLim + (st.bonus || 0));
         count.textContent = String(left);
-        if (title) title.textContent = 'Messages left';
+        if (title) title.textContent = isUserVerified(currentUser) ? 'Messages left (Verified)' : 'Messages left';
         const resetMs = coinsResetInMs(currentUser.username);
         if (sub) {
             sub.textContent = left + ' of ' + limit + ' · resets in ' + formatResetIn(resetMs) +
+                (isUserVerified(currentUser) ? ' · Verified: 500/day' : '') +
                 ' · Normal 1 · HTML/image 2';
         }
     }
@@ -2765,11 +2933,33 @@
     function updateOwnerBadgeUI() {
         const show = isOwnerAccount(currentUser);
         const hb = document.getElementById('header-owner-badge');
-        if (hb) hb.style.display = show ? 'inline-flex' : 'none';
-        const row = document.getElementById('settings-owner-row');
-        const nameEl = document.getElementById('settings-owner-name');
-        if (row) row.style.display = show ? 'flex' : 'none';
-        if (nameEl && currentUser) nameEl.textContent = '@' + currentUser.username;
+        if (hb) hb.style.display = 'none'; // header: only verified check, no Owner pill
+        const ownInline = document.getElementById('settings-owner-badge-inline');
+        if (ownInline) ownInline.style.display = show ? 'inline-flex' : 'none';
+        const du = document.getElementById('settings-display-username');
+        if (du) du.textContent = currentUser ? ('@' + currentUser.username) : '@user';
+        const verified = isUserVerified(currentUser);
+        const snv = document.getElementById('settings-name-verified');
+        if (snv) snv.style.display = verified ? 'inline-flex' : 'none';
+        const note = document.getElementById('settings-verified-note');
+        if (note) {
+            if (show) {
+                note.style.display = 'block';
+                note.textContent = 'Owner · Verified · Unlimited messages';
+            } else if (verified) {
+                note.style.display = 'block';
+                note.textContent = 'Verified · 500 messages / 24h · VIP';
+            } else {
+                note.style.display = 'none';
+            }
+        }
+        const hv = document.getElementById('header-verified-badge');
+        if (hv) {
+            hv.style.display = verified ? 'inline-flex' : 'none';
+            if (!hv.querySelector('svg')) hv.innerHTML = VERIFIED_BADGE_SVG;
+        }
+        const reqBox = document.getElementById('verify-request-box');
+        if (reqBox) reqBox.style.display = verified ? 'none' : 'block';
         updateCoinsUI();
     }
 
@@ -2778,6 +2968,187 @@
     // Owner moderation (password: kobiTheowner)
     // ============================================================
     const OWNER_PASSWORD = "kobiTheowner";
+
+    async function checkVerifyNotice() {
+        try {
+            const tok = getAuthToken();
+            if (!tok || !currentUser) return;
+            const res = await cloudPost({ action: 'get_verify_notice', token: tok });
+            if (!res || !res.ok || !res.notice) return;
+            const n = res.notice;
+            const title = n.title || (n.type === 'approved' ? "You're Verified!" : 'Verification update');
+            const message = n.message || '';
+            const t0 = getTime();
+            const body = (n.type === 'approved' ? ('✓ ' + title) : title) + '\n\n' + message;
+            appendMessage('ai', body, t0);
+            try {
+                chatHistory.push({ role: 'assistant', content: body, time: t0 });
+                saveChat();
+            } catch (_) {}
+            try { alert(title + '\n\n' + message); } catch (_) {}
+            await cloudPost({ action: 'clear_verify_notice', token: tok });
+            if (n.type === 'approved') {
+                currentUser.verified = true;
+            } else if (n.type === 'removed') {
+                currentUser.verified = false;
+            }
+            try {
+                const users = getUsers();
+                users[userKey(currentUser.username)] = currentUser;
+                saveUsers(users);
+            } catch (_) {}
+            updateOwnerBadgeUI();
+            pullCoinsFromServer().catch(() => {});
+        checkVerifyNotice().catch(() => {});
+        } catch (_) {}
+    }
+
+    async function loadOwnerVerifyRequests() {
+        const el = document.getElementById('owner-verify-requests');
+        if (!el) return;
+        const res = await cloudPost({
+            action: 'owner_list_verify_requests',
+            ownerPassword: OWNER_PASSWORD
+        });
+        if (!res || !res.ok) {
+            el.textContent = 'Could not load requests.';
+            return;
+        }
+        const list = res.requests || [];
+        if (!list.length) {
+            el.textContent = 'No pending verification requests.';
+            return;
+        }
+        el.innerHTML = list.map((r) => {
+            const when = r.at ? new Date(r.at).toLocaleString() : '';
+            const u = escapeHtml(r.username || '?');
+            const rawName = String(r.username || '?');
+            const reason = escapeHtml(String(r.reason || '').slice(0, 200));
+            return '<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);">' +
+                '<strong>@' + u + '</strong> · ' + escapeHtml(when) + '<br>' + reason +
+                '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' +
+                '<button type="button" class="owner-mini-btn" data-vapprove="' + escapeHtml(rawName) + '" style="background:#0a6a75;">Accept</button>' +
+                '<button type="button" class="owner-mini-btn" data-vdeny="' + escapeHtml(rawName) + '" style="background:#6b1a1a;">Decline</button>' +
+                '</div></div>';
+        }).join('');
+        el.querySelectorAll('button[data-vapprove]').forEach((btn) => {
+            btn.onclick = async () => {
+                const u = btn.getAttribute('data-vapprove');
+                if (!confirm('Accept verification for @' + u + '?\n\nThey get the badge, VIP treatment, and 500 messages / 24h.')) return;
+                btn.disabled = true;
+                const r = await cloudPost({
+                    action: 'owner_set_verified',
+                    ownerPassword: OWNER_PASSWORD,
+                    username: u,
+                    verified: true
+                });
+                if (r && r.ok) {
+                    alert('Accepted @' + u + '. They will see a message when they open Luba.');
+                    loadOwnerVerifyRequests();
+                } else {
+                    alert('Failed');
+                    btn.disabled = false;
+                }
+            };
+        });
+        el.querySelectorAll('button[data-vdeny]').forEach((btn) => {
+            btn.onclick = async () => {
+                const u = btn.getAttribute('data-vdeny');
+                if (!confirm('Decline verification for @' + u + '?')) return;
+                const extra = prompt('Optional message to @' + u + ':', '');
+                if (extra === null) return;
+                btn.disabled = true;
+                const r = await cloudPost({
+                    action: 'owner_deny_verified',
+                    ownerPassword: OWNER_PASSWORD,
+                    username: u,
+                    reason: extra || ''
+                });
+                if (r && r.ok) {
+                    alert('Declined @' + u + '.');
+                    loadOwnerVerifyRequests();
+                } else {
+                    alert('Failed');
+                    btn.disabled = false;
+                }
+            };
+        });
+    }
+
+    window.ownerSetVerified = async function (on) {
+        const title = document.getElementById('owner-inspect-title');
+        const username = (typeof ownerInspectUsername !== 'undefined' && ownerInspectUsername)
+            || (title && title.dataset && title.dataset.username)
+            || (title && title.textContent.replace(/^@/, '').trim());
+        if (!username) return;
+        if (String(username).toLowerCase() === OWNER_USERNAME) {
+            alert('Owner is always verified.');
+            return;
+        }
+        if (on && !confirm('Give verified to @' + username + '?')) return;
+        if (!on && !confirm('Remove verified from @' + username + '?')) return;
+        const r = await cloudPost({
+            action: 'owner_set_verified',
+            ownerPassword: OWNER_PASSWORD,
+            username,
+            verified: !!on
+        });
+        if (r && r.ok) {
+            const isOn = r.verified === true || on;
+            alert(isOn ? ('@' + username + ' is now Verified.') : ('Removed verified from @' + username));
+            const el = document.getElementById('owner-inspect-verified');
+            if (el) el.innerHTML = isOn ? ('<span class="verified-badge">' + VERIFIED_BADGE_SVG + '</span> Verified') : 'Not verified';
+            try {
+                const key = String(username).toLowerCase();
+                const idx = (cloudUsersCache || []).findIndex(x => x && String(x.username || '').toLowerCase() === key);
+                if (idx >= 0) cloudUsersCache[idx].verified = isOn;
+            } catch (_) {}
+            loadOwnerVerifyRequests().catch(() => {});
+            // re-fetch from server so status stays accurate
+            refreshOwnerInspectVerified(username).catch(() => {});
+        } else alert((r && r.error) || 'Failed');
+    };
+
+    async function refreshOwnerInspectVerified(username) {
+        const el = document.getElementById('owner-inspect-verified');
+        if (!el) return;
+        el.textContent = 'Checking…';
+        const key = String(username || '').toLowerCase();
+        if (key === OWNER_USERNAME) {
+            el.innerHTML = '<span class="verified-badge">' + VERIFIED_BADGE_SVG + '</span> Verified';
+            return;
+        }
+        // Always read live from server (not phone cache)
+        try {
+            const res = await cloudPost({
+                action: 'owner_get_user',
+                ownerPassword: OWNER_PASSWORD,
+                username: username
+            });
+            if (res && res.ok && res.user) {
+                const on = !!res.user.verified;
+                // keep cloudUsersCache in sync
+                try {
+                    const idx = (cloudUsersCache || []).findIndex(x => x && String(x.username || '').toLowerCase() === key);
+                    if (idx >= 0) cloudUsersCache[idx].verified = on;
+                    else if (cloudUsersCache) cloudUsersCache.push(res.user);
+                } catch (_) {}
+                el.innerHTML = on
+                    ? ('<span class="verified-badge">' + VERIFIED_BADGE_SVG + '</span> Verified')
+                    : 'Not verified';
+                return;
+            }
+        } catch (_) {}
+        // fallback to list cache
+        const u = (cloudUsersCache || []).find(x => x && String(x.username || '').toLowerCase() === key);
+        if (u && u.verified) {
+            el.innerHTML = '<span class="verified-badge">' + VERIFIED_BADGE_SVG + '</span> Verified';
+        } else {
+            el.textContent = 'Not verified';
+        }
+    }
+
+
     let ownerUnlocked = false;
     // Cloud directory from worker (all devices). Local is fallback only.
     let cloudUsersCache = [];
@@ -3415,11 +3786,16 @@
         const localEl = document.getElementById('owner-inspect-local');
         const savedEl = document.getElementById('owner-inspect-saved');
         const overlay = document.getElementById('owner-inspect-overlay');
-        if (title) title.textContent = '@' + username;
+        if (title) {
+            title.textContent = '@' + username;
+            title.dataset.username = username;
+        }
         if (cloudEl) cloudEl.innerHTML = '<div class="owner-empty">Loading…</div>';
         if (localEl) localEl.innerHTML = '';
         if (savedEl) savedEl.textContent = '';
         if (overlay) overlay.style.display = 'flex';
+        try { refreshOwnerInspectCoins(username); } catch (_) {}
+        try { refreshOwnerInspectVerified(username); } catch (_) {}
 
         // Prefer live server ban status over stale local cache
         let ban = getBanRecord(username);
@@ -3480,10 +3856,10 @@
         }
 
         // Coins panel
-        await refreshOwnerInspectCoins(username);
+        await refreshOwnerInspectCoins(username); refreshOwnerInspectVerified(username);
     };
 
-    async function refreshOwnerInspectCoins(username) {
+    async function refreshOwnerInspectCoins(username); refreshOwnerInspectVerified(username) {
         const el = document.getElementById('owner-inspect-coins');
         const row = document.getElementById('owner-coins-row');
         if (!el) return;
@@ -3550,7 +3926,7 @@
             alert('Failed: ' + ((res && res.error) || 'error'));
             return;
         }
-        await refreshOwnerInspectCoins(username);
+        await refreshOwnerInspectCoins(username); refreshOwnerInspectVerified(username);
         alert('Updated @' + username + ': ' + res.left + ' left (limit ' + res.limit + ')');
     };
 
@@ -3790,6 +4166,7 @@
         document.getElementById('owner-gate').classList.remove('visible');
         document.getElementById('owner-panel').classList.add('visible');
         renderOwnerUserList();
+        loadOwnerVerifyRequests().catch(() => {});
     }
 
     // ============================================================
@@ -4399,9 +4776,11 @@
             gender: profile.gender === 'girl' ? 'girl' : (profile.gender === 'other' ? 'other' : 'boy'),
             dob: profile.birthday || extras.dob || null,
             profilePic: profile.avatarDataUrl || extras.profilePic || null,
+            avatarDataUrl: profile.avatarDataUrl || extras.profilePic || null,
             lastUsernameChange: extras.lastUsernameChange || 0,
             createdAt: extras.createdAt || Date.now(),
-            cloud: true
+            cloud: true,
+            verified: !!(profile.verified)
         };
     }
 
@@ -4524,7 +4903,24 @@
                 setCurrentUsername(user.username);
                 rememberDeviceAccount(user.username);
                 storageRemove('luba_manual_logout');
-                await enterApp(user);
+                try {
+                    await enterApp(user);
+                } catch (enterErr) {
+                    console.error('enterApp failed', enterErr);
+                    loginError.textContent = 'Logged in but failed to open chat: ' + (enterErr && enterErr.message ? enterErr.message : 'unknown');
+                    // Still mark logged-in so they can use the app
+                    try {
+                        currentUser = user;
+                        document.body.classList.add('logged-in');
+                        updateOwnerBadgeUI();
+                    } catch (_) {}
+                }
+                return;
+            }
+
+            // Server returned something unexpected — show raw hint
+            if (cloud && cloud.ok === true && !cloud.token) {
+                loginError.textContent = 'Server login incomplete (no session). Try again.';
                 return;
             }
 
@@ -4581,7 +4977,14 @@
                 return;
             }
 
-            loginError.textContent = cloudErr || 'Login failed. Try again.';
+            if (cloud && cloud.error && !cloud.ok) {
+                loginError.textContent = String(cloud.error);
+            } else {
+                loginError.textContent = cloudErr || 'Login failed. Check internet, then try again. If it keeps failing, re-deploy the Cloudflare Worker.';
+            }
+        } catch (loginEx) {
+            loginError.textContent = 'Login error: ' + (loginEx && loginEx.message ? loginEx.message : 'unknown');
+            console.error(loginEx);
         } finally {
             if (loginBtn) loginBtn.disabled = false;
         }
@@ -4790,6 +5193,8 @@
         startBanPolling();
         // Immediate ban check on enter
         enforceLiveBan(true).catch(() => {});
+        try { updateOwnerBadgeUI(); } catch (_) {}
+        try { checkVerifyNotice().catch(() => {}); } catch (_) {}
     }
 
     function logout() {
@@ -5195,14 +5600,18 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     function buildSystemPrompt() {
         const customPersonality = (currentUser && loadUserPrefs(currentUser.username).systemPrompt) || localStorage.getItem('luba_system_prompt') || defaultPersonality;
         const owner = isOwnerAccount(currentUser);
-        const identityBlock = owner
+        const verified = isUserVerified(currentUser);
+        let identityBlock = owner
             ? CORE_IDENTITY + "\n\n" + USER_PROFILE
             : CORE_IDENTITY + "\n\n" + UNVERIFIED_NOTE;
+        if (verified && !owner) {
+            identityBlock += "\n\nVIP VERIFIED USER: This person has a verified badge. Treat them with extra warmth and priority — they are a trusted community member. Be a bit more helpful and friendly than average.";
+        }
 
         // Tell Luba the user's username, gender, and birthday from signup
         let nameBlock = "";
         if (currentUser && currentUser.username) {
-            nameBlock = `\n\nThe person you are talking to is logged in as username "${currentUser.username}"` + (owner ? ` and has the official Owner badge (this is Kobi).` : ` and does NOT have the Owner badge (they are not Kobi).`) + ` Address them by this username when it feels natural. Do not invent other names for them.`;
+            nameBlock = `\n\nThe person you are talking to is logged in as username "${currentUser.username}"` + (owner ? ` and has the official Owner badge (this is Kobi).` : (verified ? ` and has a Verified badge (VIP, not the owner).` : ` and does NOT have the Owner badge (they are not Kobi).`)) + ` Address them by this username when it feels natural. Do not invent other names for them.`;
             if (currentUser.gender === 'boy' || currentUser.gender === 'girl') {
                 nameBlock += ` Their gender is ${currentUser.gender}.`;
             }
@@ -5396,6 +5805,20 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
         const body = document.createElement('div');
         body.className = 'message-body';
+
+        const nameRow = document.createElement('div');
+        nameRow.className = 'msg-name-row';
+        if (sender === 'ai') {
+            nameRow.innerHTML = '<span class="msg-name">Luba AI</span>';
+        } else {
+            const uname = (currentUser && currentUser.username) ? currentUser.username : 'You';
+            // Only verified check in chat (no Owner pill) — includes kobi
+            const ver = isUserVerified(currentUser)
+                ? ('<span class="verified-badge msg-name-verified" title="Verified">' + VERIFIED_BADGE_SVG + '</span>')
+                : '';
+            nameRow.innerHTML = '<span class="msg-name">' + escapeHtmlText(uname) + '</span>' + ver;
+        }
+        body.appendChild(nameRow);
 
         const content = document.createElement('div');
         content.className = 'content';
@@ -6687,6 +7110,51 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     if (ownerCoinsSetBtn) ownerCoinsSetBtn.onclick = () => window.ownerAdjustCoins && window.ownerAdjustCoins('set_left');
     if (ownerCoinsResetBtn) ownerCoinsResetBtn.onclick = () => window.ownerAdjustCoins && window.ownerAdjustCoins('reset');
 
+    const ownerVerifyGrantBtn = document.getElementById('owner-verify-grant-btn');
+    const ownerVerifyRemoveBtn = document.getElementById('owner-verify-remove-btn');
+    if (ownerVerifyGrantBtn) ownerVerifyGrantBtn.onclick = () => window.ownerSetVerified && window.ownerSetVerified(true);
+    if (ownerVerifyRemoveBtn) ownerVerifyRemoveBtn.onclick = () => window.ownerSetVerified && window.ownerSetVerified(false);
+    const ownerRefreshRequestsBtn = document.getElementById('owner-refresh-requests-btn');
+    if (ownerRefreshRequestsBtn) ownerRefreshRequestsBtn.onclick = () => loadOwnerVerifyRequests();
+    const verifyRequestBtn = document.getElementById('verify-request-btn');
+    if (verifyRequestBtn) {
+        verifyRequestBtn.onclick = async () => {
+            const ta = document.getElementById('verify-reason-input');
+            const st = document.getElementById('verify-request-status');
+            const reason = ta ? ta.value.trim() : '';
+            if (reason.length < 10) {
+                if (st) { st.textContent = 'Write at least 10 characters.'; st.style.color = '#ff6b6b'; }
+                return;
+            }
+            if (st) st.textContent = 'Sending…';
+            const res = await cloudPost({
+                action: 'request_verified',
+                token: getAuthToken(),
+                reason
+            });
+            if (res && res.already) {
+                if (st) { st.textContent = 'You are already verified!'; st.style.color = '#3dd68c'; }
+                if (currentUser) currentUser.verified = true;
+                updateOwnerBadgeUI();
+                return;
+            }
+            if (res && res.ok) {
+                if (st) {
+                    st.textContent = '✓ Request sent! Wait for the owner in Owner CMDs → Verification requests.';
+                    st.style.color = '#3dd68c';
+                }
+                if (ta) ta.value = '';
+                try { alert('Verification request sent!'); } catch (_) {}
+            } else {
+                if (st) {
+                    st.textContent = (res && res.error) || 'Could not send. Are you logged in?';
+                    st.style.color = '#ff6b6b';
+                }
+            }
+        };
+    }
+
+
     // Show custom reason field only when "Other" is selected
     (function wireBanReasonSelect() {
         const sel = document.getElementById('owner-ban-reason-select');
@@ -6797,7 +7265,20 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     window.addEventListener('focus', () => {
         if (currentUser) enforceLiveBan(true).catch(() => {});
     });
-    sendBtn.onclick = sendMessage;
+    sendBtn.onclick = function (e) {
+        try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch (_) {}
+        if (isGenerating || forceStopGeneration || sendBtn.classList.contains('stop-mode')) {
+            stopGeneration();
+            return false;
+        }
+        sendMessage();
+        return false;
+    };
+    sendBtn.ontouchend = function (e) {
+        if (!(isGenerating || sendBtn.classList.contains('stop-mode'))) return;
+        try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
+        stopGeneration();
+    };
 
     // ============================================================
     // Tools + sendMessage (mostly original)
@@ -6806,12 +7287,17 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     /** Never show provider brand names (Gemini, Google, etc.) to users */
     function sanitizeAiError(msg) {
         let s = String(msg || 'Something went wrong.');
+        // Hide provider migration / Interactions API spam
+        if (/no longer available to new users|Interactions API|ai\.theservice|update your code to use the model/i.test(s)) {
+            return 'Luba hit a temporary model issue. Tap Retry — a different model will be used.';
+        }
         s = s.replace(/\bGoogle\s*Generative\s*AI\b/gi, 'the AI service');
         s = s.replace(/\bGenerative\s*Language\s*API\b/gi, 'the AI service');
         s = s.replace(/\bGemini(\s*[\w.-]+)?\b/gi, 'Luba');
         s = s.replace(/\bGoogle\b/gi, 'the service');
         s = s.replace(/\bOpenAI\b/gi, 'the AI service');
         s = s.replace(/\bmodels\/[\w.-]+/gi, 'the model');
+        s = s.replace(/https?:\/\/\S+/gi, '');
         s = s.replace(/^Error:\s*/i, '');
         s = s.trim();
         if (!s) s = 'Something went wrong. Please try again.';
@@ -6913,8 +7399,27 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
     let isGenerating = false;
     let abortController = null;
+    let forceStopGeneration = false;
     // Last failed user message so Retry can resend
     let lastFailedRequest = null; // { text, mediaBase64 }
+
+    function sleepAbortable(ms) {
+        return new Promise((resolve) => {
+            const start = Date.now();
+            const tick = () => {
+                if (forceStopGeneration || (abortController && abortController.signal.aborted)) {
+                    resolve(false);
+                    return;
+                }
+                if (Date.now() - start >= ms) {
+                    resolve(true);
+                    return;
+                }
+                setTimeout(tick, 40);
+            };
+            tick();
+        });
+    }
 
     function showErrorWithRetry(message) {
         const safe = escapeHtmlText(message || 'Something went wrong.');
@@ -6950,21 +7455,28 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
     }
 
     function stopGeneration() {
-        if (!isGenerating || !abortController) return;
-        try { abortController.abort(); } catch (_) {}
+        forceStopGeneration = true;
+        try { if (abortController) abortController.abort(); } catch (_) {}
+        // Kill thinking UI + button immediately (don't wait for fetch to die)
+        try { removeTyping(); } catch (_) {}
+        isGenerating = false;
+        setSendButtonMode('send');
+        if (typeof studyModeBtn !== 'undefined' && studyModeBtn) studyModeBtn.disabled = false;
     }
 
     async function sendMessage(opts) {
         if (!currentUser) return;
 
-        // Live ban: block before anything is sent
-        if (await enforceLiveBan(true)) return;
-
-        // If already generating, treat click as Stop
-        if (isGenerating) {
+        // STOP FIRST — never await anything before this
+        if (isGenerating || forceStopGeneration || (sendBtn && sendBtn.classList.contains('stop-mode'))) {
             stopGeneration();
             return;
         }
+        forceStopGeneration = false;
+
+        // Live ban: block before anything is sent
+        if (await enforceLiveBan(true)) return;
+        if (forceStopGeneration) return;
 
         const isRetry = !!(opts && (opts.retryText != null || opts.retryMedia != null));
         const text = isRetry ? String(opts.retryText || '').trim() : userInput.value.trim();
@@ -7028,6 +7540,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             cloudLogMessage(currentUser ? currentUser.username : '?', logText, !!imageToSend);
         } catch (_) {}
 
+        forceStopGeneration = false;
         isGenerating = true;
         abortController = new AbortController();
         setSendButtonMode('stop');
@@ -7067,21 +7580,22 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         const isHtmlMode = activeMode === 'html';
         // Prefer lite models first — less "high demand" than big flash for long HTML
         const DEFAULT_MODELS = [
-            "gemini-2.5-flash-lite",
-            "gemini-2.0-flash-lite",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-flash-latest",
-            "gemini-2.5-flash-lite-preview",
+            "gemini-3.5-flash",
+            "gemini-3.8-flash",
             "gemini-3.1-flash-lite",
             "gemini-3.5-flash-lite",
-            "gemini-3.6-flash"
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash"
         ];
         let modelChain = DEFAULT_MODELS.slice();
         try {
             const lastGood = storageGet('luba_last_good_model');
-            if (lastGood && modelChain.includes(lastGood)) {
+            if (lastGood && modelChain.includes(lastGood) && /gemini-3/.test(lastGood)) {
                 modelChain = [lastGood].concat(modelChain.filter(m => m !== lastGood));
+            } else if (lastGood && /gemini-2/.test(String(lastGood))) {
+                try { localStorage.removeItem('luba_last_good_model'); } catch (_) {}
             }
         } catch (_) {}
         // Simple chat: try fewer models fast. HTML: try the full list (high demand is common)
@@ -7119,7 +7633,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             const ATTEMPT_TIMEOUT_MS = isSimpleChat ? 12000 : (isHtmlMode ? 45000 : 28000);
 
             while (guard < 16) {
-                if (abortController.signal.aborted) {
+                if (forceStopGeneration || (abortController && abortController.signal.aborted)) {
                     userStopped = true;
                     break;
                 }
@@ -7143,12 +7657,18 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                     const res = await fetchWithTimeout(WORKER_URL, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ model, payload }),
+                        body: JSON.stringify({
+                            model,
+                            payload,
+                            token: (typeof getAuthToken === 'function' ? (getAuthToken() || '') : '') || '',
+                            coinCost: (typeof messageCoinCost === 'function' ? messageCoinCost(text, activeMode) : 1),
+                            username: (currentUser && currentUser.username) ? currentUser.username : undefined
+                        }),
                         signal: abortController.signal
                     }, ATTEMPT_TIMEOUT_MS);
                     data = await res.json();
                 } catch (fetchErr) {
-                    if (abortController.signal.aborted) {
+                    if (forceStopGeneration || (abortController && abortController.signal.aborted)) {
                         userStopped = true;
                         break;
                     }
@@ -7163,6 +7683,11 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
                 if (data.error) {
                     const msg = data.error.message || "";
+                    // Don't spin models forever on auth/ban/coins
+                    if (/log in|session expired|account deleted|account not found|access blocked|banned|out of daily/i.test(msg)) {
+                        reply = sanitizeAiError(msg);
+                        break;
+                    }
                     const isModelIssue = /not found|not supported|invalid model|does not exist|no longer available|not available/i.test(msg);
                     const isBusyIssue = /high demand|overloaded|unavailable|try again later|temporarily|RESOURCE_EXHAUSTED|quota|rate limit|503|429|capacity|spikes in demand/i.test(msg);
 
@@ -7171,7 +7696,8 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                         model = modelChain[modelIndex];
                         // brief pause before next model when overloaded
                         if (isBusyIssue) {
-                            try { await new Promise(r => setTimeout(r, 600 + modelIndex * 200)); } catch (_) {}
+                            const ok = await sleepAbortable(400 + modelIndex * 150);
+                            if (!ok || forceStopGeneration) { userStopped = true; break; }
                         }
                         continue;
                     }
@@ -7195,7 +7721,8 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                     if (modelIndex < modelChain.length - 1) {
                         modelIndex++;
                         model = modelChain[modelIndex];
-                        try { await new Promise(r => setTimeout(r, 400)); } catch (_) {}
+                        const ok2 = await sleepAbortable(300);
+                        if (!ok2 || forceStopGeneration) { userStopped = true; break; }
                         continue;
                     }
                     if (/SAFETY|BLOCK/i.test(String(blockReason))) {
@@ -7247,7 +7774,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 
             removeTyping();
 
-            if (userStopped || abortController.signal.aborted) {
+            if (userStopped || forceStopGeneration || (abortController && abortController.signal.aborted)) {
                 lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
@@ -7319,7 +7846,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             }
         } catch (err) {
             removeTyping();
-            if (err && (err.name === 'AbortError' || abortController?.signal?.aborted)) {
+            if (forceStopGeneration || (err && (err.name === 'AbortError' || (abortController && abortController.signal.aborted)))) {
                 lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
@@ -7338,9 +7865,10 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
         } finally {
             isGenerating = false;
             abortController = null;
+            forceStopGeneration = false;
             setSendButtonMode('send');
             if (studyModeBtn) studyModeBtn.disabled = false;
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            try { chatContainer.scrollTop = chatContainer.scrollHeight; } catch (_) {}
         }
     }
 </script>
