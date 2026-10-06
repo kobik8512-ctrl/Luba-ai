@@ -80,14 +80,18 @@
         .brand-container {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             min-width: 0;
             flex: 0 1 auto;
-            max-width: 42%;
+            max-width: 55%;
         }
         .brand-container .logo {
             overflow: hidden;
             text-overflow: ellipsis;
+            margin: 0;
+            padding: 0;
+            line-height: 1.15;
+            white-space: nowrap;
         }
 
         .logo-icon {
@@ -1563,12 +1567,14 @@
             -webkit-overflow-scrolling: touch;
         }
         #owner-overlay .modal {
+            max-width: min(640px, 98vw);
+            width: 98%;
             max-height: 92vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            max-width: 520px;
-            width: 96%;
         }
         .owner-gate, .owner-panel { display: none; }
         .owner-gate.visible { display: block; }
@@ -1577,7 +1583,13 @@
             flex-direction: column;
             min-height: 0;
             flex: 1 1 auto;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            max-height: min(78vh, 900px);
+            padding-bottom: 12px;
+            touch-action: pan-y;
         }
         .owner-panel .owner-note,
         .owner-panel .owner-section-label {
@@ -1612,19 +1624,16 @@
         .owner-user-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            /* Fixed scroll area so many accounts never squeeze */
-            height: min(52vh, 480px);
-            max-height: min(52vh, 480px);
-            overflow-y: scroll !important;
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
-            padding: 4px 6px 24px 2px;
-            flex: 1 1 auto;
-            min-height: 180px;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255, 0, 127, 0.45) transparent;
-            touch-action: pan-y;
+            gap: 14px;
+            /* Scroll through every account — grows with list, parent also scrolls */
+            height: auto;
+            max-height: none;
+            min-height: 220px;
+            overflow: visible;
+            padding: 4px 4px 32px 2px;
+            flex: 0 0 auto;
+            width: 100%;
+            box-sizing: border-box;
         }
         .owner-user-list::-webkit-scrollbar {
             width: 8px;
@@ -1645,7 +1654,10 @@
             background: var(--bubble-user);
             overflow: visible;
             flex: 0 0 auto;
-            min-height: 88px;
+            min-height: 96px;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 2px 0;
         }
         .owner-user-head {
             display: flex;
@@ -1868,10 +1880,11 @@
                 align-items: flex-end;
             }
             .owner-user-list {
-                height: 48vh;
-                max-height: 48vh;
-                gap: 12px;
-                overflow-y: scroll !important;
+                height: auto !important;
+                max-height: none !important;
+                min-height: 200px;
+                overflow: visible !important;
+                gap: 14px;
             }
             .owner-user-card {
                 min-height: 90px;
@@ -2030,7 +2043,16 @@
             vertical-align: middle;
         }
         .verified-badge svg { width: 16px; height: 16px; display: block; filter: drop-shadow(0 1px 2px rgba(32,213,236,0.35)); }
-        .header-verified-badge { margin: 0 2px 0 4px; }
+        .header-verified-badge {
+            margin: 0;
+            margin-left: 2px;
+            width: 17px;
+            height: 17px;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+        }
+        .header-verified-badge svg { width: 17px; height: 17px; display: block; }
         .settings-identity {
             display: inline-flex;
             align-items: center;
@@ -2219,6 +2241,7 @@
             <path fill="#ffffff" d="M14 50h36V42H42V34H34V26H26V18H14v32z"/>
         </svg>
         <div class="logo">Luba AI</div>
+        <span class="verified-badge header-verified-badge" id="header-verified-badge" style="display:none;" title="Verified"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     </div>
     <div class="header-actions">
         <span class="owner-crown-badge header-owner-badge" id="header-owner-badge" style="display:none;" title="Official owner account">
@@ -3859,7 +3882,7 @@
         await refreshOwnerInspectCoins(username); refreshOwnerInspectVerified(username);
     };
 
-    async function refreshOwnerInspectCoins(username); refreshOwnerInspectVerified(username) {
+    async function refreshOwnerInspectCoins(username) {
         const el = document.getElementById('owner-inspect-coins');
         const row = document.getElementById('owner-coins-row');
         if (!el) return;
