@@ -2984,6 +2984,7 @@
         const reqBox = document.getElementById('verify-request-box');
         if (reqBox) reqBox.style.display = verified ? 'none' : 'block';
         updateCoinsUI();
+        try { refreshVerifyRequestUI(); } catch (_) {}
     }
 
 
@@ -6103,7 +6104,27 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
             if (!currentUser || !getAuthToken()) return;
             pullCloudChat({ silent: false }).catch(() => {});
             enforceLiveBan(true).catch(() => {});
-        }, 8000);
+            // Instant verification approve/deny notification (no page refresh)
+            checkVerifyNotice().catch(() => {});
+            // Sync mode/theme from other phones on same account
+            syncCloudPrefsLive().catch(() => {});
+        }, 5000);
+    }
+
+    async function syncCloudPrefsLive() {
+        if (!currentUser || !getAuthToken() || isGenerating) return;
+        const cloudPrefs = await pullCloudPrefs();
+        if (!cloudPrefs) return;
+        const mode = cloudPrefs.activeMode || (cloudPrefs.studyMode ? 'study' : null);
+        if (mode && ['normal', 'study', 'html', 'code', 'creative'].includes(mode) && mode !== activeMode) {
+            activeMode = mode;
+            applyModeUI();
+        }
+        if (cloudPrefs.theme === 'light' && !document.body.classList.contains('light')) {
+            document.body.classList.add('light');
+        } else if (cloudPrefs.theme === 'dark' && document.body.classList.contains('light')) {
+            document.body.classList.remove('light');
+        }
     }
 
     function stopChatSyncPolling() {
@@ -7161,13 +7182,22 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 updateOwnerBadgeUI();
                 return;
             }
+            if (res && res.pending && res.ok === false) {
+                if (st) {
+                    st.textContent = res.error || 'You already have a pending request. Wait for the owner.';
+                    st.style.color = '#f0c14b';
+                }
+                if (verifyRequestBtn) verifyRequestBtn.disabled = true;
+                return;
+            }
             if (res && res.ok) {
                 if (st) {
-                    st.textContent = '✓ Request sent! Wait for the owner in Owner CMDs → Verification requests.';
+                    st.textContent = '✓ Request sent! Only one request allowed until the owner accepts or declines.';
                     st.style.color = '#3dd68c';
                 }
                 if (ta) ta.value = '';
-                try { alert('Verification request sent!'); } catch (_) {}
+                if (verifyRequestBtn) verifyRequestBtn.disabled = true;
+                try { alert('Verification request sent! You cannot send another until the owner reviews it.'); } catch (_) {}
             } else {
                 if (st) {
                     st.textContent = (res && res.error) || 'Could not send. Are you logged in?';
@@ -7175,6 +7205,40 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
                 }
             }
         };
+    }
+
+    async function refreshVerifyRequestUI() {
+        const st = document.getElementById('verify-request-status');
+        const btn = document.getElementById('verify-request-btn');
+        const ta = document.getElementById('verify-reason-input');
+        const box = document.getElementById('verify-request-box');
+        if (!getAuthToken() || !currentUser) return;
+        if (isUserVerified(currentUser)) {
+            if (box) box.style.display = 'none';
+            return;
+        }
+        if (box) box.style.display = 'block';
+        try {
+            const res = await cloudPost({ action: 'get_verify_status', token: getAuthToken() });
+            if (res && res.ok && res.pending) {
+                if (st) {
+                    st.textContent = 'Request pending — wait for the owner to accept or decline. You cannot send another yet.';
+                    st.style.color = '#f0c14b';
+                }
+                if (btn) btn.disabled = true;
+                if (ta) ta.disabled = true;
+            } else {
+                if (btn) btn.disabled = false;
+                if (ta) ta.disabled = false;
+                if (st && st.textContent && /pending/i.test(st.textContent)) {
+                    st.textContent = '';
+                }
+            }
+            if (res && res.ok && res.verified) {
+                if (currentUser) currentUser.verified = true;
+                updateOwnerBadgeUI();
+            }
+        } catch (_) {}
     }
 
 
