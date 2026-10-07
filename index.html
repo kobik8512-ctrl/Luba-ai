@@ -1976,11 +1976,8 @@
             margin-bottom: 6px;
         }
         .owner-reply-pair .owner-ai-reply {
-            display: none;
-            margin-top: 6px;
-        }
-        .owner-reply-pair.open .owner-ai-reply {
             display: block;
+            margin-top: 6px;
         }
         .owner-tap-hint {
             font-size: 10px;
@@ -2286,6 +2283,49 @@
             font-size: 13px;
             line-height: 1.45;
         }
+    
+        .lb-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .lb-rank {
+            width: 28px;
+            font-weight: 800;
+            font-size: 15px;
+            text-align: center;
+            flex-shrink: 0;
+            opacity: 0.9;
+        }
+        .lb-rank.gold { color: #f5c542; }
+        .lb-rank.silver { color: #c0c0c0; }
+        .lb-rank.bronze { color: #cd7f32; }
+        .lb-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: var(--bubble-user);
+            flex-shrink: 0;
+            border: 1px solid var(--border);
+        }
+        .lb-name {
+            flex: 1;
+            min-width: 0;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .lb-score {
+            font-size: 12px;
+            opacity: 0.75;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -2455,6 +2495,10 @@
         <div class="settings-row">
             <span>Appearance</span>
             <button class="icon-btn" id="theme-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg> Toggle Theme</button>
+        </div>
+        <div class="settings-row">
+            <span>Leaderboard</span>
+            <button class="icon-btn" id="open-leaderboard-btn" type="button">🏆 Top 10</button>
         </div>
 
         <p>Luba's personality (her name and creator are locked in and can't be changed here)</p>
@@ -2672,6 +2716,23 @@
             <button class="modal-btn" id="owner-ban-timed-btn" style="background:#a66b00; color:#fff;">Timed ban</button>
             <button class="modal-btn save-btn" id="owner-ban-perm-btn" style="background:#b33;">Permanent ban</button>
         </div>
+    </div>
+</div>
+
+
+<div class="modal-overlay" id="leaderboard-overlay">
+    <div class="modal" style="max-width:440px;width:96%;">
+        <div class="modal-header-row">
+            <h3>Leaderboard</h3>
+            <button class="lightbox-close saved-chats-close" id="close-leaderboard-btn" title="Close">×</button>
+        </div>
+        <p class="owner-note" style="margin-bottom:10px;">Top 10 players. Verified users show a badge.</p>
+        <div class="owner-ban-row" style="margin-bottom:12px;">
+            <button type="button" class="small-btn" id="lb-tab-time" style="background:#0a6a75;">⏱ Time online</button>
+            <button type="button" class="small-btn" id="lb-tab-messages" style="background:#6b1a4a;">💬 Messages sent</button>
+        </div>
+        <div id="leaderboard-title" style="font-size:13px;font-weight:600;margin-bottom:8px;opacity:0.85;">Time online</div>
+        <div id="leaderboard-list" class="owner-inspect-chat" style="max-height:55vh;"></div>
     </div>
 </div>
 
@@ -3566,6 +3627,7 @@
     function showBanScreen(ban, opts) {
         opts = opts || {};
         document.body.classList.add('banned');
+        try { stopHeartbeat(); } catch (_) {}
         document.body.classList.remove('logged-in');
         const titleEl = document.getElementById('ban-title');
         const iconEl = document.getElementById('ban-icon');
@@ -3922,59 +3984,42 @@
         if (!messages || !messages.length) {
             return '';
         }
-        // Pair user → next assistant so tap expands Luba reply
         const items = [];
         const list = messages.slice(-50);
         for (let i = 0; i < list.length; i++) {
             const m = list[i];
-            const role = m.role === 'user' ? 'user' : 'assistant';
+            const role = (m.role === 'user') ? 'user' : 'assistant';
             const when = m.time ? escapeHtml(String(m.time)) : '';
-            const raw = String(m.content || '').slice(0, 2000);
+            const raw = String(m.content || '').slice(0, 3000);
             if (role === 'user') {
                 const scan = scanFlaggedText(raw);
                 const flagClass = scan.flagged ? ' flagged' : '';
                 const tag = scan.flagged
-                    ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
+                    ? '<div class="owner-flag-tag">⚠ ' + escapeHtml(scan.labels.join(' · ')) + '</div>'
                     : '';
-                // Find next assistant reply
-                let replyHtml = '';
-                let replyWhen = '';
-                for (let j = i + 1; j < list.length; j++) {
-                    if (list[j].role === 'user') break;
-                    if (list[j].role === 'assistant' || list[j].role !== 'user') {
-                        const r = String(list[j].content || '').slice(0, 3000);
-                        replyWhen = list[j].time ? escapeHtml(String(list[j].time)) : '';
-                        replyHtml = escapeHtml(r).replace(/\n/g, '<br>');
-                        break;
-                    }
-                }
-                const pairId = 'opair_' + i + '_' + Math.random().toString(36).slice(2, 7);
-                if (replyHtml) {
-                    items.push(
-                        `<div class="owner-reply-pair" id="${pairId}">
-                            <div class="owner-chat-bubble meta">User${when ? ' · ' + when : ''} · tap to show Luba</div>
-                            <div class="owner-chat-bubble user clickable${flagClass}" onclick="this.parentElement.classList.toggle('open')">${tag}${scan.html}
-                                <div class="owner-tap-hint">▼ Tap to show Luba's reply</div>
-                            </div>
-                            <div class="owner-ai-reply">
-                                <div class="owner-chat-bubble meta">Luba AI${replyWhen ? ' · ' + replyWhen : ''}</div>
-                                <div class="owner-chat-bubble ai">${replyHtml}</div>
-                            </div>
-                        </div>`
-                    );
-                } else {
-                    items.push(
-                        `<div class="owner-chat-bubble meta">User${when ? ' · ' + when : ''}</div>
-                         <div class="owner-chat-bubble user${flagClass}">${tag}${scan.html}</div>`
-                    );
-                }
-            } else if (role === 'assistant') {
-                // Standalone assistant (no prior user in slice) — show directly
-                const prev = list[i - 1];
-                if (prev && prev.role === 'user') continue; // already paired
                 items.push(
-                    `<div class="owner-chat-bubble meta">Luba AI${when ? ' · ' + when : ''}</div>
-                     <div class="owner-chat-bubble ai">${escapeHtml(raw).replace(/\n/g, '<br>')}</div>`
+                    '<div class="owner-chat-bubble meta">User' + (when ? ' · ' + when : '') + '</div>' +
+                    '<div class="owner-chat-bubble user' + flagClass + '">' + tag + scan.html + '</div>'
+                );
+                // Always show next Luba reply if present (no broken toggle)
+                for (let j = i + 1; j < list.length; j++) {
+                    const rj = list[j];
+                    const rRole = (rj.role === 'user') ? 'user' : 'assistant';
+                    if (rRole === 'user') break;
+                    const r = String(rj.content || '').slice(0, 4000);
+                    const rWhen = rj.time ? escapeHtml(String(rj.time)) : '';
+                    items.push(
+                        '<div class="owner-chat-bubble meta">Luba AI' + (rWhen ? ' · ' + rWhen : '') + '</div>' +
+                        '<div class="owner-chat-bubble ai">' + escapeHtml(r).replace(/\n/g, '<br>') + '</div>'
+                    );
+                    break;
+                }
+            } else {
+                const prev = list[i - 1];
+                if (prev && prev.role === 'user') continue; // already shown with user
+                items.push(
+                    '<div class="owner-chat-bubble meta">Luba AI' + (when ? ' · ' + when : '') + '</div>' +
+                    '<div class="owner-chat-bubble ai">' + escapeHtml(raw).replace(/\n/g, '<br>') + '</div>'
                 );
             }
         }
@@ -5446,6 +5491,7 @@
         });
         pullNamedSavedChats().catch(() => {});
         startChatSyncPolling();
+        try { startHeartbeat(); } catch (_) {}
         startBanPolling();
         // Immediate ban check on enter
         enforceLiveBan(true).catch(() => {});
@@ -6164,13 +6210,14 @@ RULES (follow exactly):
         }
 
         if (needsThree && !/canvas\s*\{[^}]*height/i.test(c)) {
-            const style = '<style>html,body{margin:0;height:100%;overflow:hidden;background:#111}canvas{display:block;width:100%;height:100%}</style>';
+            const style = '<style>html,body{margin:0;height:100%;overflow:hidden;background:#111}canvas{display:block;width:100%;height:100%}</' + 'style>';
             if (/<\/head>/i.test(c)) c = c.replace(/<\/head>/i, style + '</head>');
             else c = style + c;
         }
 
         return c;
     }
+
 
     function buildPreviewBlock(code) {
         code = fixHtmlDemo(code);
@@ -6589,6 +6636,119 @@ RULES (follow exactly):
         return true;
     }
 
+
+    function formatActiveTime(ms) {
+        ms = Math.max(0, Number(ms) || 0);
+        const totalMin = Math.floor(ms / 60000);
+        const days = Math.floor(totalMin / (60 * 24));
+        const hours = Math.floor((totalMin % (60 * 24)) / 60);
+        const mins = totalMin % 60;
+        const parts = [];
+        if (days) parts.push(days + 'd');
+        if (hours || days) parts.push(hours + 'h');
+        parts.push(mins + 'm');
+        return parts.join(' ');
+    }
+
+    let heartbeatTimer = null;
+    let lastHeartbeatAt = Date.now();
+
+    function startHeartbeat() {
+        stopHeartbeat();
+        lastHeartbeatAt = Date.now();
+        heartbeatTimer = setInterval(() => {
+            if (!currentUser || !getAuthToken()) return;
+            if (document.visibilityState === 'hidden') {
+                lastHeartbeatAt = Date.now();
+                return;
+            }
+            const now = Date.now();
+            const secs = Math.min(90, Math.max(1, Math.round((now - lastHeartbeatAt) / 1000)));
+            lastHeartbeatAt = now;
+            cloudPost({ action: 'heartbeat', token: getAuthToken(), seconds: secs }).catch(() => {});
+        }, 30000);
+        // immediate small tick
+        setTimeout(() => {
+            if (!currentUser || !getAuthToken()) return;
+            cloudPost({ action: 'heartbeat', token: getAuthToken(), seconds: 5 }).catch(() => {});
+        }, 2000);
+    }
+
+    function stopHeartbeat() {
+        if (heartbeatTimer) {
+            clearInterval(heartbeatTimer);
+            heartbeatTimer = null;
+        }
+    }
+
+    let leaderboardKind = 'time';
+
+    function defaultLbAvatar(username) {
+        const u = encodeURIComponent(String(username || 'U').slice(0, 2).toUpperCase());
+        return 'data:image/svg+xml,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72"><rect width="72" height="72" rx="36" fill="#2a2a2e"/><text x="36" y="42" text-anchor="middle" fill="#aaa" font-size="22" font-family="sans-serif">' + String(username || '?').slice(0, 1).toUpperCase() + '</text></svg>'
+        );
+    }
+
+    async function loadLeaderboard(kind) {
+        leaderboardKind = kind === 'messages' ? 'messages' : 'time';
+        const list = document.getElementById('leaderboard-list');
+        const title = document.getElementById('leaderboard-title');
+        const tabT = document.getElementById('lb-tab-time');
+        const tabM = document.getElementById('lb-tab-messages');
+        if (tabT) tabT.style.opacity = leaderboardKind === 'time' ? '1' : '0.55';
+        if (tabM) tabM.style.opacity = leaderboardKind === 'messages' ? '1' : '0.55';
+        if (title) title.textContent = leaderboardKind === 'time' ? '⏱ Time online (top 10)' : '💬 Messages sent (top 10)';
+        if (list) list.innerHTML = '<div class="owner-empty">Loading…</div>';
+        const data = await cloudPost({ action: 'leaderboard', kind: leaderboardKind });
+        if (!list) return;
+        if (!data || !data.ok || !Array.isArray(data.top) || !data.top.length) {
+            list.innerHTML = '<div class="owner-empty">No data yet. Use the app and send messages — rankings will appear.</div>';
+            return;
+        }
+        list.innerHTML = data.top.map((row) => {
+            const rankClass = row.rank === 1 ? ' gold' : row.rank === 2 ? ' silver' : row.rank === 3 ? ' bronze' : '';
+            const av = row.avatarDataUrl || defaultLbAvatar(row.username);
+            const badge = row.verified
+                ? ' <span class="verified-badge" title="Verified">' + VERIFIED_BADGE_SVG + '</span>'
+                : '';
+            const score = leaderboardKind === 'time'
+                ? formatActiveTime(row.activeMs)
+                : ((Number(row.messageCount) || 0) + ' msgs');
+            return '<div class="lb-row">' +
+                '<div class="lb-rank' + rankClass + '">' + row.rank + '</div>' +
+                '<img class="lb-avatar" src="' + String(av).replace(/"/g, '') + '" alt="">' +
+                '<div class="lb-name">@' + escapeHtml(row.username) + badge + '</div>' +
+                '<div class="lb-score">' + escapeHtml(score) + '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function openLeaderboard() {
+        const ov = document.getElementById('leaderboard-overlay');
+        if (ov) ov.style.display = 'flex';
+        loadLeaderboard(leaderboardKind || 'time');
+    }
+
+    function closeLeaderboard() {
+        const ov = document.getElementById('leaderboard-overlay');
+        if (ov) ov.style.display = 'none';
+    }
+
+    (function wireLeaderboard() {
+        const openBtn = document.getElementById('open-leaderboard-btn');
+        const closeBtn = document.getElementById('close-leaderboard-btn');
+        const ov = document.getElementById('leaderboard-overlay');
+        const tabT = document.getElementById('lb-tab-time');
+        const tabM = document.getElementById('lb-tab-messages');
+        if (openBtn) openBtn.onclick = () => openLeaderboard();
+        if (closeBtn) closeBtn.onclick = () => closeLeaderboard();
+        if (ov) ov.onclick = (e) => { if (e.target === ov) closeLeaderboard(); };
+        if (tabT) tabT.onclick = () => loadLeaderboard('time');
+        if (tabM) tabM.onclick = () => loadLeaderboard('messages');
+    })();
+
+
     function startChatSyncPolling() {
         stopChatSyncPolling();
         chatSyncTimer = setInterval(() => {
@@ -6754,6 +6914,7 @@ RULES (follow exactly):
                     document.body.classList.add('logged-in');
                     startBanPolling();
                     startChatSyncPolling();
+        try { startHeartbeat(); } catch (_) {}
                 }
             }
         } finally {
