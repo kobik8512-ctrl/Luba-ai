@@ -729,6 +729,46 @@
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
         }
+        .file-attach-chip {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin: 0 12px 8px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            font-size: 13px;
+            color: var(--text, #e3e3e3);
+        }
+        .file-attach-chip.show { display: flex; }
+        .file-attach-chip .fname { font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-attach-chip .fmeta { color: #94a3b8; font-size: 11px; }
+        .file-attach-chip button {
+            border: none; background: transparent; color: #f87171;
+            font-weight: 700; cursor: pointer; padding: 4px 8px;
+        }
+        .attach-file-modal {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.55); align-items: center; justify-content: center;
+            padding: 16px;
+        }
+        .attach-file-modal.open { display: flex; }
+        .attach-file-card {
+            background: var(--header, #1e1f20); color: var(--text, #e3e3e3);
+            border-radius: 16px; padding: 20px; max-width: 360px; width: 100%;
+            border: 1px solid var(--border, #2d2f31);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+        }
+        .attach-file-card h3 { margin: 0 0 8px; font-size: 17px; }
+        .attach-file-card p { margin: 0 0 16px; font-size: 13px; color: #94a3b8; line-height: 1.45; }
+        .attach-file-actions { display: flex; gap: 8px; }
+        .attach-file-actions button {
+            flex: 1; padding: 12px; border-radius: 10px; border: none;
+            font-weight: 700; font-size: 14px; cursor: pointer;
+        }
+        .attach-file-actions .yes { background: #3b82f6; color: #fff; }
+        .attach-file-actions .no { background: #2d2f31; color: #e3e3e3; }
         .retry-btn:hover {
             background: #e00070;
         }
@@ -2420,7 +2460,7 @@
         </span>
         <button class="icon-btn" id="export-btn" title="Saved Chats"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v16l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg></button>
         <div class="modes-wrap" id="modes-wrap">
-            <button class="icon-btn" id="modes-btn" title="Modes"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 10-10-5L2 10l10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> <span id="modes-btn-label">Modes</span></button>
+            <button class="icon-btn" id="modes-btn" data-keep="1" title="Modes"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 10-10-5L2 10l10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> <span id="modes-btn-label">Modes</span></button>
             <div class="modes-menu" id="modes-menu">
                 <button type="button" class="modes-item active" data-mode="normal">
                     <span class="modes-item-title">Normal</span>
@@ -2461,6 +2501,22 @@
         <button class="action-btn" id="photo-btn" title="Photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
         <button class="action-btn" id="mic-btn" title="Voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg></button>
         <input type="file" id="image-input" accept="image/*,video/*" style="display:none">
+        <input type="file" id="code-file-input" accept=".html,.htm,.css,.js,.json,.txt,.md,.svg,.xml,.py,.ts,.tsx,.jsx,text/*" style="display:none">
+        <div class="attach-file-modal" id="attach-file-modal">
+            <div class="attach-file-card">
+                <h3>Attach as file?</h3>
+                <p id="attach-file-msg">This text is long (like a full HTML page). Attach it as a file so Luba reads the <b>whole</b> thing — same idea as Claude / ChatGPT file upload.</p>
+                <div class="attach-file-actions">
+                    <button type="button" class="yes" id="attach-file-yes">Attach file</button>
+                    <button type="button" class="no" id="attach-file-no">Send as text</button>
+                </div>
+            </div>
+        </div>
+        <div class="file-attach-chip" id="file-attach-chip">
+            <span class="fname" id="file-attach-name">file.html</span>
+            <span class="fmeta" id="file-attach-meta"></span>
+            <button type="button" id="file-attach-clear" title="Remove">✕</button>
+        </div>
         <textarea id="user-input" placeholder="Ask Luba AI something..."></textarea>
         <button class="send-btn" id="send-btn">Send</button>
     </div>
@@ -2811,6 +2867,8 @@
     let currentUser = null;          // full user object
     let chatHistory = [];
     let selectedImageBase64 = null;
+    let pendingCodeFile = null; // { name, content, size }
+    let _pasteAttachBuffer = null;
     let isListening = false;
     let activeMode = 'normal'; // normal | study | html | code | creative
     let isStudyModeOn = false; // kept in sync with activeMode === 'study'
@@ -6576,8 +6634,8 @@ RULES (follow exactly):
 
     function saveChat() {
         if (!currentUser) return;
-        if (chatHistory.length > 30) {
-            chatHistory = chatHistory.slice(-30);
+        if (chatHistory.length > 40) {
+            chatHistory = chatHistory.slice(-40);
         }
         saveUserChatHistory(currentUser.username, chatHistory);
         // Sync to server so the same account sees chats on every phone
@@ -8203,6 +8261,150 @@ RULES (follow exactly):
         if (typeof studyModeBtn !== 'undefined' && studyModeBtn) studyModeBtn.disabled = false;
     }
 
+
+    function formatBytes(n) {
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function looksLikeFullFile(text) {
+        if (!text || text.length < 3500) return false;
+        const t = text.trim();
+        if (t.length >= 8000) return true;
+        if (/<!DOCTYPE\s+html/i.test(t) || /<html[\s>]/i.test(t)) return true;
+        if (t.split('\n').length >= 80 && (/function\s|const\s|class\s|{/.test(t))) return true;
+        return t.length >= 5000;
+    }
+
+    function setPendingCodeFile(name, content) {
+        const max = 900000; // ~900KB text
+        if (content.length > max) {
+            alert('File too large (max ~900KB text). Split it or shorten it.');
+            return false;
+        }
+        pendingCodeFile = {
+            name: (name || 'file.html').slice(0, 80),
+            content: content,
+            size: content.length
+        };
+        const chip = document.getElementById('file-attach-chip');
+        const nm = document.getElementById('file-attach-name');
+        const meta = document.getElementById('file-attach-meta');
+        if (chip) chip.classList.add('show');
+        if (nm) nm.textContent = pendingCodeFile.name;
+        if (meta) meta.textContent = formatBytes(pendingCodeFile.size);
+        return true;
+    }
+
+    function clearPendingCodeFile() {
+        pendingCodeFile = null;
+        _pasteAttachBuffer = null;
+        const chip = document.getElementById('file-attach-chip');
+        if (chip) chip.classList.remove('show');
+    }
+
+    function openAttachFileModal(previewText) {
+        _pasteAttachBuffer = previewText;
+        const modal = document.getElementById('attach-file-modal');
+        const msg = document.getElementById('attach-file-msg');
+        if (msg) {
+            msg.innerHTML = 'This looks like a <b>long file</b> (' + formatBytes(previewText.length) +
+                '). Attach it as a file so Luba reads the <b>entire</b> thing — like Claude / ChatGPT — instead of treating it as a short chat message.';
+        }
+        if (modal) modal.classList.add('open');
+    }
+
+    function closeAttachFileModal() {
+        const modal = document.getElementById('attach-file-modal');
+        if (modal) modal.classList.remove('open');
+    }
+
+    function guessFileName(text) {
+        if (/<!DOCTYPE\s+html/i.test(text) || /<html[\s>]/i.test(text)) return 'project.html';
+        if (/function\s|=>|const\s/.test(text) && /\{/.test(text)) return 'script.js';
+        if (/^\s*\{[\s\S]*\}\s*$/.test(text.trim())) return 'data.json';
+        return 'attachment.txt';
+    }
+
+    function buildFileMessageBlock(file, userNote) {
+        const note = (userNote || '').trim();
+        return (note ? note + '\n\n' : '') +
+            '=== ATTACHED FILE: ' + file.name + ' (' + formatBytes(file.size) + ') ===\n' +
+            'Read this entire file carefully. When fixing or editing, return the complete updated file when asked.\n' +
+            '----- BEGIN FILE -----\n' +
+            file.content +
+            '\n----- END FILE -----\n';
+    }
+
+
+    // ---- Attach long code/HTML as file (Claude-style full read) ----
+    (function wireFileAttach() {
+        const input = document.getElementById('user-input');
+        const fileInput = document.getElementById('code-file-input');
+        const clearBtn = document.getElementById('file-attach-clear');
+        const yes = document.getElementById('attach-file-yes');
+        const no = document.getElementById('attach-file-no');
+        if (clearBtn) clearBtn.onclick = () => clearPendingCodeFile();
+        if (yes) yes.onclick = () => {
+            closeAttachFileModal();
+            if (_pasteAttachBuffer) {
+                setPendingCodeFile(guessFileName(_pasteAttachBuffer), _pasteAttachBuffer);
+                if (input) input.value = '';
+            }
+            _pasteAttachBuffer = null;
+        };
+        if (no) no.onclick = () => {
+            closeAttachFileModal();
+            // leave text in input as normal message
+            if (input && _pasteAttachBuffer && !input.value) input.value = _pasteAttachBuffer;
+            _pasteAttachBuffer = null;
+        };
+        if (fileInput) {
+            fileInput.onchange = () => {
+                const f = fileInput.files && fileInput.files[0];
+                fileInput.value = '';
+                if (!f) return;
+                if (f.size > 900000) { alert('File too large (max ~900KB)'); return; }
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const text = String(reader.result || '');
+                    if (!text.trim()) { alert('Empty file'); return; }
+                    setPendingCodeFile(f.name || 'file.txt', text);
+                };
+                reader.onerror = () => alert('Could not read file');
+                reader.readAsText(f);
+            };
+        }
+        if (input) {
+            input.addEventListener('paste', (e) => {
+                try {
+                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+                    if (looksLikeFullFile(pasted)) {
+                        e.preventDefault();
+                        openAttachFileModal(pasted);
+                    }
+                } catch (_) {}
+            });
+        }
+        // Optional: long-press or button — expose global
+        window.lubaPickCodeFile = function() {
+            if (fileInput) fileInput.click();
+        };
+        // Add small paperclip if image button exists
+        const imgBtn = document.getElementById('image-btn') || document.getElementById('attach-btn') || document.getElementById('btn-image');
+        if (imgBtn && !document.getElementById('btn-attach-file')) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.id = 'btn-attach-file';
+            b.title = 'Attach code / HTML file';
+            b.textContent = '📎';
+            b.style.cssText = 'border:none;background:transparent;font-size:18px;cursor:pointer;padding:6px;';
+            b.onclick = () => fileInput && fileInput.click();
+            if (imgBtn.parentNode) imgBtn.parentNode.insertBefore(b, imgBtn.nextSibling);
+        }
+    })();
+
     async function sendMessage(opts) {
         if (!currentUser) return;
 
@@ -8218,10 +8420,29 @@ RULES (follow exactly):
         if (forceStopGeneration) return;
 
         const isRetry = !!(opts && (opts.retryText != null || opts.retryMedia != null));
-        const text = isRetry ? String(opts.retryText || '').trim() : userInput.value.trim();
+        let text = isRetry ? String(opts.retryText || '').trim() : userInput.value.trim();
         const retryMedia = isRetry ? (opts.retryMedia || null) : null;
-        if (!isRetry && !text && !selectedImageBase64) return;
+        // Long paste still in input? Offer attach once more on send
+        if (!isRetry && !pendingCodeFile && looksLikeFullFile(text)) {
+            openAttachFileModal(text);
+            return;
+        }
+        if (!isRetry && !text && !selectedImageBase64 && !pendingCodeFile) return;
         if (isRetry && !text && !retryMedia) return;
+
+        // Merge attached file into the message Luba actually receives (FULL content)
+        let attachedFileSnapshot = null;
+        if (!isRetry && pendingCodeFile) {
+            attachedFileSnapshot = pendingCodeFile;
+            text = buildFileMessageBlock(pendingCodeFile, text);
+            clearPendingCodeFile();
+        }
+        // Network/API retry must continue the SAME task — never restart a new project
+        if (isRetry && text) {
+            text = text + "\n\n[SYSTEM RETRY] The previous attempt failed due to a network or model error. " +
+                "Continue the EXACT same task from chat history. Do NOT start a different game or rewrite from scratch. " +
+                "If you already began an HTML project, finish and improve THAT same project. Keep features already discussed.";
+        }
 
         if (!WORKER_URL || WORKER_URL.includes('YOUR-WORKER-NAME')) {
             alert("Luba isn't fully set up yet — the developer needs to finish the backend setup (WORKER_URL) before this app can talk to the AI.");
@@ -8252,15 +8473,28 @@ RULES (follow exactly):
         const imageToSend = isRetry ? retryMedia : selectedImageBase64;
         const mediaIsVideo = !!(imageToSend && /^data:video\//i.test(imageToSend));
         let display = text || (imageToSend ? (mediaIsVideo ? "(sent a video)" : "(sent a photo)") : "");
+        if (attachedFileSnapshot) {
+            const note = (userInput && !isRetry) ? '' : '';
+            display = '📎 Attached file: <b>' + escapeHtml(attachedFileSnapshot.name) + '</b> (' +
+                formatBytes(attachedFileSnapshot.size) + ')' +
+                (text && text.indexOf('=== ATTACHED FILE') === 0 ? '' :
+                    (text && text.indexOf('----- BEGIN FILE') === -1 ? '<br>' + escapeHtml(text.slice(0, 200)) : ''));
+            // Prefer clean chip-style bubble text
+            const userNoteMatch = text.match(/^([\s\S]*?)\n\n=== ATTACHED FILE/);
+            const userNote = userNoteMatch ? userNoteMatch[1].trim() : '';
+            display = '📎 <b>' + escapeHtml(attachedFileSnapshot.name) + '</b> · ' + formatBytes(attachedFileSnapshot.size) +
+                ' <span style="opacity:.7">(full file sent to Luba)</span>' +
+                (userNote ? '<br>' + escapeHtml(userNote) : '');
+        }
         if (imageToSend) {
             const mediaTag = mediaIsVideo
                 ? `<video src="${imageToSend}" controls playsinline></video>`
                 : `<img src="${imageToSend}">`;
-            display = (text ? text + "\n\n" : "") + mediaTag;
+            display = (display ? display + "\n\n" : "") + mediaTag;
         }
         // Retry does not add another user bubble
         if (!isRetry) {
-            appendMessage('user', display, time, !!imageToSend);
+            appendMessage('user', display, time, !!(imageToSend || attachedFileSnapshot));
             clearMediaPreview();
             if (userInput) userInput.value = '';
         }
@@ -8296,7 +8530,7 @@ RULES (follow exactly):
         const isSimpleChat = !imageToSend && !needsTools && msgText.length > 0 && msgText.length < 120
             && activeMode === 'normal';
 
-        const historyLimit = isSimpleChat ? 4 : 10;
+        const historyLimit = isSimpleChat ? 4 : (text && text.length > 12000 ? 6 : 12);
         const recent = chatHistory.slice(-historyLimit);
 
         const contents = recent.map(m => ({
