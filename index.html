@@ -1946,6 +1946,48 @@
             border: none;
             background: transparent;
         }
+        
+        .owner-chat-bubble.ai {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text);
+            margin-left: 0;
+            margin-right: 12px;
+        }
+        .owner-chat-bubble.user {
+            background: rgba(255, 0, 127, 0.12);
+            border: 1px solid rgba(255, 0, 127, 0.25);
+        }
+        .owner-chat-bubble.meta {
+            opacity: 0.55;
+            font-size: 11px;
+            background: transparent;
+            border: none;
+            padding: 2px 4px;
+            margin-top: 10px;
+        }
+        .owner-chat-bubble.clickable {
+            cursor: pointer;
+        }
+        .owner-chat-bubble.clickable:active {
+            opacity: 0.85;
+        }
+        .owner-reply-pair {
+            margin-bottom: 6px;
+        }
+        .owner-reply-pair .owner-ai-reply {
+            display: none;
+            margin-top: 6px;
+        }
+        .owner-reply-pair.open .owner-ai-reply {
+            display: block;
+        }
+        .owner-tap-hint {
+            font-size: 10px;
+            opacity: 0.5;
+            margin-top: 4px;
+        }
+
         .owner-inspect-chat {
             max-height: 45vh;
             overflow-y: auto;
@@ -2043,7 +2085,7 @@
             padding: 0;
             vertical-align: middle;
         }
-        .verified-badge svg { width: 16px; height: 16px; display: block; filter: drop-shadow(0 1px 2px rgba(32,213,236,0.35)); }
+        .verified-badge svg { width: 16px; height: 16px; display: block; filter: none; }
         .header-verified-badge {
             margin: 0;
             margin-left: 2px;
@@ -2329,7 +2371,7 @@
             <path fill="#ffffff" d="M14 50h36V42H42V34H34V26H26V18H14v32z"/>
         </svg>
         <div class="logo">Luba AI</div>
-        <span class="verified-badge header-verified-badge" id="header-verified-badge" style="display:none;" title="Verified"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="verified-badge header-verified-badge" id="header-verified-badge" style="display:none;" title="Verified"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1D9BF0"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     </div>
     <div class="header-actions">
         <span class="owner-crown-badge header-owner-badge" id="header-owner-badge" style="display:none;" title="Official owner account">
@@ -2422,13 +2464,13 @@
         <div class="account-section">
             <h4>Your Account</h4>
             <div class="settings-identity" id="settings-identity">
-                <span id="settings-display-username">@user</span><span class="verified-badge" id="settings-name-verified" style="display:none;" title="Verified"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="owner-crown-badge" id="settings-owner-badge-inline" style="display:none;" title="Official owner account"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 19h18v2H3v-2zm2.5-6.5L3 7l4.5 2L12 4l4.5 5L21 7l-2.5 5.5V17H5.5v-4.5z"/></svg> Owner</span>
+                <span id="settings-display-username">@user</span><span class="verified-badge" id="settings-name-verified" style="display:none;" title="Verified"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1D9BF0"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="owner-crown-badge" id="settings-owner-badge-inline" style="display:none;" title="Official owner account"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 19h18v2H3v-2zm2.5-6.5L3 7l4.5 2L12 4l4.5 5L21 7l-2.5 5.5V17H5.5v-4.5z"/></svg> Owner</span>
             </div>
             <div id="settings-verified-note" style="display:none;font-size:12px;opacity:0.7;margin:-2px 0 10px;">Verified · 500 messages / 24h · VIP</div>
 
             <div class="verify-request-box" id="verify-request-box">
                 <h5>
-                    <span class="verified-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    <span class="verified-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1D9BF0"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                     Get Verified
                 </h5>
                 <p>Verified users get a blue check, VIP treatment from Luba, and <strong>500 messages every 24 hours</strong> (instead of 50).<br>
@@ -2729,7 +2771,7 @@
     // ============================================================
     const DAILY_COINS = 50; // messages per rolling 24 hours (normal users)
     const DAILY_COINS_VERIFIED = 500;
-    const VERIFIED_BADGE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#20D5EC"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const VERIFIED_BADGE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1D9BF0"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
     function isUserVerified(user) {
         if (!user) return false;
@@ -3650,8 +3692,11 @@
                         const tag = scan.flagged
                             ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
                             : '';
-                        return `<div class="owner-chat-bubble meta">[${escapeHtml(when)}] ${escapeHtml(e.username || '?')}</div>
-                            <div class="owner-chat-bubble user${flagClass}" style="margin-bottom:10px;">${tag}${scan.html}</div>`;
+                        const uname = String(e.username || '?');
+                        const jsName = uname.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        return `<div class="owner-chat-bubble meta">[${escapeHtml(when)}] @${escapeHtml(uname)} · tap for full chat</div>
+                            <div class="owner-chat-bubble user clickable${flagClass}" style="margin-bottom:10px;" onclick="window.ownerInspectUser && window.ownerInspectUser('${jsName}')">${tag}${scan.html}
+                            <div class="owner-tap-hint">▼ Open chat (User + Luba)</div></div>`;
                     }).join('');
             } else if (cloudOk) {
                 let localLog = [];
@@ -3858,7 +3903,7 @@
 
     function renderBubblesFromCloudLogs(logs) {
         if (!logs || !logs.length) {
-            return '<div class="owner-empty">No messages from this user on the server yet.</div>';
+            return '<div class="owner-empty">No user messages logged yet.</div>';
         }
         return logs.slice().reverse().map(e => {
             const when = e.at ? new Date(e.at).toLocaleString() : '';
@@ -3868,27 +3913,79 @@
             const tag = scan.flagged
                 ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
                 : '';
-            return `<div class="owner-chat-bubble meta">${escapeHtml(when)}</div>
+            return `<div class="owner-chat-bubble meta">${escapeHtml(when)} · user sent</div>
                 <div class="owner-chat-bubble user${flagClass}">${tag}${scan.html}${media}</div>`;
         }).join('');
     }
 
+    function renderFullThread(messages) {
+        if (!messages || !messages.length) {
+            return '';
+        }
+        // Pair user → next assistant so tap expands Luba reply
+        const items = [];
+        const list = messages.slice(-50);
+        for (let i = 0; i < list.length; i++) {
+            const m = list[i];
+            const role = m.role === 'user' ? 'user' : 'assistant';
+            const when = m.time ? escapeHtml(String(m.time)) : '';
+            const raw = String(m.content || '').slice(0, 2000);
+            if (role === 'user') {
+                const scan = scanFlaggedText(raw);
+                const flagClass = scan.flagged ? ' flagged' : '';
+                const tag = scan.flagged
+                    ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
+                    : '';
+                // Find next assistant reply
+                let replyHtml = '';
+                let replyWhen = '';
+                for (let j = i + 1; j < list.length; j++) {
+                    if (list[j].role === 'user') break;
+                    if (list[j].role === 'assistant' || list[j].role !== 'user') {
+                        const r = String(list[j].content || '').slice(0, 3000);
+                        replyWhen = list[j].time ? escapeHtml(String(list[j].time)) : '';
+                        replyHtml = escapeHtml(r).replace(/\n/g, '<br>');
+                        break;
+                    }
+                }
+                const pairId = 'opair_' + i + '_' + Math.random().toString(36).slice(2, 7);
+                if (replyHtml) {
+                    items.push(
+                        `<div class="owner-reply-pair" id="${pairId}">
+                            <div class="owner-chat-bubble meta">User${when ? ' · ' + when : ''} · tap to show Luba</div>
+                            <div class="owner-chat-bubble user clickable${flagClass}" onclick="this.parentElement.classList.toggle('open')">${tag}${scan.html}
+                                <div class="owner-tap-hint">▼ Tap to show Luba's reply</div>
+                            </div>
+                            <div class="owner-ai-reply">
+                                <div class="owner-chat-bubble meta">Luba AI${replyWhen ? ' · ' + replyWhen : ''}</div>
+                                <div class="owner-chat-bubble ai">${replyHtml}</div>
+                            </div>
+                        </div>`
+                    );
+                } else {
+                    items.push(
+                        `<div class="owner-chat-bubble meta">User${when ? ' · ' + when : ''}</div>
+                         <div class="owner-chat-bubble user${flagClass}">${tag}${scan.html}</div>`
+                    );
+                }
+            } else if (role === 'assistant') {
+                // Standalone assistant (no prior user in slice) — show directly
+                const prev = list[i - 1];
+                if (prev && prev.role === 'user') continue; // already paired
+                items.push(
+                    `<div class="owner-chat-bubble meta">Luba AI${when ? ' · ' + when : ''}</div>
+                     <div class="owner-chat-bubble ai">${escapeHtml(raw).replace(/\n/g, '<br>')}</div>`
+                );
+            }
+        }
+        return items.join('') || '<div class="owner-empty">No messages.</div>';
+    }
+
     function renderBubblesFromLocalHistory(hist) {
         if (!hist || !hist.length) {
-            return '<div class="owner-empty">No chat for this user stored on this phone. Full back-and-forth only exists on their device; the server keeps what they sent.</div>';
+            return '<div class="owner-empty">No chat for this user stored on this phone.</div>';
         }
-        return hist.slice(-40).map(m => {
-            const who = m.role === 'user' ? 'User' : 'Luba';
-            const when = m.time ? escapeHtml(String(m.time)) : '';
-            const raw = String(m.content || '').slice(0, 800);
-            const scan = m.role === 'user' ? scanFlaggedText(raw) : { flagged: false, labels: [], html: escapeHtml(raw) };
-            const flagClass = scan.flagged ? ' flagged' : '';
-            const tag = scan.flagged
-                ? `<div class="owner-flag-tag">⚠ ${escapeHtml(scan.labels.join(' · '))}</div>`
-                : '';
-            return `<div class="owner-chat-bubble meta">${who}${when ? ' · ' + when : ''}</div>
-                <div class="owner-chat-bubble user${flagClass}">${tag}${scan.html}</div>`;
-        }).join('');
+        return renderFullThread(hist);
     }
 
     window.ownerInspectUser = async function (username) {
@@ -3938,15 +4035,35 @@
                 (lastIp ? `<br>Last IP: <code>${escapeHtml(lastIp)}</code>` : '<br><span style="opacity:0.6">Last IP: not recorded yet</span>');
         }
 
-        // Cloud messages for this user
-        let logs = (cloudLogsCache || []).filter(e => String(e.username || '').toLowerCase() === String(username).toLowerCase());
+        // Full cloud chat (user + Luba) from server — primary view
+        let fullThread = [];
         try {
-            const extra = await cloudOwnerUserLogs(username);
-            if (extra && extra.ok && Array.isArray(extra.logs) && extra.logs.length) {
-                logs = extra.logs;
+            const chatData = await cloudPost({
+                action: 'owner_get_chat',
+                ownerPassword: OWNER_PASSWORD,
+                username
+            });
+            if (chatData && chatData.ok && Array.isArray(chatData.messages)) {
+                fullThread = chatData.messages;
             }
         } catch (_) {}
-        if (cloudEl) cloudEl.innerHTML = renderBubblesFromCloudLogs(logs);
+        if (cloudEl) {
+            if (fullThread.length) {
+                cloudEl.innerHTML = '<div class="owner-empty" style="margin-bottom:8px;opacity:0.7;">Full chat (tap a user message to show Luba reply)</div>' +
+                    renderFullThread(fullThread);
+            } else {
+                // Fallback: user-only mod logs
+                let logs = (cloudLogsCache || []).filter(e => String(e.username || '').toLowerCase() === String(username).toLowerCase());
+                try {
+                    const extra = await cloudOwnerUserLogs(username);
+                    if (extra && extra.ok && Array.isArray(extra.logs) && extra.logs.length) {
+                        logs = extra.logs;
+                    }
+                } catch (_) {}
+                cloudEl.innerHTML = renderBubblesFromCloudLogs(logs) +
+                    '<div class="owner-empty" style="margin-top:10px;">No full synced chat yet — only user messages above. New chats sync both sides.</div>';
+            }
+        }
 
         // Local full chat only if this phone has their history
         const hist = loadUserChatHistory(username) || [];
