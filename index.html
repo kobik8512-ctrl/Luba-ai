@@ -733,13 +733,17 @@
             display: none;
             align-items: center;
             gap: 8px;
-            margin: 0 12px 8px;
-            padding: 8px 12px;
-            border-radius: 10px;
-            background: rgba(59, 130, 246, 0.12);
-            border: 1px solid rgba(59, 130, 246, 0.35);
+            margin: 0 10px 8px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(59, 130, 246, 0.14);
+            border: 1px solid rgba(59, 130, 246, 0.4);
             font-size: 13px;
             color: var(--text, #e3e3e3);
+            width: calc(100% - 20px);
+            max-width: 100%;
+            box-sizing: border-box;
+            flex-shrink: 0;
         }
         .file-attach-chip.show { display: flex; }
         .file-attach-chip .fname { font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2497,28 +2501,30 @@
         <video id="preview-video" src="" controls playsinline style="display:none"></video>
         <button id="remove-image">×</button>
     </div>
+    <!-- File chip ABOVE the text box so you can still type -->
+    <div class="file-attach-chip" id="file-attach-chip">
+        <span style="font-size:16px">📎</span>
+        <span class="fname" id="file-attach-name">file.html</span>
+        <span class="fmeta" id="file-attach-meta"></span>
+        <button type="button" id="file-attach-clear" title="Remove">✕</button>
+    </div>
     <div id="input-container">
         <button class="action-btn" id="photo-btn" title="Photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
-        <button class="action-btn" id="mic-btn" title="Voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg></button>
+        <button class="action-btn" id="btn-attach-file" title="Attach HTML / code file"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
         <input type="file" id="image-input" accept="image/*,video/*" style="display:none">
         <input type="file" id="code-file-input" accept=".html,.htm,.css,.js,.json,.txt,.md,.svg,.xml,.py,.ts,.tsx,.jsx,text/*" style="display:none">
-        <div class="attach-file-modal" id="attach-file-modal">
-            <div class="attach-file-card">
-                <h3>Attach as file?</h3>
-                <p id="attach-file-msg">This text is long (like a full HTML page). Attach it as a file so Luba reads the <b>whole</b> thing — same idea as Claude / ChatGPT file upload.</p>
-                <div class="attach-file-actions">
-                    <button type="button" class="yes" id="attach-file-yes">Attach file</button>
-                    <button type="button" class="no" id="attach-file-no">Send as text</button>
-                </div>
+        <textarea id="user-input" placeholder="Add a note or ask to fix something..."></textarea>
+        <button class="send-btn" id="send-btn">Send</button>
+    </div>
+    <div class="attach-file-modal" id="attach-file-modal">
+        <div class="attach-file-card">
+            <h3>Attach as file?</h3>
+            <p id="attach-file-msg">This text is long (like a full HTML page). Attach it as a file so Luba reads the <b>whole</b> thing.</p>
+            <div class="attach-file-actions">
+                <button type="button" class="yes" id="attach-file-yes">Attach file</button>
+                <button type="button" class="no" id="attach-file-no">Send as text</button>
             </div>
         </div>
-        <div class="file-attach-chip" id="file-attach-chip">
-            <span class="fname" id="file-attach-name">file.html</span>
-            <span class="fmeta" id="file-attach-meta"></span>
-            <button type="button" id="file-attach-clear" title="Remove">✕</button>
-        </div>
-        <textarea id="user-input" placeholder="Ask Luba AI something..."></textarea>
-        <button class="send-btn" id="send-btn">Send</button>
     </div>
 </div>
 
@@ -2826,7 +2832,7 @@
     const removeImageBtn = document.getElementById('remove-image');
     const themeBtn = document.getElementById('theme-btn');
     const exportBtn = document.getElementById('export-btn');
-    const micBtn = document.getElementById('mic-btn');
+    const micBtn = document.getElementById('mic-btn'); // removed from UI — keep ref for safety
     const modesBtn = document.getElementById('modes-btn');
     const modesMenu = document.getElementById('modes-menu');
     const modesBtnLabel = document.getElementById('modes-btn-label');
@@ -7324,7 +7330,9 @@ RULES (follow exactly):
     // ============================================================
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
+    if (!micBtn) {
+        // Voice button removed from UI — file attach replaced it
+    } else if (!SpeechRecognition) {
         micBtn.onclick = () => {
             alert("Voice input is not supported on this browser/device.\n\nIt works best on Chrome (Android).\nIt usually does NOT work on iPhone Safari or in-app browsers.");
         };
@@ -8269,12 +8277,17 @@ RULES (follow exactly):
     }
 
     function looksLikeFullFile(text) {
-        if (!text || text.length < 3500) return false;
-        const t = text.trim();
-        if (t.length >= 8000) return true;
-        if (/<!DOCTYPE\s+html/i.test(t) || /<html[\s>]/i.test(t)) return true;
-        if (t.split('\n').length >= 80 && (/function\s|const\s|class\s|{/.test(t))) return true;
-        return t.length >= 5000;
+        if (!text) return false;
+        const len = text.length;
+        if (len < 1500) return false;
+        // Only peek at edges — never .split() the whole file (freezes UI)
+        const head = text.slice(0, 800);
+        const tail = text.slice(-500);
+        if (len >= 2500) return true;
+        if (/<!DOCTYPE\s+html/i.test(head) || /<html[\s>]/i.test(head)) return true;
+        if (/<\/html>|<\/body>/i.test(tail) && len >= 1500) return true;
+        if (/(?:function|const|let|var|class)\s/.test(head) && len >= 2000) return true;
+        return false;
     }
 
     function setPendingCodeFile(name, content) {
@@ -8345,63 +8358,102 @@ RULES (follow exactly):
         const clearBtn = document.getElementById('file-attach-clear');
         const yes = document.getElementById('attach-file-yes');
         const no = document.getElementById('attach-file-no');
-        if (clearBtn) clearBtn.onclick = () => clearPendingCodeFile();
-        if (yes) yes.onclick = () => {
+
+        if (clearBtn) clearBtn.onclick = function() { clearPendingCodeFile(); };
+
+        if (yes) yes.onclick = function() {
             closeAttachFileModal();
             if (_pasteAttachBuffer) {
                 setPendingCodeFile(guessFileName(_pasteAttachBuffer), _pasteAttachBuffer);
+            }
+            _pasteAttachBuffer = null;
+            if (input) {
+                input.value = '';
+                input.placeholder = 'Add a note about this file (optional)...';
+                try { input.focus(); } catch (_) {}
+            }
+        };
+
+        if (no) no.onclick = function() {
+            closeAttachFileModal();
+            // Do NOT dump huge text into the box — freezes the phone
+            if (_pasteAttachBuffer && _pasteAttachBuffer.length > 8000) {
+                // Still attach as file so user doesn't lose the paste
+                setPendingCodeFile(guessFileName(_pasteAttachBuffer), _pasteAttachBuffer);
                 if (input) input.value = '';
+                alert('Text was very long, so it was attached as a file instead (avoids freezing). Type a short note and hit Send.');
+            } else if (input && _pasteAttachBuffer) {
+                input.value = _pasteAttachBuffer;
             }
             _pasteAttachBuffer = null;
         };
-        if (no) no.onclick = () => {
-            closeAttachFileModal();
-            // leave text in input as normal message
-            if (input && _pasteAttachBuffer && !input.value) input.value = _pasteAttachBuffer;
-            _pasteAttachBuffer = null;
-        };
+
         if (fileInput) {
-            fileInput.onchange = () => {
+            fileInput.onchange = function() {
                 const f = fileInput.files && fileInput.files[0];
                 fileInput.value = '';
                 if (!f) return;
                 if (f.size > 900000) { alert('File too large (max ~900KB)'); return; }
                 const reader = new FileReader();
-                reader.onload = () => {
+                reader.onload = function() {
                     const text = String(reader.result || '');
                     if (!text.trim()) { alert('Empty file'); return; }
                     setPendingCodeFile(f.name || 'file.txt', text);
+                    if (input) {
+                        input.value = '';
+                        input.placeholder = 'Add a note about this file (optional)...';
+                    }
                 };
-                reader.onerror = () => alert('Could not read file');
+                reader.onerror = function() { alert('Could not read file'); };
                 reader.readAsText(f);
             };
         }
-        if (input) {
-            input.addEventListener('paste', (e) => {
-                try {
-                    const pasted = (e.clipboardData || window.clipboardData).getData('text');
-                    if (looksLikeFullFile(pasted)) {
-                        e.preventDefault();
-                        openAttachFileModal(pasted);
-                    }
-                } catch (_) {}
-            });
+
+        const fileBtn = document.getElementById('btn-attach-file');
+        if (fileBtn && fileInput) {
+            fileBtn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInput.click();
+            };
         }
-        // Optional: long-press or button — expose global
+
         window.lubaPickCodeFile = function() {
             if (fileInput) fileInput.click();
         };
-        // Add small paperclip if image button exists
-        const imgBtn = document.getElementById('image-btn') || document.getElementById('attach-btn') || document.getElementById('btn-image');
-        if (imgBtn && !document.getElementById('btn-attach-file')) {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.id = 'btn-attach-file';
-            b.title = 'Attach code / HTML file';
-            b.textContent = '📎';
-            b.style.cssText = 'border:none;background:transparent;font-size:18px;cursor:pointer;padding:6px;';
-            b.onclick = () => fileInput && fileInput.click();
-            if (imgBtn.parentNode) imgBtn.parentNode.insertBefore(b, imgBtn.nextSibling);
+
+        if (input) {
+            // CRITICAL: capture paste BEFORE text enters the textarea (stops freeze)
+            input.addEventListener('paste', function(e) {
+                try {
+                    const cd = e.clipboardData || window.clipboardData;
+                    if (!cd) return;
+                    const pasted = cd.getData('text') || cd.getData('text/plain') || '';
+                    if (!pasted) return;
+                    // Any sizable paste → don't put it in the chat box
+                    if (pasted.length >= 1500 || looksLikeFullFile(pasted)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+                        // Clear anything that might have leaked in
+                        setTimeout(function() {
+                            if (input.value && input.value.length > 1500) input.value = '';
+                        }, 0);
+                        openAttachFileModal(pasted);
+                        return false;
+                    }
+                } catch (_) {}
+            }, true); // capture phase = runs first
+
+            // Safety net: if huge text still lands in the box, yank it out
+            input.addEventListener('input', function() {
+                const v = input.value || '';
+                if (v.length >= 1500 && !pendingCodeFile) {
+                    const saved = v;
+                    input.value = '';
+                    openAttachFileModal(saved);
+                }
+            });
         }
     })();
 
