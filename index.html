@@ -3036,18 +3036,30 @@
     
     function showLedgerBuyCoinsCTA() {
         try {
-            if (document.getElementById("ledger-buy-coins-cta")) return;
-            const chat = document.getElementById("chat-messages") || document.getElementById("messages") || document.querySelector(".messages") || document.querySelector("#chat");
+            const url = (typeof LEDGER_BUY_COINS_URL !== "undefined")
+                ? LEDGER_BUY_COINS_URL
+                : "https://kobik8512-ctrl.github.io/Golive/?lubaBuy=1";
+            // Remove old CTA so it can reappear under the latest message
+            const old = document.getElementById("ledger-buy-coins-cta");
+            if (old) old.remove();
             const wrap = document.createElement("div");
             wrap.id = "ledger-buy-coins-cta";
-            wrap.style.cssText = "margin:12px 16px 16px;text-align:center;";
-            wrap.innerHTML = '<p style="font-size:13px;color:var(--muted,#888);margin:0 0 10px;line-height:1.4">Need more messages? Buy Luba coins in <b>Ledger Life</b> with in-app money (same account name if you use both).</p>' +
-                '<a href="' + (typeof LEDGER_BUY_COINS_URL !== "undefined" ? LEDGER_BUY_COINS_URL : "https://kobik8512-ctrl.github.io/Golive/?lubaBuy=1") + '" ' +
-                'style="display:inline-block;padding:12px 20px;border-radius:14px;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;font-weight:700;font-size:14px;text-decoration:none">Buy more messages in Ledger Life</a>';
-            if (chat) chat.appendChild(wrap);
-            else document.body.appendChild(wrap);
-            try { wrap.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(_){}
-        } catch (e) { console.warn(e); }
+            wrap.className = "message ai";
+            wrap.style.cssText = "display:flex;justify-content:center;padding:4px 12px 16px;";
+            wrap.innerHTML =
+                '<div style="max-width:92%;text-align:center;padding:14px 16px;border-radius:16px;background:rgba(124,58,237,0.12);border:1px solid rgba(167,139,250,0.35);">' +
+                '<div style="font-size:13px;color:#c4b5fd;margin-bottom:12px;line-height:1.45">Need more messages? Buy them in <b style="color:#fff">Ledger Life</b> with in-app money.</div>' +
+                '<a href="' + url + '" target="_blank" rel="noopener" ' +
+                'style="display:inline-block;padding:12px 22px;border-radius:14px;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;font-weight:700;font-size:14px;text-decoration:none;box-shadow:0 4px 14px rgba(124,58,237,0.35)">Buy more messages in Ledger Life</a>' +
+                '</div>';
+            const chat = document.getElementById("chat-container");
+            if (chat) {
+                chat.appendChild(wrap);
+                chat.scrollTop = chat.scrollHeight;
+            } else {
+                document.body.appendChild(wrap);
+            }
+        } catch (e) { console.warn("CTA", e); }
     }
 
 async function spendCoin(username, cost) {
@@ -3117,6 +3129,9 @@ async function spendCoin(username, cost) {
         const baseLim = isUserVerified(currentUser) ? DAILY_COINS_VERIFIED : DAILY_COINS;
         const limit = (coinsCache && coinsCache.limit) ? coinsCache.limit : (baseLim + (st.bonus || 0));
         count.textContent = String(left);
+        if (left <= 0) {
+            try { showLedgerBuyCoinsCTA(); } catch (_) {}
+        }
         if (title) title.textContent = isUserVerified(currentUser) ? 'Messages left (Verified)' : 'Messages left';
         const resetMs = coinsResetInMs(currentUser.username);
         if (sub) {
@@ -6441,6 +6456,11 @@ LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
     function appendMessage(sender, text, time = null, isHtml = false) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${sender}`;
+        try {
+            if (sender === 'ai' && /out of (daily )?messages|not enough messages/i.test(String(text || ''))) {
+                setTimeout(function(){ try { showLedgerBuyCoinsCTA(); } catch(_){} }, 50);
+            }
+        } catch(_){}
 
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
@@ -8545,7 +8565,7 @@ LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
             }
             if (!(await spendCoin(currentUser.username, cost))) {
                 const t0 = getTime();
-                appendMessage('ai', "Not enough messages left. They reset every 24 hours — check Settings for the timer.", t0);
+                appendMessage('ai', "Out of daily messages. They reset every 24 hours.", t0);
                 showLedgerBuyCoinsCTA();
                 return;
             }
