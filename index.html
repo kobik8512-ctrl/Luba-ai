@@ -6096,7 +6096,7 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 - Keep using LaTeX ($...$ / $$...$$) for any math exactly as usual.
 - This applies even to arithmetic that looks quick or trivial (e.g. "297 + 973 * 93"). Do not skip the explanation just because you could give the number in one line — walk through the order of operations (PEMDAS/BODMAS) step by step, then give the final result. Never reply with only the final number while study mode is on.`;
 
-    const HTML_MODE_INSTRUCTIONS = `HTML MODE IS CURRENTLY ON. The user wants a WORKING interactive demo in the chat preview.
+    const HTML_MODE_INSTRUCTIONS = `HTML MODE IS CURRENTLY ON. The user wants a WORKING interactive demo / app / game in the chat preview.
 RULES (follow exactly):
 1) Reply with a short 1-line intro, then ONE markdown fence labeled html containing a COMPLETE single-file HTML document.
 2) The document MUST start with <!DOCTYPE html> and include <html>, <head>, and <body>.
@@ -6104,13 +6104,20 @@ RULES (follow exactly):
 4) The visual MUST fill the viewport: use width/height 100% on html, body, canvas/container. Give canvas an explicit size (e.g. canvas { width:100%; height:100%; display:block; } and html,body{margin:0;height:100%;overflow:hidden;background:#111}).
 5) Interactive demos must work immediately on load (animation loop, drag, click). For 3D: one connected Group, orbit-style drag rotate, scroll zoom, visible lighting so objects are not black.
 6) NEVER answer with only description text when the user asked to make/build/show something — always include the full HTML fence.
-7) Do not use multiple files, React, or build tools. Pure HTML/CSS/JS only.`;
+7) Do not use multiple files, React, or build tools. Pure HTML/CSS/JS only.
+LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
+8) Do NOT ship a 300–500 line stub when they asked for a large complete game/app. Implement real systems: state, UI screens, input, game loop, persistence, win/lose, multiple content pieces.
+9) Forbidden: "// TODO", "// rest of levels", "// add more later", empty placeholder functions, fake data only.
+10) Prefer depth over a pretty empty shell. If output is cut off mid-file, stop at a clean point; the app will auto-continue — resume the SAME file without restarting from DOCTYPE.
+11) Think architecture first (briefly), then code. Fix logic bugs; avoid half-wired buttons and broken state.`;
 
     const CODE_MODE_INSTRUCTIONS = `CODE MODE IS CURRENTLY ON. Focus on complete, working code:
 - Give full runnable programs or full files, not fragments the user has to glue together.
 - State the language clearly and put code in a proper markdown fence.
 - Include brief setup notes only when needed (how to run). Prefer copy-paste-ready output.
-- Fix errors carefully; explain only the important parts, not every line unless asked.`;
+- Fix errors carefully; explain only the important parts, not every line unless asked.
+- When the user asks for a large project (thousands of lines, full game, full app): implement real features end-to-end. No TODO stubs for core systems. If truncated, continue the same project on the next chunk without rewriting from scratch.
+- Prefer correctness and completeness over a short demo that only looks finished.`;
 
     const CREATIVE_MODE_INSTRUCTIONS = `CREATIVE MODE IS CURRENTLY ON. Lean into imagination:
 - Stories, characters, world-building, jokes, brainstorming, and vivid descriptions are welcome.
@@ -8572,10 +8579,16 @@ RULES (follow exactly):
         if (studyModeBtn) studyModeBtn.disabled = true;
         showTyping();
 
-        const systemPrompt = buildSystemPrompt();
+        let systemPrompt = buildSystemPrompt();
 
         // Fast path for easy chat ("hi", short questions) — less history, no tools, smaller output
         const msgText = (text || '').trim();
+        // Pre-detect large code/game asks so prompt + limits match (Modes can stay Normal)
+        if (/\b(5\s*k|5000|thousands? of lines|full game|complete game|big game|entire app|full app)\b/i.test(msgText)
+            || /\b(make|build|create|write)\b[\s\S]{0,80}\b(game|html app|tycoon|simulator)\b/i.test(msgText)
+            || activeMode === 'html' || activeMode === 'code') {
+            systemPrompt += "\n\nLARGE BUILD RULES: Produce complete working code, not a short demo. Implement real systems (UI, state, loops, saves, multiple features). No TODO stubs for core logic. If output hits the length limit, stop cleanly — you will be asked to continue the same file. Prefer a single full HTML document when building games/apps.";
+        }
         const needsImageTool = /\b(draw|generate|create|make|paint|show)\b.{0,40}\b(image|picture|photo|art|artwork|illustration|wallpaper|logo)\b|\b(image|picture|photo)\b.{0,20}\b(of|for)\b/i.test(msgText);
         const needsCalcTool = /[\d]+\s*[+\-*/x×÷]\s*[\d]|calculate|what(?:'s| is)\s+\d|solve\s+\d/i.test(msgText);
         const needsTools = !!(needsImageTool || needsCalcTool);
@@ -8652,12 +8665,16 @@ RULES (follow exactly):
             let accumulatedText = "";
             let guard = 0;
             let continueCount = 0;
-            const MAX_CONTINUES = isSimpleChat ? 1 : (isHtmlMode ? 8 : 6);
+            // Big project detection (even if Modes is still "normal")
+            const wantsBig = /\b(5\s*k|5000|thousands? of lines|full game|complete game|big game|entire app|full app|minimum \d+k|at least \d+\s*lines)\b/i.test(msgText)
+                || /\b(make|build|create|write)\b[\s\S]{0,80}\b(game|html app|tycoon|simulator)\b/i.test(msgText);
+            const longCodeMode = isHtmlMode || activeMode === 'code' || wantsBig;
+            const MAX_CONTINUES = isSimpleChat && !longCodeMode ? 1 : (longCodeMode ? 14 : 8);
             const generatedImageUrls = [];
-            // HTML needs longer; simple stays fast
-            const ATTEMPT_TIMEOUT_MS = isSimpleChat ? 12000 : (isHtmlMode ? 45000 : 28000);
+            // HTML / big projects need longer; simple stays fast
+            const ATTEMPT_TIMEOUT_MS = isSimpleChat && !longCodeMode ? 12000 : (longCodeMode ? 60000 : 35000);
 
-            while (guard < 16) {
+            while (guard < 24) {
                 if (forceStopGeneration || (abortController && abortController.signal.aborted)) {
                     userStopped = true;
                     break;
@@ -8668,8 +8685,8 @@ RULES (follow exactly):
                     contents,
                     systemInstruction: { parts: [{ text: systemPrompt }] },
                     generationConfig: {
-                        temperature: isHtmlMode ? 0.35 : (isSimpleChat ? 0.6 : 0.4),
-                        maxOutputTokens: isSimpleChat ? 512 : (isHtmlMode ? 8192 : 4096)
+                        temperature: longCodeMode ? 0.3 : (isSimpleChat ? 0.6 : 0.4),
+                        maxOutputTokens: isSimpleChat && !longCodeMode ? 512 : 8192
                     }
                 };
                 // Tools only when needed — tool routing slows easy replies a lot
@@ -8788,7 +8805,7 @@ RULES (follow exactly):
                     contents.push({ role: "model", parts });
                     contents.push({
                         role: "user",
-                        parts: [{ text: "Continue your previous answer exactly where you left off. Do not repeat anything you already said, and do not add any preamble like \"continuing...\" — just pick back up mid-thought and keep going to the end." }]
+                        parts: [{ text: "Continue EXACTLY where you left off in the SAME project/file. Do not restart from the beginning. Do not repeat prior text. Do not write preamble like \"continuing...\". If you were inside an HTML/JS code fence, keep emitting code for the same document until systems are complete and working — no TODO stubs for core features." }]
                     });
                     continue;
                 }
