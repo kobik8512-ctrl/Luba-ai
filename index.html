@@ -2882,6 +2882,10 @@
 
     // ---- Backend ----
     const WORKER_URL = "https://luba-ai-proxy.kobik8512.workers.dev";
+    // Out of Luba messages → Ledger Life buy-coins (GitHub host, deep link)
+    const LEDGER_BUY_COINS_URL = "https://kobik8512-ctrl.github.io/Golive/?lubaBuy=1";
+    // Public normal Ledger (no forced buy):
+    // https://ledger-life-ashen.vercel.app/
 
     // Owner account = username "kobi" (case-insensitive). No password challenge.
     const OWNER_USERNAME = "kobi";
@@ -3029,7 +3033,24 @@
         return COIN_COST_NORMAL;
     }
 
-    async function spendCoin(username, cost) {
+    
+    function showLedgerBuyCoinsCTA() {
+        try {
+            if (document.getElementById("ledger-buy-coins-cta")) return;
+            const chat = document.getElementById("chat-messages") || document.getElementById("messages") || document.querySelector(".messages") || document.querySelector("#chat");
+            const wrap = document.createElement("div");
+            wrap.id = "ledger-buy-coins-cta";
+            wrap.style.cssText = "margin:12px 16px 16px;text-align:center;";
+            wrap.innerHTML = '<p style="font-size:13px;color:var(--muted,#888);margin:0 0 10px;line-height:1.4">Need more messages? Buy Luba coins in <b>Ledger Life</b> with in-app money (same account name if you use both).</p>' +
+                '<a href="' + (typeof LEDGER_BUY_COINS_URL !== "undefined" ? LEDGER_BUY_COINS_URL : "https://kobik8512-ctrl.github.io/Golive/?lubaBuy=1") + '" ' +
+                'style="display:inline-block;padding:12px 20px;border-radius:14px;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;font-weight:700;font-size:14px;text-decoration:none">Buy more messages in Ledger Life</a>';
+            if (chat) chat.appendChild(wrap);
+            else document.body.appendChild(wrap);
+            try { wrap.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(_){}
+        } catch (e) { console.warn(e); }
+    }
+
+async function spendCoin(username, cost) {
         if (isOwnerAccount({ username: username })) return true;
         cost = Math.max(1, parseInt(cost, 10) || 1);
         const token = getAuthToken();
@@ -8519,11 +8540,13 @@ LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
                     ? ("You're out of messages for now.\n\nYou get " + DAILY_COINS + " every 24 hours. Resets in " + formatResetIn(resetMs) + ". HTML mode and image requests use 2 each.")
                     : ("Not enough messages left.\n\nThis action needs " + cost + " (you have " + left + "). HTML / image = 2, normal = 1. Resets in " + formatResetIn(resetMs) + ".");
                 appendMessage('ai', msg, t0);
+                showLedgerBuyCoinsCTA();
                 return;
             }
             if (!(await spendCoin(currentUser.username, cost))) {
                 const t0 = getTime();
                 appendMessage('ai', "Not enough messages left. They reset every 24 hours — check Settings for the timer.", t0);
+                showLedgerBuyCoinsCTA();
                 return;
             }
         }
