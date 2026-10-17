@@ -2486,6 +2486,10 @@
                     <span class="modes-item-title">Creative</span>
                     <span class="modes-item-desc">Stories, ideas, fun writing</span>
                 </button>
+                <button type="button" class="modes-item" data-mode="lawyer">
+                    <span class="modes-item-title">Lawyer</span>
+                    <span class="modes-item-desc">Laws, legal vs illegal, clear bottom lines</span>
+                </button>
             </div>
         </div>
         <button class="icon-btn" id="clear-chat-btn" title="Clear chat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
@@ -2876,7 +2880,7 @@
     let pendingCodeFile = null; // { name, content, size }
     let _pasteAttachBuffer = null;
     let isListening = false;
-    let activeMode = 'normal'; // normal | study | html | code | creative
+    let activeMode = 'normal'; // normal | study | html | code | creative | lawyer
     let isStudyModeOn = false; // kept in sync with activeMode === 'study'
     let pendingAvatarBase64 = null;  // temporary while editing in settings
 
@@ -5553,7 +5557,7 @@ async function spendCoin(username, cost) {
         // restore prefs (local first, then cloud personality/theme/mode)
         let prefs = loadUserPrefs(user.username);
         activeMode = prefs.activeMode || (prefs.studyMode ? 'study' : 'normal');
-        if (!['normal', 'study', 'html', 'code', 'creative'].includes(activeMode)) activeMode = 'normal';
+        if (!['normal', 'study', 'html', 'code', 'creative', 'lawyer'].includes(activeMode)) activeMode = 'normal';
         applyModeUI();
         if (prefs.theme === 'light') document.body.classList.add('light');
         else document.body.classList.remove('light');
@@ -5570,7 +5574,7 @@ async function spendCoin(username, cost) {
         pullCloudPrefs().then((cloudPrefs) => {
             if (!cloudPrefs) return;
             activeMode = cloudPrefs.activeMode || (cloudPrefs.studyMode ? 'study' : activeMode);
-            if (!['normal', 'study', 'html', 'code', 'creative'].includes(activeMode)) activeMode = 'normal';
+            if (!['normal', 'study', 'html', 'code', 'creative', 'lawyer'].includes(activeMode)) activeMode = 'normal';
             applyModeUI();
             if (cloudPrefs.theme === 'light') document.body.classList.add('light');
             else if (cloudPrefs.theme === 'dark') document.body.classList.remove('light');
@@ -6160,11 +6164,39 @@ LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
 - Be expressive and fun while staying coherent.
 - Still follow safety and identity rules.`;
 
+    const LAWYER_MODE_INSTRUCTIONS = `LAWYER MODE IS CURRENTLY ON. You are answering as a knowledgeable legal explainer (NOT a licensed attorney and NOT a substitute for real legal counsel).
+
+ROLE:
+- Explain laws, rights, duties, procedures, and what is typically legal vs illegal in clear language.
+- Cover civil, criminal, consumer, traffic, employment, online, property, and everyday legal topics when asked.
+- Compare how rules often differ by country/region when relevant; if the user does not name a place, say that laws vary and give the most common pattern, then ask for their country/state if it matters.
+- Structure answers with short sections and always end with a **Bottom line** (1–3 sentences): the practical takeaway.
+
+STYLE:
+- Professional but plain — like a sharp lawyer explaining to a friend, not courtroom jargon dumps.
+- Use bullet points for elements of a rule, defenses, risks, and next steps.
+- Define legal terms the first time you use them.
+- Be direct about uncertainty: "often illegal", "usually allowed", "depends on jurisdiction".
+
+HARD LIMITS (never break):
+- You are NOT their lawyer. Always include a brief disclaimer that this is general information, not legal advice, and serious matters need a real attorney or official source.
+- Do NOT give step-by-step instructions for committing crimes, fraud, hacking, violence, or evading law enforcement.
+- You MAY explain what the law generally says about an activity, penalties that often apply, and legal alternatives.
+- Do NOT invent case citations or statute numbers. If you are not sure of an exact citation, say so and describe the rule in plain terms instead.
+- Do NOT encourage illegal activity. If someone asks how to break the law, refuse the how-to and explain the legal risks at a high level.
+
+BOTTOM LINE RULE:
+Every substantive answer ends with:
+**Bottom line:** …`;
+
+
+
     function modeInstructions(mode) {
         if (mode === 'study') return STUDY_MODE_INSTRUCTIONS;
         if (mode === 'html') return HTML_MODE_INSTRUCTIONS;
         if (mode === 'code') return CODE_MODE_INSTRUCTIONS;
         if (mode === 'creative') return CREATIVE_MODE_INSTRUCTIONS;
+        if (mode === 'lawyer') return LAWYER_MODE_INSTRUCTIONS;
         return '';
     }
 
@@ -6173,6 +6205,7 @@ LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
         if (mode === 'html') return 'HTML';
         if (mode === 'code') return 'Code';
         if (mode === 'creative') return 'Creative';
+        if (mode === 'lawyer') return 'Lawyer';
         return 'Modes';
     }
 
@@ -7130,7 +7163,8 @@ LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
                     study: 'Study mode ON — I will teach step by step, not only give the answer.',
                     html: 'HTML mode ON — I will focus on complete single-file HTML you can run and preview. (Big projects may take longer; if the AI is busy, hit Retry.)',
                     code: 'Code mode ON — complete working programs, not half-finished snippets.',
-                    creative: 'Creative mode ON — stories, ideas, and more imaginative writing.'
+                    creative: 'Creative mode ON — stories, ideas, and more imaginative writing.',
+                    lawyer: 'Lawyer mode ON — I explain laws, legal vs illegal, and end with a clear bottom line. Not real legal advice.'
                 };
                 const msg = messages[activeMode] || messages.normal;
                 const t = getTime();
