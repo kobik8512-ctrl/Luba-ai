@@ -2879,6 +2879,64 @@
     let currentUser = null;          // full user object
     let chatHistory = [];
     let selectedImageBase64 = null;
+
+    const LUBA_MEDIA_DB = 'luba_media_v1';
+    const LUBA_MEDIA_STORE = 'media';
+    function openMediaDb() {
+        return new Promise(function(resolve, reject) {
+            try {
+                const req = indexedDB.open(LUBA_MEDIA_DB, 1);
+                req.onupgradeneeded = function() {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(LUBA_MEDIA_STORE)) db.createObjectStore(LUBA_MEDIA_STORE);
+                };
+                req.onsuccess = function() { resolve(req.result); };
+                req.onerror = function() { reject(req.error); };
+            } catch (e) { reject(e); }
+        });
+    }
+    async function idbPutMedia(id, dataUrl) {
+        if (!id || !dataUrl) return false;
+        try {
+            const db = await openMediaDb();
+            await new Promise(function(resolve, reject) {
+                const tx = db.transaction(LUBA_MEDIA_STORE, 'readwrite');
+                tx.objectStore(LUBA_MEDIA_STORE).put(dataUrl, id);
+                tx.oncomplete = function() { resolve(); };
+                tx.onerror = function() { reject(tx.error); };
+            });
+            return true;
+        } catch (e) { console.warn('idbPutMedia', e); return false; }
+    }
+    async function idbGetMedia(id) {
+        if (!id) return null;
+        try {
+            const db = await openMediaDb();
+            return await new Promise(function(resolve, reject) {
+                const tx = db.transaction(LUBA_MEDIA_STORE, 'readonly');
+                const req = tx.objectStore(LUBA_MEDIA_STORE).get(id);
+                req.onsuccess = function() { resolve(req.result || null); };
+                req.onerror = function() { reject(req.error); };
+            });
+        } catch (e) { return null; }
+    }
+    function newMediaId() {
+        return 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    }
+    async function hydrateMediaInChat() {
+        if (!chatContainer) return;
+        const nodes = chatContainer.querySelectorAll('[data-media-id]');
+        for (let i = 0; i < nodes.length; i++) {
+            const el = nodes[i];
+            const id = el.getAttribute('data-media-id');
+            if (!id) continue;
+            const cur = el.getAttribute('src') || '';
+            if (cur.indexOf('data:') === 0) continue;
+            const data = await idbGetMedia(id);
+            if (data) el.setAttribute('src', data);
+        }
+    }
+
     let pendingCodeFile = null; // { name, content, size }
     let _pasteAttachBuffer = null;
     let isListening = false;
@@ -4924,14 +4982,37 @@ async function spendCoin(username, cost) {
         }
     }
 
+    function stripHeavyMediaHtml(html) {
+        if (!html || typeof html !== 'string') return html;
+        // Keep data-media-id, remove huge data: URLs from src so localStorage fits
+        return html
+            .replace(/src=["']data:video\/[^"']+["']/gi, 'src=""')
+            .replace(/src=["']data:image\/[^"']+["']/gi, 'src=""');
+    }
+    function compactHistoryForStorage(history) {
+        return (history || []).map(function(msg) {
+            const m = Object.assign({}, msg);
+            if (m.displayHtml) m.displayHtml = stripHeavyMediaHtml(m.displayHtml);
+            if (typeof m.content === 'string' && m.content.indexOf('data:video/') !== -1) {
+                m.content = m.content.indexOf('(sent a video)') !== -1 ? m.content : '(sent a video)';
+            }
+            if (typeof m.content === 'string' && m.content.indexOf('data:image/') !== -1 && m.content.length > 5000) {
+                m.content = '(sent a photo)';
+            }
+            // drop raw base64 field if present
+            if (m.mediaBase64 && String(m.mediaBase64).length > 1000) delete m.mediaBase64;
+            return m;
+        });
+    }
     function saveUserChatHistory(username, history) {
         const key = 'luba_chat_' + userKey(username);
         try {
             let trimmed = history;
-            if (trimmed.length > 30) trimmed = trimmed.slice(-30);
-            localStorage.setItem(key, JSON.stringify(trimmed));
+            if (trimmed.length > 40) trimmed = trimmed.slice(-40);
+            const compact = compactHistoryForStorage(trimmed);
+            localStorage.setItem(key, JSON.stringify(compact));
         } catch (err) {
-            let trimmed = history.slice();
+            let trimmed = compactHistoryForStorage(history.slice());
             while (trimmed.length > 4) {
                 trimmed = trimmed.slice(4);
                 try {
@@ -5773,123 +5854,75 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: October 6, 2026
+        const TERMS_TEXT = `Last updated: October 26, 2026
 
-1. Who we are
-Luba AI is a chat assistant created by Kobi. By creating an account or using the app, you agree to these Terms of Service and our Privacy Policy.
+1. Agreement
+Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you:
-• Chat with an AI assistant and send images or short videos
-• Use modes such as Study, HTML, Code, and Creative
-• Generate images when the feature is available
-• Hear spoken replies on supported devices
-• Save chats and sync some data across devices when logged in
-• Request a Verified badge (reviewed by the owner)
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Optional features may include speech, code previews, generated images, coins, and linked tools we add over time.
 
-Features may change, improve, or temporarily go offline without notice.
+The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
-3. Your account
-You are responsible for keeping your username and password private. Do not share your password. You must be old enough to use the app under the laws where you live, or use it only with a parent or guardian's permission. You may only use accounts you are allowed to use. We may suspend or permanently remove accounts that break these Terms.
+3. Accounts
+You are responsible for your username and password. Do not share your password. You must be old enough under the laws where you live, or use the app only with a parent or guardian's permission. We may suspend or remove accounts that break these Terms, abuse the service, or harm others.
 
-4. Daily message limits
-To keep the service stable and fair:
-• Most accounts get a limited number of AI messages per rolling 24-hour window (currently 50)
-• Verified accounts get a higher limit (currently 500 messages per 24 hours)
-• Normal messages usually cost 1 unit
-• Demanding requests (HTML mode demos, image generation, and similar) may cost 2 units
-• When your limit is reached, wait until the window resets
-• The official owner account is not subject to these limits
+4. Acceptable use
+You agree not to threaten, harass, exploit, or harm people (especially minors); break into accounts or systems; spam, scam, or spread malware; upload illegal content; abuse limits or bugs; or present AI output as licensed professional advice when it is not.
 
-Limits, costs, and window length may change. Trying to bypass limits (fake accounts, automation abuse, etc.) may lead to bans under section 6.
+5. Messages, media, and limits
+Messages and media you send are processed so Luba can reply. Videos and images may be stored on your device (including IndexedDB) and, when sync is available, on our servers for your account. Large files may be limited by device storage or network rules. Message limits, coins, or verification rules may apply and can change.
 
-5. Verified badge
-• Anyone can request verification from Settings and explain why
-• Only one pending request is allowed until the owner accepts or declines
-• If declined, you may request again later
-• Verified users get a badge next to their name, a higher daily message limit, and VIP-style treatment from Luba
-• Verification is a privilege, not a right — the owner may grant or remove it at any time for fairness or safety
+6. Ownership
+You keep rights to content you create and own. You give us permission to process that content to run Luba AI. The Luba name, branding, and app code are owned by Kobi / Luba AI unless stated otherwise.
 
-6. Acceptable use
-You agree not to use Luba AI to:
-• Break the law or encourage others to break the law
-• Harass, threaten, abuse, or target people
-• Spam, flood, or overload the service
-• Hack, bypass security, abuse limits, or use other people's accounts
-• Upload or request highly illegal or severely harmful content
-• Impersonate the owner, staff, or other users in a deceptive way
-• Try to force the AI into harmful or policy-breaking behavior
+7. AI output
+AI replies are generated automatically and may be incomplete or incorrect. You use them at your own risk.
 
-The owner may review chats for abuse and may apply temporary or permanent bans (including by account or network/IP when needed). If you believe a ban was a mistake, contact lubaai.official@gmail.com.
+8. Service changes
+We may update, pause, or discontinue features. Keep your own backups of important work.
 
-7. AI answers
-Luba can make mistakes. Replies are not professional medical, legal, financial, or safety advice. Always double-check important information yourself. Spoken playback uses your device's text-to-speech and may vary by browser or phone.
+9. Contact
+Questions: lubaai.official@gmail.com (creator: Kobi).
 
-8. Content you send
-You keep rights to what you type and upload. You give permission for that content to be processed so the AI can reply, and — when you are logged in — for limited copies to be stored on our backend so chats, settings, verification status, and message limits can sync across devices and so moderation can work. Do not send content you are not allowed to share.
-
-9. Availability and liability
-The app is provided "as is." It may go offline, lose data in some situations, or change. Hosting or third-party AI providers may rate-limit or interrupt service. To the fullest extent allowed by law, we are not liable for lost chats, interruptions, or decisions you make based on AI replies.
-
-10. Contact
-Questions about these Terms: lubaai.official@gmail.com (creator: Kobi).
-
-11. Changes
+10. Updates
 We may update these Terms. Continued use after changes means you accept the updated version.
+`;
 
-Made on Earth by humans.`;
-
-    const PRIVACY_TEXT = `Last updated: October 6, 2026
+    const PRIVACY_TEXT = `Last updated: October 26, 2026
 
 1. Overview
-This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data is stored on our cloud backend when you create an account and use the service while logged in.
+This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
 
 2. Account data
-When you sign up we store your username, a hashed password (not plain text), gender, date of birth, and optional profile photo. We may also store verification status (whether your account is Verified), verification requests you submit, and notices about approve/decline decisions. Account records live on our Cloudflare Worker / KV backend so you can log in from more than one phone. A limited local cache may also be kept on each device for offline convenience.
+We may store username, password hash, profile photo, preferences, verification status, and session tokens.
 
-3. Chat, settings, modes, and message limits
-• Active chat history and named "Saved chats" can be stored on your device and, when you are logged in, synced to our backend so the same account can see them on other devices
-• Preferences such as theme, mode (Normal, Study, HTML, Code, Creative), and custom personality text may also sync when logged in
-• Message-limit usage (how many AI messages you have used in the current 24-hour window, bonuses, and verified higher limits) may be stored on the backend and cached on your device
-• Clearing chat or deleting a saved chat on one device is intended to update the synced copy when the server is reachable
+3. Chat and media
+When you send a message (and optional image, short video, or file), content is sent through our secure proxy to an AI provider so Luba can reply. On your device we may keep chat history and media in localStorage and IndexedDB so videos and photos can return after refresh. When cloud sync is enabled, recent messages may also be stored on our servers for multi-device access. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
 
-4. What is sent to make the AI work
-When you send a message (and optional image or short video), that content is sent through our secure proxy to an AI provider so Luba can reply. HTML-mode demos run in a sandboxed preview on your device. Generated-image requests send a text description to an image service. If you use "speak," your device may convert on-screen text to audio locally. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
+4. Device storage
+Clearing site data removes local copies on that device. Large videos depend on available storage.
 
 5. Moderation and safety
-To run the service and enforce the rules, the backend may store:
-• Recent message logs (for Owner moderation tools)
-• Ban records (account and, when needed, IP/network bans for abuse)
-• Basic connection metadata such as approximate last IP used with an account
-• Message-limit and verification records
-• Verification request text you submit
-
-These are used only to operate Luba AI, stop abuse, handle verification, and respond to support requests — not to sell advertising profiles.
+The backend may store recent message logs, ban records, basic connection metadata, message-limit/coin/verification records, and verification request text — only to operate Luba AI, stop abuse, and handle support — not to sell advertising profiles.
 
 6. What we do not sell
 We do not sell your personal information.
 
 7. Your choices
-• Log out anytime
-• Clear chat history from the app
-• Change password and profile photo in Settings
-• See your remaining message allowance and verification status in Settings
-• Request verification or cancel by waiting for a decision and requesting again later if declined
-• Contact lubaai.official@gmail.com about account deletion or privacy questions
-• Clear site/app data on a device to wipe local caches on that device
-
-If the owner permanently deletes an account on the server, that account can no longer log in and the username may become available again.
+Log out, clear chat, change password/photo, check limits and verification in Settings, and contact lubaai.official@gmail.com about deletion or privacy questions.
 
 8. Children
 If you are under the age required in your country, use the app only with a parent or guardian.
 
 9. Security
-Passwords are stored as hashes. Sessions use tokens. No system is perfect — use a unique password and do not reuse it on other sites.
+Passwords are stored as hashes. Sessions use tokens. Use a unique password.
 
 10. Contact
 Privacy questions: lubaai.official@gmail.com
 
-Made on Earth by humans.`;
+Made on Earth by humans.
+`;
 
 
     const legalOverlay = document.getElementById('legal-overlay');
@@ -6717,6 +6750,7 @@ Every substantive answer ends with:
             }
         });
         try { chatContainer.scrollTop = chatContainer.scrollHeight; } catch (_) {}
+        try { hydrateMediaInChat(); } catch (_) {}
     }
 
     let chatSyncTimer = null;
@@ -8611,6 +8645,7 @@ Every substantive answer ends with:
         const time = getTime();
         const imageToSend = isRetry ? retryMedia : selectedImageBase64;
         const mediaIsVideo = !!(imageToSend && /^data:video\//i.test(imageToSend));
+        let sentMediaId = null;
         let display = text || (imageToSend ? (mediaIsVideo ? "(sent a video)" : "(sent a photo)") : "");
         if (attachedFileSnapshot) {
             const note = (userInput && !isRetry) ? '' : '';
@@ -8626,10 +8661,23 @@ Every substantive answer ends with:
                 (userNote ? '<br>' + escapeHtml(userNote) : '');
         }
         if (imageToSend) {
-            const mediaTag = mediaIsVideo
-                ? `<video src="${imageToSend}" controls playsinline></video>`
-                : `<img src="${imageToSend}">`;
-            display = (display ? display + "\n\n" : "") + mediaTag;
+            if (imageToSend && imageToSend.indexOf('data:') === 0) {
+                sentMediaId = newMediaId();
+                // Persist full media so refresh keeps video/photo
+                idbPutMedia(sentMediaId, imageToSend).catch(function(){});
+            }
+            const mediaTag = imageToSend
+                ? buildMediaTag(imageToSend, mediaIsVideo, sentMediaId)
+                : '';
+            // Embed src for immediate view; data-media-id allows restore after save strips huge base64
+            if (mediaTag) {
+                // Prefer ID reference in stored HTML; still show src now
+                const liveTag = mediaIsVideo
+                    ? ('<div class="user-media-wrap"><video class="user-chat-video" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>')
+                    : ('<div class="user-media-wrap"><img class="user-chat-image" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>');
+                display = (display ? display + "\n\n" : "") + liveTag;
+            }
+
         }
         // Retry does not add another user bubble
         if (!isRetry) {
@@ -8752,10 +8800,10 @@ Every substantive answer ends with:
             const MAX_CONTINUES = isSimpleChat && !longCodeMode ? 1 : (longCodeMode ? 14 : 8);
             const generatedImageUrls = [];
             // HTML / big projects need longer; simple stays fast
-            const ATTEMPT_TIMEOUT_MS = isSimpleChat && !longCodeMode ? 12000 : (longCodeMode ? 60000 : 35000);
+            const ATTEMPT_TIMEOUT_MS = isSimpleChat && !longCodeMode ? 45000 : (longCodeMode ? 180000 : 120000);
 
             while (guard < 24) {
-                if (forceStopGeneration || (abortController && abortController.signal.aborted)) {
+                if (forceStopGeneration) {
                     userStopped = true;
                     break;
                 }
@@ -8790,7 +8838,7 @@ Every substantive answer ends with:
                     }, ATTEMPT_TIMEOUT_MS);
                     data = await res.json();
                 } catch (fetchErr) {
-                    if (forceStopGeneration || (abortController && abortController.signal.aborted)) {
+                    if (forceStopGeneration) {
                         userStopped = true;
                         break;
                     }
@@ -8896,7 +8944,7 @@ Every substantive answer ends with:
 
             removeTyping();
 
-            if (userStopped || forceStopGeneration || (abortController && abortController.signal.aborted)) {
+            if (userStopped || forceStopGeneration) {
                 lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
@@ -8905,7 +8953,8 @@ Every substantive answer ends with:
                     content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
                     time,
                     displayHtml: imageToSend ? display : null,
-                    isHtml: !!imageToSend
+                    isHtml: !!imageToSend,
+                    mediaId: sentMediaId || null
                 });
                 chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
                 saveChat();
@@ -8968,7 +9017,8 @@ Every substantive answer ends with:
             }
         } catch (err) {
             removeTyping();
-            if (forceStopGeneration || (err && (err.name === 'AbortError' || (abortController && abortController.signal.aborted)))) {
+            // Only the Stop button counts as user-stopped. Timeouts/network aborts are errors.
+            if (forceStopGeneration) {
                 lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
@@ -8977,9 +9027,23 @@ Every substantive answer ends with:
                     content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
                     time,
                     displayHtml: imageToSend ? display : null,
-                    isHtml: !!imageToSend
+                    isHtml: !!imageToSend,
+                    mediaId: (typeof sentMediaId !== 'undefined' ? sentMediaId : null)
                 });
                 chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
+                saveChat();
+            } else if (err && err.name === 'AbortError') {
+                const timeoutMsg = "That took too long. Tap Retry — your message was not cancelled.";
+                showErrorWithRetry(timeoutMsg);
+                chatHistory.push({
+                    role: "user",
+                    content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
+                    time,
+                    displayHtml: imageToSend ? display : null,
+                    isHtml: !!imageToSend,
+                    mediaId: sentMediaId || null
+                });
+                chatHistory.push({ role: "assistant", content: timeoutMsg, time: getTime() });
                 saveChat();
             } else {
                 showErrorWithRetry("Network error: " + (err && err.message ? err.message : "unknown"));
