@@ -7375,74 +7375,162 @@ Every substantive answer ends with:
     // ============================================================
     let imageInputEl = imageInput;
     const previewVideo = document.getElementById('preview-video');
+    let mediaLoading = false; // true while FileReader is working
+    let mediaLoadError = null;
 
     function clearMediaPreview() {
         selectedImageBase64 = null;
+        mediaLoading = false;
+        mediaLoadError = null;
         if (previewImg) {
             previewImg.src = '';
             previewImg.style.display = 'none';
         }
         if (previewVideo) {
-            previewVideo.pause();
+            try { previewVideo.pause(); } catch (_) {}
             previewVideo.removeAttribute('src');
-            previewVideo.load();
+            try { previewVideo.load(); } catch (_) {}
             previewVideo.style.display = 'none';
         }
         if (imagePreview) imagePreview.style.display = 'none';
-        if (imageInputEl) imageInputEl.value = '';
+        // Reset file input so the same file can be picked again
+        try {
+            if (imageInputEl) imageInputEl.value = '';
+        } catch (_) {}
+    }
+
+    function resetImageInputElement() {
+        // Recreate the <input type=file> so mobile browsers always open the picker again
+        try {
+            const parent = imageInputEl && imageInputEl.parentNode;
+            if (!parent) return;
+            const fresh = document.createElement('input');
+            fresh.type = 'file';
+            fresh.id = 'image-input';
+            fresh.accept = 'image/*,video/*';
+            fresh.style.display = 'none';
+            // Helps some mobile browsers
+            try { fresh.setAttribute('multiple', 'false'); } catch (_) {}
+            parent.replaceChild(fresh, imageInputEl);
+            imageInputEl = fresh;
+            imageInputEl.addEventListener('change', handleImageInputChange);
+        } catch (err) {
+            console.warn('resetImageInputElement', err);
+            try {
+                if (imageInputEl) {
+                    imageInputEl.value = '';
+                    imageInputEl.onchange = handleImageInputChange;
+                }
+            } catch (_) {}
+        }
     }
 
     function handleImageInputChange(e) {
-        const file = e.target.files[0];
+        const inputEl = e && e.target ? e.target : imageInputEl;
+        const file = inputEl && inputEl.files && inputEl.files[0];
         if (!file) return;
-        const isVideo = (file.type || '').startsWith('video/');
-        const isImage = (file.type || '').startsWith('image/');
+
+        const isVideo = (file.type || '').startsWith('video/') || /\.(mp4|mov|webm|m4v|avi)$/i.test(file.name || '');
+        const isImage = (file.type || '').startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(file.name || '');
         if (!isVideo && !isImage) {
             alert('Please choose a photo or video.');
+            resetImageInputElement();
             return;
         }
         const maxBytes = isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024;
         if (file.size > maxBytes) {
             alert(isVideo ? 'Video too big (max 25MB)' : 'Image too big (max 12MB)');
+            resetImageInputElement();
             return;
         }
+
+        mediaLoading = true;
+        mediaLoadError = null;
+        selectedImageBase64 = null;
+        if (imagePreview) imagePreview.style.display = 'block';
+        if (previewImg) { previewImg.style.display = 'none'; }
+        if (previewVideo) { previewVideo.style.display = 'none'; }
+
         const reader = new FileReader();
-        reader.onload = ev => {
-            selectedImageBase64 = ev.target.result;
-            if (isVideo) {
-                if (previewImg) previewImg.style.display = 'none';
-                if (previewVideo) {
-                    previewVideo.src = selectedImageBase64;
-                    previewVideo.style.display = 'block';
+        reader.onerror = function () {
+            mediaLoading = false;
+            mediaLoadError = 'Could not read that file.';
+            alert('Could not read that photo/video. Try another one.');
+            clearMediaPreview();
+            resetImageInputElement();
+        };
+        reader.onload = function (ev) {
+            try {
+                selectedImageBase64 = ev.target.result;
+                mediaLoading = false;
+                mediaLoadError = null;
+                if (isVideo) {
+                    if (previewImg) previewImg.style.display = 'none';
+                    if (previewVideo) {
+                        previewVideo.src = selectedImageBase64;
+                        previewVideo.style.display = 'block';
+                    }
+                } else {
+                    if (previewVideo) {
+                        previewVideo.style.display = 'none';
+                        previewVideo.removeAttribute('src');
+                    }
+                    if (previewImg) {
+                        previewImg.src = selectedImageBase64;
+                        previewImg.style.display = 'block';
+                    }
                 }
-            } else {
-                if (previewVideo) {
-                    previewVideo.style.display = 'none';
-                    previewVideo.removeAttribute('src');
+                if (imagePreview) imagePreview.style.display = 'block';
+                // Unstick send if a previous reply left stop-mode stuck
+                if (sendBtn && !isGenerating) {
+                    try {
+                        sendBtn.disabled = false;
+                        sendBtn.classList.remove('stop-mode');
+                        if (sendBtn.textContent === 'Stop') sendBtn.textContent = 'Send';
+                    } catch (_) {}
                 }
-                if (previewImg) {
-                    previewImg.src = selectedImageBase64;
-                    previewImg.style.display = 'block';
-                }
+            } catch (err) {
+                mediaLoading = false;
+                console.warn(err);
+                alert('Could not open that media.');
+                clearMediaPreview();
             }
-            imagePreview.style.display = 'block';
+            // Allow picking the same file again later
+            try { if (inputEl) inputEl.value = ''; } catch (_) {}
         };
         reader.readAsDataURL(file);
     }
 
-    photoBtn.onclick = () => {
-        const fresh = imageInputEl.cloneNode(true);
-        fresh.value = '';
-        imageInputEl.parentNode.replaceChild(fresh, imageInputEl);
-        imageInputEl = fresh;
-        imageInputEl.onchange = handleImageInputChange;
-        imageInputEl.click();
-    };
-    imageInputEl.onchange = handleImageInputChange;
+    if (photoBtn) {
+        photoBtn.onclick = function (e) {
+            try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch (_) {}
+            // If a reply left generation flags stuck, clear them so attach still works
+            if (!isGenerating) {
+                try { forceStopGeneration = false; } catch (_) {}
+            }
+            resetImageInputElement();
+            // Click must be synchronous from the user gesture on some mobile browsers
+            setTimeout(function () {
+                try {
+                    if (imageInputEl) imageInputEl.click();
+                } catch (err) {
+                    console.warn(err);
+                    alert('Could not open photo library. Re-open the app and try again.');
+                }
+            }, 0);
+            return false;
+        };
+    }
+    if (imageInputEl) {
+        imageInputEl.addEventListener('change', handleImageInputChange);
+    }
 
-    removeImageBtn.onclick = () => {
-        clearMediaPreview();
-    };
+    if (removeImageBtn) {
+        removeImageBtn.onclick = function () {
+            clearMediaPreview();
+            resetImageInputElement();
+        };
+    }
 
     // ============================================================
     // Voice
@@ -8191,8 +8279,14 @@ Every substantive answer ends with:
     });
     sendBtn.onclick = function (e) {
         try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch (_) {}
-        if (isGenerating || forceStopGeneration || sendBtn.classList.contains('stop-mode')) {
+        if (isGenerating || sendBtn.classList.contains('stop-mode')) {
             stopGeneration();
+            return false;
+        }
+        // forceStopGeneration can get stuck after a cancelled reply — clear if not generating
+        if (forceStopGeneration && !isGenerating) forceStopGeneration = false;
+        if (mediaLoading && !selectedImageBase64) {
+            alert('Loading photo/video… tap Send again in a moment.');
             return false;
         }
         sendMessage();
@@ -8596,6 +8690,17 @@ Every substantive answer ends with:
         // Long paste still in input? Offer attach once more on send
         if (!isRetry && !pendingCodeFile && looksLikeFullFile(text)) {
             openAttachFileModal(text);
+            return;
+        }
+        // Wait briefly if user hit Send while the photo/video is still loading
+        if (!isRetry && mediaLoading && !selectedImageBase64) {
+            var waitStart = Date.now();
+            while (mediaLoading && Date.now() - waitStart < 8000) {
+                await new Promise(function (r) { setTimeout(r, 50); });
+            }
+        }
+        if (!isRetry && mediaLoading && !selectedImageBase64) {
+            alert('Still loading your photo/video. Wait a second and tap Send again.');
             return;
         }
         if (!isRetry && !text && !selectedImageBase64 && !pendingCodeFile) return;
