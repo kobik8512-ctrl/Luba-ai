@@ -2931,10 +2931,38 @@
             const id = el.getAttribute('data-media-id');
             if (!id) continue;
             const cur = el.getAttribute('src') || '';
-            if (cur.indexOf('data:') === 0) continue;
-            const data = await idbGetMedia(id);
-            if (data) el.setAttribute('src', data);
+            if (cur.indexOf('data:') === 0 && cur.length > 32) continue;
+            let data = await idbGetMedia(id);
+            // Fallback: tiny mirror in localStorage for small images
+            if (!data) {
+                try { data = localStorage.getItem('luba_media_' + id); } catch (_) {}
+            }
+            if (data) {
+                el.setAttribute('src', data);
+            } else {
+                // Placeholder so user knows something was there
+                if (el.tagName === 'IMG' && !el.getAttribute('alt')) el.setAttribute('alt', 'photo');
+                if (!el.dataset.missing) {
+                    el.dataset.missing = '1';
+                    el.style.minWidth = '120px';
+                    el.style.minHeight = '80px';
+                    el.style.background = 'rgba(255,255,255,0.06)';
+                }
+            }
         }
+    }
+
+    async function ensureMediaStored(id, dataUrl) {
+        if (!id || !dataUrl) return false;
+        var ok = false;
+        try { ok = await idbPutMedia(id, dataUrl); } catch (_) { ok = false; }
+        // Mirror small images in localStorage as backup (videos too large)
+        try {
+            if (dataUrl.indexOf('data:image/') === 0 && dataUrl.length < 400000) {
+                localStorage.setItem('luba_media_' + id, dataUrl);
+            }
+        } catch (_) {}
+        return ok;
     }
 
     let pendingCodeFile = null; // { name, content, size }
@@ -6751,6 +6779,9 @@ Every substantive answer ends with:
         });
         try { chatContainer.scrollTop = chatContainer.scrollHeight; } catch (_) {}
         try { hydrateMediaInChat(); } catch (_) {}
+        // Second pass — IndexedDB can be slow on mobile after reopen
+        setTimeout(function () { try { hydrateMediaInChat(); } catch (_) {} }, 300);
+        setTimeout(function () { try { hydrateMediaInChat(); } catch (_) {} }, 1200);
     }
 
     let chatSyncTimer = null;
@@ -8415,6 +8446,19 @@ Every substantive answer ends with:
         return { mimeType: match[1], data: match[2] };
     }
 
+    /** Build a safe HTML tag for a user-uploaded photo/video (used in chat bubble). */
+    function buildMediaTag(dataUrl, isVideo, mediaId) {
+        if (!dataUrl) return '';
+        const idAttr = mediaId ? (' data-media-id="' + String(mediaId).replace(/"/g, '') + '"') : '';
+        // Prefer data-media-id for storage; src kept for immediate display
+        if (isVideo) {
+            return '<div class="user-media-wrap"><video class="user-chat-video"' + idAttr +
+                ' src="' + dataUrl + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>';
+        }
+        return '<div class="user-media-wrap"><img class="user-chat-image"' + idAttr +
+            ' src="' + dataUrl + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>';
+    }
+
     let isGenerating = false;
     let abortController = null;
     let forceStopGeneration = false;
@@ -8480,6 +8524,10 @@ Every substantive answer ends with:
         isGenerating = false;
         setSendButtonMode('send');
         if (typeof studyModeBtn !== 'undefined' && studyModeBtn) studyModeBtn.disabled = false;
+        // Allow the NEXT send to work. In-flight async still saw forceStopGeneration=true.
+        setTimeout(function () {
+            if (!isGenerating) forceStopGeneration = false;
+        }, 50);
     }
 
 
@@ -8670,11 +8718,38 @@ Every substantive answer ends with:
         }
     })();
 
+
+    function pushAssistantOnly(content, time, extra) {
+        const row = Object.assign({ role: 'assistant', content: content, time: time || getTime() }, extra || {});
+        chatHistory.push(row);
+        saveChat();
+    }
+    function alreadySavedUserAt(time) {
+        if (!time) return false;
+        for (var i = chatHistory.length - 1; i >= 0 && i >= chatHistory.length - 6; i--) {
+            if (chatHistory[i] && chatHistory[i].role === 'user' && chatHistory[i].time === time) return true;
+        }
+        return false;
+    }
+
     async function sendMessage(opts) {
         if (!currentUser) return;
 
-        // STOP FIRST — never await anything before this
-        if (isGenerating || forceStopGeneration || (sendBtn && sendBtn.classList.contains('stop-mode'))) {
+        // If nothing is generating, never treat this as Stop — clear stuck latch
+        // (bug: after "You stopped the reply", forceStopGeneration stayed true and blocked all sends)
+        if (!isGenerating) {
+            forceStopGeneration = false;
+            try {
+                if (sendBtn) {
+                    sendBtn.classList.remove('stop-mode');
+                    sendBtn.disabled = false;
+                    if (sendBtn.textContent === 'Stop') sendBtn.textContent = 'Send';
+                }
+            } catch (_) {}
+        }
+
+        // Only stop when a reply is actually running
+        if (isGenerating || (sendBtn && sendBtn.classList.contains('stop-mode') && sendBtn.textContent === 'Stop')) {
             stopGeneration();
             return;
         }
@@ -8682,7 +8757,8 @@ Every substantive answer ends with:
 
         // Live ban: block before anything is sent
         if (await enforceLiveBan(true)) return;
-        if (forceStopGeneration) return;
+        // Do not abort a fresh send because of a previous stop latch
+        forceStopGeneration = false;
 
         const isRetry = !!(opts && (opts.retryText != null || opts.retryMedia != null));
         let text = isRetry ? String(opts.retryText || '').trim() : userInput.value.trim();
@@ -8766,27 +8842,43 @@ Every substantive answer ends with:
                 (userNote ? '<br>' + escapeHtml(userNote) : '');
         }
         if (imageToSend) {
-            if (imageToSend && imageToSend.indexOf('data:') === 0) {
-                sentMediaId = newMediaId();
-                // Persist full media so refresh keeps video/photo
-                idbPutMedia(sentMediaId, imageToSend).catch(function(){});
+            try {
+                if (imageToSend.indexOf('data:') === 0) {
+                    sentMediaId = newMediaId();
+                    // MUST finish storing before save/refresh or media vanishes
+                    try { await ensureMediaStored(sentMediaId, imageToSend); } catch (_) {}
+                }
+                var mediaTag = '';
+                try {
+                    mediaTag = buildMediaTag(imageToSend, mediaIsVideo, sentMediaId) || '';
+                } catch (_) { mediaTag = ''; }
+                if (!mediaTag) {
+                    mediaTag = mediaIsVideo
+                        ? ('<div class="user-media-wrap"><video class="user-chat-video" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>')
+                        : ('<div class="user-media-wrap"><img class="user-chat-image" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>');
+                }
+                display = (display ? display + "\n\n" : "") + mediaTag;
+            } catch (mediaErr) {
+                console.warn('media attach display failed', mediaErr);
+                display = display || (mediaIsVideo ? '(sent a video)' : '(sent a photo)');
             }
-            const mediaTag = imageToSend
-                ? buildMediaTag(imageToSend, mediaIsVideo, sentMediaId)
-                : '';
-            // Embed src for immediate view; data-media-id allows restore after save strips huge base64
-            if (mediaTag) {
-                // Prefer ID reference in stored HTML; still show src now
-                const liveTag = mediaIsVideo
-                    ? ('<div class="user-media-wrap"><video class="user-chat-video" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>')
-                    : ('<div class="user-media-wrap"><img class="user-chat-image" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>');
-                display = (display ? display + "\n\n" : "") + liveTag;
-            }
-
         }
         // Retry does not add another user bubble
         if (!isRetry) {
             appendMessage('user', display, time, !!(imageToSend || attachedFileSnapshot));
+            // Save user message NOW (with media id) so refresh keeps it even if AI is still thinking
+            try {
+                var storedDisplay = imageToSend ? stripHeavyMediaHtml(display) : (attachedFileSnapshot ? display : null);
+                chatHistory.push({
+                    role: 'user',
+                    content: text || (imageToSend ? (mediaIsVideo ? '(sent a video)' : '(sent a photo)') : ''),
+                    time: time,
+                    displayHtml: (imageToSend || attachedFileSnapshot) ? (storedDisplay || display) : null,
+                    isHtml: !!(imageToSend || attachedFileSnapshot),
+                    mediaId: sentMediaId || null
+                });
+                saveChat();
+            } catch (histErr) { console.warn(histErr); }
             clearMediaPreview();
             if (userInput) userInput.value = '';
         }
@@ -9053,14 +9145,16 @@ Every substantive answer ends with:
                 lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
-                chatHistory.push({
-                    role: "user",
-                    content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
-                    time,
-                    displayHtml: imageToSend ? display : null,
-                    isHtml: !!imageToSend,
-                    mediaId: sentMediaId || null
-                });
+                if (!alreadySavedUserAt(time)) {
+                    chatHistory.push({
+                        role: "user",
+                        content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
+                        time,
+                        displayHtml: imageToSend ? stripHeavyMediaHtml(display) : null,
+                        isHtml: !!imageToSend,
+                        mediaId: sentMediaId || null
+                    });
+                }
                 chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
                 saveChat();
             } else {
@@ -9071,13 +9165,17 @@ Every substantive answer ends with:
 
                 if (isApiError) {
                     showErrorWithRetry(reply);
+                    if (!alreadySavedUserAt(time)) {
+
                     chatHistory.push({
                         role: "user",
                         content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
                         time,
-                        displayHtml: imageToSend ? display : null,
+                        displayHtml: imageToSend ? stripHeavyMediaHtml(display) : null,
                         isHtml: !!imageToSend
                     });
+
+                    }
                     chatHistory.push({ role: "assistant", content: reply, time: getTime() });
                     saveChat();
                 } else {
@@ -9103,13 +9201,16 @@ Every substantive answer ends with:
                     const useHtml = hasImages || formatted.hasCode;
                     appendMessage('ai', displayReply, getTime(), useHtml);
 
-                    chatHistory.push({
-                        role: "user",
-                        content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
-                        time,
-                        displayHtml: imageToSend ? display : null,
-                        isHtml: !!imageToSend
-                    });
+                    if (!alreadySavedUserAt(time)) {
+                        chatHistory.push({
+                            role: "user",
+                            content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
+                            time,
+                            displayHtml: imageToSend ? stripHeavyMediaHtml(display) : null,
+                            isHtml: !!imageToSend,
+                            mediaId: sentMediaId || null
+                        });
+                    }
                     chatHistory.push({
                         role: "assistant",
                         content: reply,
@@ -9127,27 +9228,35 @@ Every substantive answer ends with:
                 lastFailedRequest = null;
                 const stopMsg = "You stopped the reply.";
                 appendMessage('ai', stopMsg, getTime());
+                if (!alreadySavedUserAt(time)) {
+
                 chatHistory.push({
                     role: "user",
                     content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
                     time,
-                    displayHtml: imageToSend ? display : null,
+                    displayHtml: imageToSend ? stripHeavyMediaHtml(display) : null,
                     isHtml: !!imageToSend,
                     mediaId: (typeof sentMediaId !== 'undefined' ? sentMediaId : null)
                 });
+
+                }
                 chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
                 saveChat();
             } else if (err && err.name === 'AbortError') {
                 const timeoutMsg = "That took too long. Tap Retry — your message was not cancelled.";
                 showErrorWithRetry(timeoutMsg);
+                if (!alreadySavedUserAt(time)) {
+
                 chatHistory.push({
                     role: "user",
                     content: text || (mediaIsVideo ? "(sent a video)" : "(sent a photo)"),
                     time,
-                    displayHtml: imageToSend ? display : null,
+                    displayHtml: imageToSend ? stripHeavyMediaHtml(display) : null,
                     isHtml: !!imageToSend,
                     mediaId: sentMediaId || null
                 });
+
+                }
                 chatHistory.push({ role: "assistant", content: timeoutMsg, time: getTime() });
                 saveChat();
             } else {
