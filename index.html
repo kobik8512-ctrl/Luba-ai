@@ -535,8 +535,8 @@
         #image-preview {
             display: none;
             position: relative;
-            margin-bottom: 4px;
-            max-width: 220px;
+            margin-bottom: 6px;
+            max-width: 100%;
         }
 
         #image-preview img,
@@ -547,6 +547,64 @@
             border: 1px solid var(--border);
             display: block;
             background: #000;
+        }
+
+        #preview-thumbs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 100%;
+        }
+        .preview-thumb {
+            position: relative;
+            width: 72px;
+            height: 72px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: #000;
+            flex-shrink: 0;
+        }
+        .preview-thumb img,
+        .preview-thumb video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            max-height: none;
+            border: none;
+            border-radius: 0;
+        }
+        .preview-thumb .thumb-x {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 22px;
+            height: 22px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(0,0,0,.7);
+            color: #fff;
+            font-size: 14px;
+            line-height: 22px;
+            text-align: center;
+            padding: 0;
+            cursor: pointer;
+        }
+        .preview-thumb .vid-badge {
+            position: absolute;
+            left: 4px;
+            bottom: 4px;
+            font-size: 10px;
+            background: rgba(0,0,0,.65);
+            color: #fff;
+            padding: 1px 5px;
+            border-radius: 6px;
+        }
+        #media-count-label {
+            font-size: 11px;
+            color: var(--text-muted, #8b97ab);
+            margin-top: 4px;
         }
 
         .content video {
@@ -2503,9 +2561,11 @@
 
 <div id="input-wrapper">
     <div id="image-preview">
+        <div id="preview-thumbs"></div>
+        <div id="media-count-label"></div>
         <img id="preview-img" src="" alt="Selected" style="display:none">
         <video id="preview-video" src="" controls playsinline style="display:none"></video>
-        <button id="remove-image">×</button>
+        <button id="remove-image" title="Clear all">×</button>
     </div>
     <!-- File chip ABOVE the text box so you can still type -->
     <div class="file-attach-chip" id="file-attach-chip">
@@ -2517,7 +2577,7 @@
     <div id="input-container">
         <button class="action-btn" id="photo-btn" title="Photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
         <button class="action-btn" id="btn-attach-file" title="Attach HTML / code file"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
-        <input type="file" id="image-input" accept="image/*,video/*" style="display:none">
+        <input type="file" id="image-input" accept="image/*,video/*" multiple style="display:none">
         <input type="file" id="code-file-input" accept=".html,.htm,.css,.js,.json,.txt,.md,.svg,.xml,.py,.ts,.tsx,.jsx,text/*" style="display:none">
         <textarea id="user-input" placeholder="Add a note or ask to fix something..."></textarea>
         <button class="send-btn" id="send-btn">Send</button>
@@ -2879,6 +2939,9 @@
     let currentUser = null;          // full user object
     let chatHistory = [];
     let selectedImageBase64 = null;
+    let selectedMediaItems = [];
+    const MAX_PHOTOS = 10;
+    const MAX_VIDEOS = 5;
 
     const LUBA_MEDIA_DB = 'luba_media_v1';
     const LUBA_MEDIA_STORE = 'media';
@@ -7410,9 +7473,11 @@ Every substantive answer ends with:
     let mediaLoadError = null;
 
     function clearMediaPreview() {
+        selectedMediaItems = [];
         selectedImageBase64 = null;
         mediaLoading = false;
         mediaLoadError = null;
+        renderMediaThumbs();
         if (previewImg) {
             previewImg.src = '';
             previewImg.style.display = 'none';
@@ -7424,14 +7489,71 @@ Every substantive answer ends with:
             previewVideo.style.display = 'none';
         }
         if (imagePreview) imagePreview.style.display = 'none';
-        // Reset file input so the same file can be picked again
         try {
             if (imageInputEl) imageInputEl.value = '';
         } catch (_) {}
     }
 
+    function countMediaTypes() {
+        var photos = 0, videos = 0;
+        selectedMediaItems.forEach(function (m) {
+            if (m.isVideo) videos++; else photos++;
+        });
+        return { photos: photos, videos: videos };
+    }
+
+    function renderMediaThumbs() {
+        var thumbs = document.getElementById('preview-thumbs');
+        var label = document.getElementById('media-count-label');
+        if (!thumbs) return;
+        thumbs.innerHTML = '';
+        if (!selectedMediaItems.length) {
+            if (imagePreview) imagePreview.style.display = 'none';
+            if (label) label.textContent = '';
+            selectedImageBase64 = null;
+            return;
+        }
+        if (imagePreview) imagePreview.style.display = 'block';
+        selectedMediaItems.forEach(function (m, idx) {
+            var wrap = document.createElement('div');
+            wrap.className = 'preview-thumb';
+            if (m.isVideo) {
+                var v = document.createElement('video');
+                v.src = m.dataUrl;
+                v.muted = true;
+                v.playsInline = true;
+                wrap.appendChild(v);
+                var badge = document.createElement('span');
+                badge.className = 'vid-badge';
+                badge.textContent = 'VIDEO';
+                wrap.appendChild(badge);
+            } else {
+                var im = document.createElement('img');
+                im.src = m.dataUrl;
+                im.alt = 'photo';
+                wrap.appendChild(im);
+            }
+            var x = document.createElement('button');
+            x.type = 'button';
+            x.className = 'thumb-x';
+            x.textContent = '\u00d7';
+            x.onclick = function (ev) {
+                try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
+                selectedMediaItems.splice(idx, 1);
+                selectedImageBase64 = selectedMediaItems.length ? selectedMediaItems[0].dataUrl : null;
+                renderMediaThumbs();
+            };
+            wrap.appendChild(x);
+            thumbs.appendChild(wrap);
+        });
+        var c = countMediaTypes();
+        if (label) {
+            label.textContent = c.photos + '/' + MAX_PHOTOS + ' photos \u00b7 ' + c.videos + '/' + MAX_VIDEOS + ' videos';
+        }
+        selectedImageBase64 = selectedMediaItems[0].dataUrl;
+    }
+
     function resetImageInputElement() {
-        // Recreate the <input type=file> so mobile browsers always open the picker again
         try {
             const parent = imageInputEl && imageInputEl.parentNode;
             if (!parent) return;
@@ -7439,9 +7561,9 @@ Every substantive answer ends with:
             fresh.type = 'file';
             fresh.id = 'image-input';
             fresh.accept = 'image/*,video/*';
+            fresh.multiple = true;
             fresh.style.display = 'none';
-            // Helps some mobile browsers
-            try { fresh.setAttribute('multiple', 'false'); } catch (_) {}
+            try { fresh.setAttribute('multiple', 'multiple'); } catch (_) {}
             parent.replaceChild(fresh, imageInputEl);
             imageInputEl = fresh;
             imageInputEl.addEventListener('change', handleImageInputChange);
@@ -7450,97 +7572,93 @@ Every substantive answer ends with:
             try {
                 if (imageInputEl) {
                     imageInputEl.value = '';
+                    try { imageInputEl.multiple = true; } catch (_) {}
                     imageInputEl.onchange = handleImageInputChange;
                 }
             } catch (_) {}
         }
     }
 
-    function handleImageInputChange(e) {
-        const inputEl = e && e.target ? e.target : imageInputEl;
-        const file = inputEl && inputEl.files && inputEl.files[0];
-        if (!file) return;
+    function readFileAsDataUrl(file) {
+        return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onerror = function () { reject(new Error('read failed')); };
+            reader.onload = function (ev) { resolve(ev.target.result); };
+            reader.readAsDataURL(file);
+        });
+    }
 
-        const isVideo = (file.type || '').startsWith('video/') || /\.(mp4|mov|webm|m4v|avi)$/i.test(file.name || '');
-        const isImage = (file.type || '').startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(file.name || '');
-        if (!isVideo && !isImage) {
-            alert('Please choose a photo or video.');
-            resetImageInputElement();
-            return;
-        }
-        const maxBytes = isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024;
-        if (file.size > maxBytes) {
-            alert(isVideo ? 'Video too big (max 25MB)' : 'Image too big (max 12MB)');
-            resetImageInputElement();
-            return;
-        }
+    async function handleImageInputChange(e) {
+        const inputEl = e && e.target ? e.target : imageInputEl;
+        const files = inputEl && inputEl.files ? Array.prototype.slice.call(inputEl.files) : [];
+        if (!files.length) return;
 
         mediaLoading = true;
         mediaLoadError = null;
-        selectedImageBase64 = null;
         if (imagePreview) imagePreview.style.display = 'block';
-        if (previewImg) { previewImg.style.display = 'none'; }
-        if (previewVideo) { previewVideo.style.display = 'none'; }
 
-        const reader = new FileReader();
-        reader.onerror = function () {
-            mediaLoading = false;
-            mediaLoadError = 'Could not read that file.';
-            alert('Could not read that photo/video. Try another one.');
-            clearMediaPreview();
-            resetImageInputElement();
-        };
-        reader.onload = function (ev) {
-            try {
-                selectedImageBase64 = ev.target.result;
-                mediaLoading = false;
-                mediaLoadError = null;
-                if (isVideo) {
-                    if (previewImg) previewImg.style.display = 'none';
-                    if (previewVideo) {
-                        previewVideo.src = selectedImageBase64;
-                        previewVideo.style.display = 'block';
-                    }
-                } else {
-                    if (previewVideo) {
-                        previewVideo.style.display = 'none';
-                        previewVideo.removeAttribute('src');
-                    }
-                    if (previewImg) {
-                        previewImg.src = selectedImageBase64;
-                        previewImg.style.display = 'block';
-                    }
-                }
-                if (imagePreview) imagePreview.style.display = 'block';
-                // Unstick send if a previous reply left stop-mode stuck
-                if (sendBtn && !isGenerating) {
-                    try {
-                        sendBtn.disabled = false;
-                        sendBtn.classList.remove('stop-mode');
-                        if (sendBtn.textContent === 'Stop') sendBtn.textContent = 'Send';
-                    } catch (_) {}
-                }
-            } catch (err) {
-                mediaLoading = false;
-                console.warn(err);
-                alert('Could not open that media.');
-                clearMediaPreview();
+        var added = 0;
+        var skipped = [];
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            var isVideo = (file.type || '').startsWith('video/') || /\.(mp4|mov|webm|m4v|avi)$/i.test(file.name || '');
+            var isImage = (file.type || '').startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(file.name || '');
+            if (!isVideo && !isImage) {
+                skipped.push(file.name || 'file');
+                continue;
             }
-            // Allow picking the same file again later
-            try { if (inputEl) inputEl.value = ''; } catch (_) {}
-        };
-        reader.readAsDataURL(file);
+            var counts = countMediaTypes();
+            if (isVideo && counts.videos >= MAX_VIDEOS) {
+                skipped.push('video limit');
+                continue;
+            }
+            if (!isVideo && counts.photos >= MAX_PHOTOS) {
+                skipped.push('photo limit');
+                continue;
+            }
+            var maxBytes = isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024;
+            if (file.size > maxBytes) {
+                skipped.push((file.name || 'file') + ' too big');
+                continue;
+            }
+            try {
+                var dataUrl = await readFileAsDataUrl(file);
+                selectedMediaItems.push({ dataUrl: dataUrl, isVideo: !!isVideo });
+                added++;
+            } catch (_) {
+                skipped.push(file.name || 'unreadable');
+            }
+        }
+
+        mediaLoading = false;
+        selectedImageBase64 = selectedMediaItems.length ? selectedMediaItems[0].dataUrl : null;
+        renderMediaThumbs();
+        resetImageInputElement();
+
+        try {
+            if (!isGenerating) forceStopGeneration = false;
+        } catch (_) {}
+
+        if (!added && skipped.length) {
+            alert('Could not add media. Max ' + MAX_PHOTOS + ' photos / ' + MAX_VIDEOS + ' videos.');
+        } else if (skipped.length) {
+            var c = countMediaTypes();
+            alert('Added ' + added + '. Some skipped (limits/size). Now: ' + c.photos + ' photos, ' + c.videos + ' videos.');
+        }
     }
 
     if (photoBtn) {
         photoBtn.onclick = function (e) {
             try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch (_) {}
-            // If a reply left generation flags stuck, clear them so attach still works
             if (!isGenerating) {
                 try { forceStopGeneration = false; } catch (_) {}
             }
+            var counts = countMediaTypes();
+            if (counts.photos >= MAX_PHOTOS && counts.videos >= MAX_VIDEOS) {
+                alert('Limit: ' + MAX_PHOTOS + ' photos and ' + MAX_VIDEOS + ' videos per message.');
+                return false;
+            }
             resetImageInputElement();
-            // Click must be synchronous from the user gesture on some mobile browsers
             setTimeout(function () {
                 try {
                     if (imageInputEl) imageInputEl.click();
@@ -7553,6 +7671,7 @@ Every substantive answer ends with:
         };
     }
     if (imageInputEl) {
+        try { imageInputEl.multiple = true; imageInputEl.setAttribute('multiple', 'multiple'); } catch (_) {}
         imageInputEl.addEventListener('change', handleImageInputChange);
     }
 
@@ -8316,7 +8435,7 @@ Every substantive answer ends with:
         }
         // forceStopGeneration can get stuck after a cancelled reply — clear if not generating
         if (forceStopGeneration && !isGenerating) forceStopGeneration = false;
-        if (mediaLoading && !selectedImageBase64) {
+        if (mediaLoading && !(selectedMediaItems && selectedMediaItems.length)) {
             alert('Loading photo/video… tap Send again in a moment.');
             return false;
         }
@@ -8769,17 +8888,17 @@ Every substantive answer ends with:
             return;
         }
         // Wait briefly if user hit Send while the photo/video is still loading
-        if (!isRetry && mediaLoading && !selectedImageBase64) {
+        if (!isRetry && mediaLoading && !(selectedMediaItems && selectedMediaItems.length)) {
             var waitStart = Date.now();
             while (mediaLoading && Date.now() - waitStart < 8000) {
                 await new Promise(function (r) { setTimeout(r, 50); });
             }
         }
-        if (!isRetry && mediaLoading && !selectedImageBase64) {
+        if (!isRetry && mediaLoading && !(selectedMediaItems && selectedMediaItems.length)) {
             alert('Still loading your photo/video. Wait a second and tap Send again.');
             return;
         }
-        if (!isRetry && !text && !selectedImageBase64 && !pendingCodeFile) return;
+        if (!isRetry && !text && !(selectedMediaItems && selectedMediaItems.length) && !pendingCodeFile) return;
         if (isRetry && !text && !retryMedia) return;
 
         // Merge attached file into the message Luba actually receives (FULL content)
@@ -8824,10 +8943,25 @@ Every substantive answer ends with:
         }
 
         const time = getTime();
-        const imageToSend = isRetry ? retryMedia : selectedImageBase64;
+        let mediaList = [];
+        if (isRetry && retryMedia) {
+            if (Array.isArray(retryMedia)) mediaList = retryMedia.slice();
+            else mediaList = [{ dataUrl: retryMedia, isVideo: /^data:video\//i.test(String(retryMedia)) }];
+        } else {
+            mediaList = (selectedMediaItems || []).slice();
+        }
+        const imageToSend = mediaList.length ? mediaList[0].dataUrl : null;
         const mediaIsVideo = !!(imageToSend && /^data:video\//i.test(imageToSend));
         let sentMediaId = null;
-        let display = text || (imageToSend ? (mediaIsVideo ? "(sent a video)" : "(sent a photo)") : "");
+        const mediaSummary = mediaList.length ? (function(){
+            var p = 0, v = 0;
+            mediaList.forEach(function(m){ if (m.isVideo) v++; else p++; });
+            var parts = [];
+            if (p) parts.push(p + (p === 1 ? ' photo' : ' photos'));
+            if (v) parts.push(v + (v === 1 ? ' video' : ' videos'));
+            return '(sent ' + parts.join(' + ') + ')';
+        })() : '';
+        let display = text || mediaSummary;
         if (attachedFileSnapshot) {
             const note = (userInput && !isRetry) ? '' : '';
             display = '📎 Attached file: <b>' + escapeHtml(attachedFileSnapshot.name) + '</b> (' +
@@ -8841,26 +8975,36 @@ Every substantive answer ends with:
                 ' <span style="opacity:.7">(full file sent to Luba)</span>' +
                 (userNote ? '<br>' + escapeHtml(userNote) : '');
         }
-        if (imageToSend) {
+        if (mediaList.length) {
             try {
-                if (imageToSend.indexOf('data:') === 0) {
-                    sentMediaId = newMediaId();
-                    // MUST finish storing before save/refresh or media vanishes
-                    try { await ensureMediaStored(sentMediaId, imageToSend); } catch (_) {}
+                var mediaHtmlParts = [];
+                var firstId = null;
+                for (var mi = 0; mi < mediaList.length; mi++) {
+                    var item = mediaList[mi];
+                    var du = item.dataUrl;
+                    var isVid = !!item.isVideo;
+                    var mid = null;
+                    if (du && du.indexOf('data:') === 0) {
+                        mid = newMediaId();
+                        if (!firstId) firstId = mid;
+                        try { await ensureMediaStored(mid, du); } catch (_) {}
+                    }
+                    var mediaTag = '';
+                    try {
+                        mediaTag = buildMediaTag(du, isVid, mid) || '';
+                    } catch (_) { mediaTag = ''; }
+                    if (!mediaTag) {
+                        mediaTag = isVid
+                            ? ('<div class="user-media-wrap"><video class="user-chat-video" data-media-id="' + (mid||'') + '" src="' + du + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>')
+                            : ('<div class="user-media-wrap"><img class="user-chat-image" data-media-id="' + (mid||'') + '" src="' + du + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>');
+                    }
+                    mediaHtmlParts.push(mediaTag);
                 }
-                var mediaTag = '';
-                try {
-                    mediaTag = buildMediaTag(imageToSend, mediaIsVideo, sentMediaId) || '';
-                } catch (_) { mediaTag = ''; }
-                if (!mediaTag) {
-                    mediaTag = mediaIsVideo
-                        ? ('<div class="user-media-wrap"><video class="user-chat-video" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>')
-                        : ('<div class="user-media-wrap"><img class="user-chat-image" data-media-id="' + (sentMediaId||'') + '" src="' + imageToSend + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>');
-                }
-                display = (display ? display + "\n\n" : "") + mediaTag;
+                sentMediaId = firstId;
+                display = (display ? display + "\n\n" : "") + mediaHtmlParts.join("\n");
             } catch (mediaErr) {
                 console.warn('media attach display failed', mediaErr);
-                display = display || (mediaIsVideo ? '(sent a video)' : '(sent a photo)');
+                display = display || mediaSummary || '(sent media)';
             }
         }
         // Retry does not add another user bubble
@@ -8871,7 +9015,7 @@ Every substantive answer ends with:
                 var storedDisplay = imageToSend ? stripHeavyMediaHtml(display) : (attachedFileSnapshot ? display : null);
                 chatHistory.push({
                     role: 'user',
-                    content: text || (imageToSend ? (mediaIsVideo ? '(sent a video)' : '(sent a photo)') : ''),
+                    content: text || mediaSummary || '',
                     time: time,
                     displayHtml: (imageToSend || attachedFileSnapshot) ? (storedDisplay || display) : null,
                     isHtml: !!(imageToSend || attachedFileSnapshot),
@@ -8883,11 +9027,11 @@ Every substantive answer ends with:
             if (userInput) userInput.value = '';
         }
         // Remember this turn for Retry if the API fails
-        lastFailedRequest = { text: text || '', mediaBase64: imageToSend || null };
+        lastFailedRequest = { text: text || '', mediaBase64: mediaList.length ? mediaList : (imageToSend || null) };
 
         // Moderation log — local + cloud (all devices)
         try {
-            const logText = text || (imageToSend ? (mediaIsVideo ? '[video]' : '[photo]') : '');
+            const logText = text || (mediaList.length ? mediaSummary : '');
             appendModLog({
                 at: Date.now(),
                 username: currentUser ? currentUser.username : '?',
@@ -8928,18 +9072,23 @@ Every substantive answer ends with:
             parts: [{ text: m.content }]
         }));
 
+        const visionItems = (mediaList || []).filter(function(m){ return m && m.dataUrl; }).slice(0, 10);
         const currentParts = [{
-            text: text || (imageToSend
-                ? (mediaIsVideo ? "Describe this video and what happens in it." : "What do you see in this image?")
+            text: text || (visionItems.length
+                ? (visionItems.length === 1
+                    ? (visionItems[0].isVideo ? "Describe this video and what happens in it." : "What do you see in this image?")
+                    : ("I sent " + visionItems.length + " files. Look at all of them and answer."))
                 : "")
         }];
-        if (imageToSend) {
-            const { mimeType, data } = splitDataUrl(imageToSend);
-            currentParts.push({ inlineData: { mimeType, data } });
-        }
+        visionItems.forEach(function(m) {
+            try {
+                const parts = splitDataUrl(m.dataUrl);
+                if (parts && parts.data) currentParts.push({ inlineData: { mimeType: parts.mimeType, data: parts.data } });
+            } catch (_) {}
+        });
         contents.push({ role: "user", parts: currentParts });
 
-        const usingVision = !!imageToSend;
+        const usingVision = visionItems.length > 0;
         const isHtmlMode = activeMode === 'html';
         // Prefer lite models first — less "high demand" than big flash for long HTML
         const DEFAULT_MODELS = [
