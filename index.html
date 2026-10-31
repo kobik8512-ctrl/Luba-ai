@@ -3113,9 +3113,9 @@
 
     // ---- Backend ----
     const WORKER_URL = "https://luba-ai-proxy.kobik8512.workers.dev";
-    // Out of Luba messages → Ledger Life buy-coins (GitHub host, deep link)
-    const LEDGER_BUY_COINS_URL = "https://kobik8512-ctrl.github.io/Golive/?lubaBuy=1";
-    // Public normal Ledger (no forced buy):
+    // Out of Luba messages → Ledger Life buy-coins (Vercel — GitHub Pages is flagged)
+    const LEDGER_BUY_COINS_URL = "https://ledger-life-ashen.vercel.app/?lubaBuy=1";
+    // Public normal Ledger:
     // https://ledger-life-ashen.vercel.app/
 
     // Owner account = username "kobi" (case-insensitive). No password challenge.
@@ -3269,7 +3269,7 @@
         try {
             const url = (typeof LEDGER_BUY_COINS_URL !== "undefined")
                 ? LEDGER_BUY_COINS_URL
-                : "https://kobik8512-ctrl.github.io/Golive/?lubaBuy=1";
+                : "https://ledger-life-ashen.vercel.app/?lubaBuy=1";
             // Remove old CTA so it can reappear under the latest message
             const old = document.getElementById("ledger-buy-coins-cta");
             if (old) old.remove();
