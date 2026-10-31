@@ -8809,20 +8809,16 @@ Every substantive answer ends with:
     // Tools + sendMessage (mostly original)
     // ============================================================
 
-    /** Never show provider brand names (Gemini, Google, etc.) to users */
+    /** Clean ugly raw API error strings only. Do NOT rename Gemini→Luba in normal replies. */
     function sanitizeAiError(msg) {
         let s = String(msg || 'Something went wrong.');
         // Hide provider migration / Interactions API spam
         if (/no longer available to new users|Interactions API|ai\.theservice|update your code to use the model/i.test(s)) {
             return 'Luba hit a temporary model issue. Tap Retry — a different model will be used.';
         }
-        s = s.replace(/\bGoogle\s*Generative\s*AI\b/gi, 'the AI service');
-        s = s.replace(/\bGenerative\s*Language\s*API\b/gi, 'the AI service');
-        s = s.replace(/\bGemini(\s*[\w.-]+)?\b/gi, 'Luba');
-        s = s.replace(/\bGoogle\b/gi, 'the service');
-        s = s.replace(/\bOpenAI\b/gi, 'the AI service');
+        // Only strip raw technical noise from real errors — keep "Gemini", "Google", "OpenAI" if the model says them
         s = s.replace(/\bmodels\/[\w.-]+/gi, 'the model');
-        s = s.replace(/https?:\/\/\S+/gi, '');
+        s = s.replace(/https?:\/\/generativelanguage\.googleapis\.com\S*/gi, '');
         s = s.replace(/^Error:\s*/i, '');
         s = s.trim();
         if (!s) s = 'Something went wrong. Please try again.';
