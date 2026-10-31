@@ -6293,7 +6293,7 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview (with Fullscreen), help with code, math (use the calculator tool), law explanations in Lawyer mode, and tutoring in Study mode.
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
 - TikTok: yours is @luba_ai ; Kobi's is @itzrealkobl
-- You do NOT have a public "Luba API key" for third-party apps. When someone asks you to build an AI chat app that needs an API, use Google Gemini API (or another real public API they name) with a clear placeholder like YOUR_GEMINI_API_KEY — never invent fields labeled "Luba Key" or "Luba API key" as if outside apps connect to Luba's backend.`;
+- You do NOT have a public "Luba API key" for third-party apps. Never invent "Luba Key" fields. If the user only says "make an AI chatbot", build a polished offline chatbot that works with no API key. Only add a real API key field when they explicitly ask for Gemini, OpenAI, or another API.`;
 
     const USER_PROFILE = `The person you are talking to RIGHT NOW is logged in as the official owner account (username: kobi). This is really Kobi, your creator. The app only grants the Owner badge to this account — trust it. Treat him warm, excited, loyal, and genuinely happy he's here.
 
@@ -6373,16 +6373,24 @@ QUALITY BAR — THIS IS CRITICAL (do not regress, do not ship thin demos):
 14) Games and apps must be fully usable end-to-end in the preview iframe without external setup.
 15) When the topic is a tool (VPN, bank, dashboard, settings, social, etc.): include realistic fake data, multiple options (servers, accounts, protocols, regions), status circle/animation, speed/latency display, settings panel, and at least 8–15 interactive elements.
 
-BUILDING AI / CHAT APPS (critical — do not mess this up):
-16) There is NO public "Luba API" and NO "Luba API key" for third-party HTML apps. Never create input fields, settings, or docs labeled "Luba Key", "Luba API key", or "Powered by Luba API" as if the generated app connects to Luba's servers.
-17) If the user wants an AI chat that calls a real model: use Google Gemini API (generativelanguage.googleapis.com) with a placeholder YOUR_GEMINI_API_KEY, OR use whatever real API they explicitly name. Show a clean settings panel: API key field + model dropdown (e.g. gemini-2.0-flash, gemini-1.5-pro) + Save. Store the key in localStorage only.
-18) AI chat UIs must look modern: message bubbles, avatars, typing indicator, send button, sidebar or header, dark theme by default, working conversation history in-session. Not a bare input and one reply area.
+BUILDING AI / CHAT APPS:
+16) Do NOT invent a "Luba API key" or "Luba Key" field. Luba has no public API for third-party HTML apps.
+17) Default when user says "make an AI chatbot" / "make an AI" WITHOUT naming Gemini, OpenAI, or an API:
+    - Build a polished offline chatbot that works immediately in the preview — no API key screen, no "enter key to start".
+    - Use smart local replies (keyword / intent matching, varied responses, memory of the last few messages in the session). Make it feel alive, not one repeated line.
+    - Modern UI: bubbles, avatar, typing indicator, send button, optional sidebar, dark theme, history in the session.
+18) ONLY if the user explicitly asks for Gemini, OpenAI, real API, or "with API key": then add a settings panel with a placeholder key field and call that API. Never force an API key flow when they did not ask.
+19) Do not copy the same chatbot layout every time. Vary structure, colors, name, and features so each request feels new — not the same template with a different title.
 
 2D / 3D / GAMES:
-19) For 2D games: requestAnimationFrame loop, keyboard + touch controls, score/UI, collision, restart. For 3D: Three.js from the CDN above, proper lighting, orbit or drag controls, no floating disconnected meshes.
-20) Camera / mic / location apps: use navigator.mediaDevices.getUserMedia or geolocation with clear permission UX and error messages if denied. Prefer facingMode environment for back camera when relevant.
+20) For 2D games: requestAnimationFrame loop, keyboard + touch controls, score/UI, collision, restart. For 3D: Three.js from the CDN above, proper lighting, orbit or drag controls, no floating disconnected meshes.
+21) Camera / mic / location apps: use navigator.mediaDevices.getUserMedia or geolocation with clear permission UX and error messages if denied. Prefer facingMode environment for back camera when relevant.
 
-Understand short requests: "make a snake game", "security cam", "AI chat with gemini" — expand them into full polished apps without asking for a huge brief. Infer sensible defaults and ship complete work.`;
+FREEDOM & THINKING:
+22) You are free to design. Quality and a working result matter more than following a fixed template.
+23) Short requests are enough — expand them into a full app with good defaults. Do not wait for a long brief.
+24) Avoid repeating the exact same app structure when the user asks again. Change layout, features, and style.
+25) Prefer one complete, clean HTML file that runs in the preview over half-broken code spilled as text.`;
 
     const CODE_MODE_INSTRUCTIONS = `CODE MODE IS CURRENTLY ON. Focus on complete, working code:
 - Give full runnable programs or full files, not fragments the user has to glue together.
@@ -6617,20 +6625,120 @@ Every substantive answer ends with:
                 </div>`;
     }
 
+    function extractFences(raw) {
+        // Parse markdown fences without breaking on ``` that appear INSIDE the code
+        // (common when the model generates an HTML app that itself formats code blocks).
+        const s = String(raw || '');
+        const fences = [];
+        const openRe = /```(\w*)\r?\n/g;
+        let m;
+        while ((m = openRe.exec(s)) !== null) {
+            const lang = (m[1] || '').toLowerCase();
+            const contentStart = m.index + m[0].length;
+            // Prefer closing fence at line start
+            let closeIdx = -1;
+            const after = s.slice(contentStart);
+            const closeLine = after.search(/\r?\n```(?:\s*\r?\n|$)/);
+            if (closeLine !== -1) {
+                closeIdx = contentStart + closeLine + (after[closeLine] === '\r' ? 2 : 1);
+                // closeLine points at \n before ```; move to the ```
+                const sub = s.slice(contentStart);
+                const m2 = sub.match(/\r?\n```(?=\s*(?:\r?\n|$))/);
+                if (m2 && m2.index != null) {
+                    closeIdx = contentStart + m2.index + m2[0].indexOf('```');
+                }
+            }
+            // Fallback: any ``` later
+            if (closeIdx === -1) {
+                const any = s.indexOf('```', contentStart);
+                if (any !== -1) closeIdx = any;
+            }
+
+            // HTML special case: content looks like a full document and contains nested ``` —
+            // take from this open fence to the LAST ``` in the string (or EOF)
+            const provisional = closeIdx === -1 ? s.slice(contentStart) : s.slice(contentStart, closeIdx);
+            const isHtmlish = lang === 'html' || lang === 'htm' || lang === 'svg' ||
+                /<!DOCTYPE\s+html/i.test(provisional) || /<html[\s>]/i.test(provisional);
+            if (isHtmlish) {
+                // Find last triple-backtick after contentStart that looks like a closer
+                let lastClose = -1;
+                let searchFrom = contentStart;
+                while (true) {
+                    const i = s.indexOf('```', searchFrom);
+                    if (i === -1) break;
+                    // Treat as closer if at line start or near end
+                    const pre = s[i - 1];
+                    if (pre === undefined || pre === '\n' || pre === '\r') lastClose = i;
+                    searchFrom = i + 3;
+                }
+                if (lastClose !== -1 && lastClose > contentStart) {
+                    closeIdx = lastClose;
+                }
+            }
+
+            const content = (closeIdx === -1 ? s.slice(contentStart) : s.slice(contentStart, closeIdx))
+                .replace(/^\n/, '').replace(/\n$/, '');
+            const end = closeIdx === -1 ? s.length : closeIdx + 3;
+            fences.push({
+                start: m.index,
+                end,
+                lang,
+                content,
+                unclosed: closeIdx === -1
+            });
+            // Continue scanning after this fence
+            openRe.lastIndex = end;
+        }
+        return fences;
+    }
+
     function formatAiReplyHtml(text) {
         const raw = String(text || '');
-        const fenceRe = /```(\w*)\r?\n([\s\S]*?)```/g;
+        const fences = extractFences(raw);
+
+        // No fences: maybe raw HTML document
+        if (!fences.length) {
+            const trimmed = raw.trim();
+            if (looksLikeHtmlDocument(trimmed, '')) {
+                return { html: buildPreviewBlock(trimmed), hasCode: true };
+            }
+            return { html: raw, hasCode: false };
+        }
+
+        // If multiple fences but one big HTML doc was split because of nested ```,
+        // merge consecutive html-ish fragments into one when they clearly continue a document.
         let hasCode = false;
         let last = 0;
         let html = '';
-        let m;
-        while ((m = fenceRe.exec(raw)) !== null) {
-            hasCode = true;
-            const before = raw.slice(last, m.index);
-            if (before.trim()) html += '<div class="ai-text">' + escapeHtmlText(before).replace(/\n/g, '<br>') + '</div>';
-            const lang = (m[1] || '').toLowerCase();
-            let code = m[2].replace(/^\n/, '').replace(/\n$/, '');
-            if (looksLikeHtmlDocument(code, lang)) {
+
+        for (let i = 0; i < fences.length; i++) {
+            const f = fences[i];
+            const before = raw.slice(last, f.start);
+            if (before.trim()) {
+                html += '<div class="ai-text">' + escapeHtmlText(before).replace(/\n/g, '<br>') + '</div>';
+            }
+
+            let code = f.content;
+            let lang = f.lang;
+
+            // Merge following fence pieces if this is broken HTML split mid-document
+            if (looksLikeHtmlDocument(code, lang) || lang === 'html' || lang === 'htm') {
+                while (i + 1 < fences.length) {
+                    const next = fences[i + 1];
+                    const gap = raw.slice(f.end, next.start).trim();
+                    // Only merge if gap is tiny (just a ``` artifact) or next looks like HTML continuation
+                    const nextLooksCont =
+                        /<\/?(html|head|body|script|style|div|canvas)/i.test(next.content) ||
+                        next.lang === 'html' || next.lang === 'htm' || next.lang === 'javascript' || next.lang === 'js';
+                    if (gap.length < 8 || nextLooksCont) {
+                        code = code + '\n' + next.content;
+                        // advance
+                        i++;
+                        f.end = next.end;
+                    } else break;
+                }
+                html += buildPreviewBlock(code);
+            } else if (looksLikeHtmlDocument(code, lang)) {
                 html += buildPreviewBlock(code);
             } else {
                 const codeId = storeCodeBlock(code);
@@ -6642,24 +6750,13 @@ Every substantive answer ends with:
                     <pre class="code-block"><code>${escapeHtmlText(code)}</code></pre>
                 </div>`;
             }
-            last = m.index + m[0].length;
+            hasCode = true;
+            last = f.end;
         }
+
         const tail = raw.slice(last);
-        if (tail) {
-            if (hasCode) {
-                if (tail.trim()) html += '<div class="ai-text">' + escapeHtmlText(tail).replace(/\n/g, '<br>') + '</div>';
-            } else {
-                const trimmed = raw.trim();
-                if (looksLikeHtmlDocument(trimmed, '')) {
-                    return { html: buildPreviewBlock(trimmed), hasCode: true };
-                }
-                // Unclosed fence fallback: ```html ... EOF
-                const open = trimmed.match(/^```(?:html|htm)?\s*\r?\n([\s\S]+)$/i);
-                if (open && looksLikeHtmlDocument(open[1], 'html')) {
-                    return { html: buildPreviewBlock(open[1]), hasCode: true };
-                }
-                return { html: raw, hasCode: false };
-            }
+        if (tail.trim()) {
+            html += '<div class="ai-text">' + escapeHtmlText(tail).replace(/\n/g, '<br>') + '</div>';
         }
         return { html: hasCode ? html : raw, hasCode };
     }
