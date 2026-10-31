@@ -2142,6 +2142,57 @@
             font-size: 12px;
             background: #0a0a0a;
         }
+
+        /* Fullscreen preview overlay */
+        #preview-fullscreen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            background: #000;
+            flex-direction: column;
+        }
+        #preview-fullscreen.open {
+            display: flex;
+        }
+        #preview-fullscreen .fs-bar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            padding-top: max(10px, env(safe-area-inset-top));
+            background: rgba(20,20,22,0.95);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        #preview-fullscreen .fs-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+        #preview-fullscreen .fs-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #preview-fullscreen .fs-close:active {
+            background: rgba(255,255,255,0.22);
+        }
+        #preview-fullscreen iframe {
+            flex: 1;
+            width: 100%;
+            border: 0;
+            background: #111;
+        }
         .code-block-wrap {
             margin: 8px 0;
             border-radius: 12px;
@@ -6262,20 +6313,26 @@ For 3D objects (chairs, tables, cars, etc.): build one Group; every part must be
 - Keep using LaTeX ($...$ / $$...$$) for any math exactly as usual.
 - This applies even to arithmetic that looks quick or trivial (e.g. "297 + 973 * 93"). Do not skip the explanation just because you could give the number in one line — walk through the order of operations (PEMDAS/BODMAS) step by step, then give the final result. Never reply with only the final number while study mode is on.`;
 
-    const HTML_MODE_INSTRUCTIONS = `HTML MODE IS CURRENTLY ON. The user wants a WORKING interactive demo / app / game in the chat preview.
-RULES (follow exactly):
-1) Reply with a short 1-line intro, then ONE markdown fence labeled html containing a COMPLETE single-file HTML document.
-2) The document MUST start with <!DOCTYPE html> and include <html>, <head>, and <body>.
-3) Put ALL CSS and JS inside that same file. CDN tags MUST be complete: script src="https://unpkg.com/three@0.160.0/build/three.min.js" with a full opening and closing script tag (never leave src empty or cut off). If you use THREE, that CDN script is required BEFORE your own script.
-4) The visual MUST fill the viewport: use width/height 100% on html, body, canvas/container. Give canvas an explicit size (e.g. canvas { width:100%; height:100%; display:block; } and html,body{margin:0;height:100%;overflow:hidden;background:#111}).
-5) Interactive demos must work immediately on load (animation loop, drag, click). For 3D: one connected Group, orbit-style drag rotate, scroll zoom, visible lighting so objects are not black.
-6) NEVER answer with only description text when the user asked to make/build/show something — always include the full HTML fence.
-7) Do not use multiple files, React, or build tools. Pure HTML/CSS/JS only.
-LARGE PROJECTS (critical — user often asks for big games / 5k+ lines):
-8) Do NOT ship a 300–500 line stub when they asked for a large complete game/app. Implement real systems: state, UI screens, input, game loop, persistence, win/lose, multiple content pieces.
-9) Forbidden: "// TODO", "// rest of levels", "// add more later", empty placeholder functions, fake data only.
-10) Prefer depth over a pretty empty shell. If output is cut off mid-file, stop at a clean point; the app will auto-continue — resume the SAME file without restarting from DOCTYPE.
-11) Think architecture first (briefly), then code. Fix logic bugs; avoid half-wired buttons and broken state.`;
+    const HTML_MODE_INSTRUCTIONS = `HTML MODE IS CURRENTLY ON. The user wants a WORKING interactive app / game in the chat preview. Ship your ABSOLUTE MAX quality — this mode is for complete, polished, feature-rich results that look and feel like real production apps, not sketches or demos.
+
+OUTPUT FORMAT (exact):
+1) One short intro line only, then ONE markdown fence labeled html with a COMPLETE single-file document.
+2) Document MUST start with <!DOCTYPE html> and include <html>, <head>, <body>.
+3) ALL CSS and JS in that same file. Complete CDN tags only (never empty src). Three.js: https://unpkg.com/three@0.160.0/build/three.min.js BEFORE your script.
+4) Full viewport: html,body{margin:0;height:100%;overflow:hidden} (or overflow:auto if content needs scroll) and canvas/container 100% size.
+5) Must run on load: real interactivity, working buttons, keyboard/touch as needed. No dead UI.
+6) NEVER reply with description-only when they asked to make/build something — always the full HTML fence.
+7) Pure HTML/CSS/JS only — no React, no multi-file projects, no external frameworks except allowed CDNs (Three.js, etc.).
+
+QUALITY BAR — THIS IS CRITICAL (do not regress, do not ship thin demos):
+8) Match or beat what a top AI (Gemini, Claude, etc.) would produce for the same request. If the user asks for a VPN, banking app, dashboard, game, or any tool, deliver a RICH, realistic UI with many interactive sections — not one big button and four options.
+9) Real features required: multiple screens or panels, status indicators, lists with real data (10+ items when relevant), toggles that actually change state and visuals, animated transitions, realistic numbers (ping, speed, balance, etc.), working settings, and localStorage persistence where it makes sense.
+10) Visual polish is mandatory: dark/cyber or modern theme matching the topic, gradients, soft glows, card layouts, proper spacing, readable typography, hover/active states, and smooth CSS transitions. Never ship plain gray/white default browser look.
+11) Forbidden: "// TODO", "// add more later", empty stubs, placeholder buttons that do nothing, 200-400 line shells when the request deserves a full app, single giant button as the only control.
+12) Every visible control must do something real. State must update the UI. Connection, selection, and status changes must feel alive.
+13) If cut off mid-file, end at a clean point; continue resumes the SAME file (no second DOCTYPE).
+14) Games and apps must be fully usable end-to-end in the preview iframe without external setup.
+15) When the topic is a tool (VPN, bank, dashboard, settings, social, etc.): include realistic fake data, multiple options (servers, accounts, protocols, regions), status circle/animation, speed/latency display, settings panel, and at least 8–15 interactive elements.`;
 
     const CODE_MODE_INSTRUCTIONS = `CODE MODE IS CURRENTLY ON. Focus on complete, working code:
 - Give full runnable programs or full files, not fragments the user has to glue together.
@@ -6502,6 +6559,7 @@ Every substantive answer ends with:
                         <div class="code-preview-actions">
                             <button type="button" class="small-btn" onclick="toggleCodeSource(this)">Show code</button>
                             <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy code</button>
+                            <button type="button" class="small-btn" onclick="openPreviewFullscreen(this)">Fullscreen</button>
                         </div>
                     </div>
                     <iframe class="code-preview-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" data-srcdoc-b64="${b64}" src="about:blank"></iframe>
@@ -6581,6 +6639,57 @@ Every substantive answer ends with:
         const show = src.style.display === 'none';
         src.style.display = show ? 'block' : 'none';
         btn.textContent = show ? 'Hide code' : 'Show code';
+    };
+
+    window.openPreviewFullscreen = function (btn) {
+        const wrap = btn.closest('.code-preview-wrap');
+        if (!wrap) return;
+        const frame = wrap.querySelector('iframe.code-preview-frame');
+        if (!frame) return;
+
+        let fs = document.getElementById('preview-fullscreen');
+        if (!fs) {
+            fs = document.createElement('div');
+            fs.id = 'preview-fullscreen';
+            fs.innerHTML = `
+                <div class="fs-bar">
+                    <div class="fs-title">Preview</div>
+                    <button type="button" class="fs-close" aria-label="Close">×</button>
+                </div>
+                <iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" src="about:blank"></iframe>
+            `;
+            document.body.appendChild(fs);
+            fs.querySelector('.fs-close').addEventListener('click', closePreviewFullscreen);
+        }
+
+        const fsFrame = fs.querySelector('iframe');
+        // Prefer live srcdoc, fall back to stored base64
+        if (frame.srcdoc) {
+            fsFrame.srcdoc = frame.srcdoc;
+        } else {
+            const b64 = frame.getAttribute('data-srcdoc-b64') || '';
+            if (b64) {
+                try {
+                    fsFrame.srcdoc = decodeURIComponent(escape(atob(b64)));
+                } catch (_) {
+                    fsFrame.srcdoc = frame.srcdoc || '';
+                }
+            } else {
+                fsFrame.srcdoc = '';
+            }
+        }
+
+        fs.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.closePreviewFullscreen = function () {
+        const fs = document.getElementById('preview-fullscreen');
+        if (!fs) return;
+        fs.classList.remove('open');
+        const fsFrame = fs.querySelector('iframe');
+        if (fsFrame) fsFrame.srcdoc = '';
+        document.body.style.overflow = '';
     };
 
     window.copyLubaCode = function (btn) {
@@ -6739,31 +6848,111 @@ Every substantive answer ends with:
     }
 
     let thinkingStatusTimer = null;
+    let thinkingStages = [];
+    let thinkingStageIdx = 0;
 
-    const THINKING_PHRASES = [
-        'Luba is thinking',
-        'Reading your message',
-        'Figuring out the best answer',
-        'Putting ideas together',
-        'Checking a few angles',
-        'Almost there',
-        'Crafting a reply',
-        'Double-checking the details',
-        'Connecting the dots',
-        'Working on it'
-    ];
+    /** Build a one-way progress list from the user's ask — does NOT loop the same lines forever. */
+    function buildThinkingStages(userText, mode) {
+        const raw = String(userText || '').trim();
+        const t = raw.toLowerCase();
+        const stages = [];
+        const isBuild = mode === 'html' || mode === 'code' ||
+            /\b(make|build|create|write|code|html|game|app|website|script|vpn|dashboard|bank)\b/i.test(t);
 
-    function showTyping() {
+        if (isBuild) {
+            stages.push('Reading what you want built');
+            // Topic-specific steps — keep them specific so user sees real progress
+            if (/\b(vpn|proxy|tunnel|wireguard|openvpn)\b/.test(t)) {
+                stages.push('Designing the cyber UI and connection status');
+                stages.push('Building server list with latency and locations');
+                stages.push('Coding connect / disconnect animations');
+                stages.push('Adding speed test, protocols and kill switch');
+                stages.push('Wiring settings and realistic status data');
+                stages.push('Polishing neon theme and transitions');
+            } else if (/\b(car|race|racing|drive|driving|vehicle)\b/.test(t)) {
+                stages.push('Planning the track and car');
+                stages.push('Building the car model');
+                stages.push('Writing controls and physics');
+                stages.push('Adding the race loop');
+                stages.push('Polishing UI and finish line');
+            } else if (/\b(chess|checkers|board game)\b/.test(t)) {
+                stages.push('Setting up the board');
+                stages.push('Coding piece rules');
+                stages.push('Adding moves and turns');
+                stages.push('Wiring win checks');
+            } else if (/\b(3d|three\.js|threejs)\b/.test(t)) {
+                stages.push('Setting up the 3D scene');
+                stages.push('Building meshes and lights');
+                stages.push('Adding camera controls');
+                stages.push('Starting the render loop');
+            } else if (/\b(shooter|platformer|rpg|tycoon|simulator|puzzle)\b/.test(t)) {
+                stages.push('Designing core systems');
+                stages.push('Building the world / levels');
+                stages.push('Coding player actions');
+                stages.push('Adding score and game state');
+                stages.push('Connecting menus and UI');
+            } else if (/\b(chat|discord|social|live)\b/.test(t)) {
+                stages.push('Planning screens and layout');
+                stages.push('Building the chat UI');
+                stages.push('Writing message logic');
+                stages.push('Adding extras (rooms, users)');
+            } else if (/\b(bank|wallet|finance|money|payment|ledger)\b/.test(t)) {
+                stages.push('Designing account overview and cards');
+                stages.push('Building balance and transaction lists');
+                stages.push('Coding transfer and history logic');
+                stages.push('Adding settings and security UI');
+            } else {
+                stages.push('Planning structure and systems');
+                stages.push('Writing HTML layout and sections');
+                stages.push('Adding polished styles and theme');
+                stages.push('Coding the main interactive logic');
+                stages.push('Wiring buttons, state and feedback');
+                stages.push('Filling realistic data and extras');
+            }
+            stages.push('Assembling the full HTML file');
+            stages.push('Still writing — rich apps take a moment');
+            stages.push('Finalizing so the preview can run');
+        } else if (mode === 'study') {
+            stages.push('Reading the problem');
+            stages.push('Working through the steps');
+            stages.push('Checking the reasoning');
+            stages.push('Writing a clear explanation');
+        } else if (mode === 'lawyer') {
+            stages.push('Reading the situation');
+            stages.push('Sorting legal angles');
+            stages.push('Writing a clear bottom line');
+        } else if (mode === 'creative') {
+            stages.push('Catching the vibe');
+            stages.push('Shaping the idea');
+            stages.push('Writing it out');
+        } else {
+            // short / normal chat — few steps, no endless loop
+            if (raw.length < 40) {
+                stages.push('Reading your message');
+                stages.push('Writing a reply');
+            } else {
+                stages.push('Reading your message');
+                stages.push('Working through it');
+                stages.push('Writing the answer');
+            }
+        }
+        return stages;
+    }
+
+    function showTyping(userText) {
         removeTyping();
+        thinkingStages = buildThinkingStages(userText || '', activeMode);
+        thinkingStageIdx = 0;
         const div = document.createElement('div');
         div.className = 'message ai';
         div.id = 'typing-indicator';
+        const first = thinkingStages[0] || 'Luba is thinking';
         div.innerHTML = `
             <div class="avatar">${aiAvatarHTML}</div>
             <div class="message-body">
                 <div class="content">
                     <div class="thinking-bubble">
-                        <span class="thinking-text">Luba is thinking</span>
+                        <span class="thinking-text">${first.replace(/</g,'')}</span>
                         <div class="thinking-dots">
                             <span></span><span></span><span></span>
                         </div>
@@ -6773,24 +6962,40 @@ Every substantive answer ends with:
         chatContainer.appendChild(div);
         chatContainer.scrollTop = chatContainer.scrollHeight;
 
-        // Rotate status text like Claude / Grok while waiting
-        let idx = 0;
         const el = div.querySelector('.thinking-text');
+        // Advance one-way through stages; only the LAST stage may soft-refresh wording (no full loop)
         thinkingStatusTimer = setInterval(() => {
             if (!el || !document.getElementById('typing-indicator')) {
                 clearInterval(thinkingStatusTimer);
                 thinkingStatusTimer = null;
                 return;
             }
-            idx = (idx + 1) % THINKING_PHRASES.length;
-            el.style.opacity = '0.35';
-            setTimeout(() => {
-                if (el) {
-                    el.textContent = THINKING_PHRASES[idx];
-                    el.style.opacity = '0.9';
+            if (thinkingStageIdx < thinkingStages.length - 1) {
+                thinkingStageIdx++;
+                const next = thinkingStages[thinkingStageIdx];
+                el.style.opacity = '0.35';
+                setTimeout(() => {
+                    if (el) {
+                        el.textContent = next;
+                        el.style.opacity = '0.9';
+                    }
+                }, 160);
+            } else {
+                // Stay on last stage — optional soft variants so it doesn't look frozen, but not a phrase carousel
+                const last = thinkingStages[thinkingStages.length - 1] || 'Still working';
+                const soft = [
+                    last,
+                    last + '…',
+                    'Almost ready',
+                    last
+                ];
+                const pick = soft[Math.floor(Date.now() / 3000) % soft.length];
+                if (el.textContent !== pick) {
+                    el.style.opacity = '0.5';
+                    setTimeout(() => { if (el) { el.textContent = pick; el.style.opacity = '0.9'; } }, 120);
                 }
-            }, 180);
-        }, 2200);
+            }
+        }, 2400);
     }
 
     function removeTyping() {
@@ -7247,7 +7452,12 @@ Every substantive answer ends with:
     }
     lightboxClose.onclick = closeLightbox;
     lightboxOverlay.onclick = (e) => { if (e.target === lightboxOverlay) closeLightbox(); };
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeLightbox();
+            if (typeof closePreviewFullscreen === 'function') closePreviewFullscreen();
+        }
+    });
     chatContainer.addEventListener('click', (e) => {
         if (e.target.tagName === 'IMG') openLightbox(e.target.src);
     });
@@ -9046,7 +9256,7 @@ Every substantive answer ends with:
         abortController = new AbortController();
         setSendButtonMode('stop');
         if (studyModeBtn) studyModeBtn.disabled = true;
-        showTyping();
+        showTyping(text || '');
 
         let systemPrompt = buildSystemPrompt();
 
@@ -9056,7 +9266,7 @@ Every substantive answer ends with:
         if (/\b(5\s*k|5000|thousands? of lines|full game|complete game|big game|entire app|full app)\b/i.test(msgText)
             || /\b(make|build|create|write)\b[\s\S]{0,80}\b(game|html app|tycoon|simulator)\b/i.test(msgText)
             || activeMode === 'html' || activeMode === 'code') {
-            systemPrompt += "\n\nLARGE BUILD RULES: Produce complete working code, not a short demo. Implement real systems (UI, state, loops, saves, multiple features). No TODO stubs for core logic. If output hits the length limit, stop cleanly — you will be asked to continue the same file. Prefer a single full HTML document when building games/apps.";
+            systemPrompt += "\n\nLARGE BUILD RULES: Produce complete working code at maximum depth and visual quality, not a short demo. Implement real systems (UI, state, loops, saves, multiple features, win/lose, realistic data). No TODO stubs. Every button must work and change the UI. If output hits the length limit, stop cleanly — continue resumes the same file. Prefer one full HTML document for games/apps. Never ship a hollow 300-line shell or a single big button when the user asked for a real app (VPN, dashboard, bank, tool, game, etc.). Match the richness a top AI would deliver: many interactive controls, polished theme, status animations, and real-feeling data.";
         }
         const needsImageTool = /\b(draw|generate|create|make|paint|show)\b.{0,40}\b(image|picture|photo|art|artwork|illustration|wallpaper|logo)\b|\b(image|picture|photo)\b.{0,20}\b(of|for)\b/i.test(msgText);
         const needsCalcTool = /[\d]+\s*[+\-*/x×÷]\s*[\d]|calculate|what(?:'s| is)\s+\d|solve\s+\d/i.test(msgText);
@@ -9146,7 +9356,7 @@ Every substantive answer ends with:
             const MAX_CONTINUES = isSimpleChat && !longCodeMode ? 1 : (longCodeMode ? 14 : 8);
             const generatedImageUrls = [];
             // HTML / big projects need longer; simple stays fast
-            const ATTEMPT_TIMEOUT_MS = isSimpleChat && !longCodeMode ? 45000 : (longCodeMode ? 180000 : 120000);
+            const ATTEMPT_TIMEOUT_MS = isSimpleChat && !longCodeMode ? 60000 : (longCodeMode ? 240000 : 150000);
 
             while (guard < 24) {
                 if (forceStopGeneration) {
@@ -9329,6 +9539,7 @@ Every substantive answer ends with:
                     saveChat();
                 } else {
                     lastFailedRequest = null;
+                    window._lubaTimeoutRetried = false;
                     // Light cleanup only — do NOT strip backticks
                     reply = reply
                         .replace(/\*\*(.+?)\*\*/g, '$1')
@@ -9392,7 +9603,26 @@ Every substantive answer ends with:
                 chatHistory.push({ role: "assistant", content: stopMsg, time: getTime() });
                 saveChat();
             } else if (err && err.name === 'AbortError') {
-                const timeoutMsg = "That took too long. Tap Retry — your message was not cancelled.";
+                // Client-side wait limit hit (Gemini often still fine) — one silent retry for builds
+                if (!window._lubaTimeoutRetried && (activeMode === 'html' || activeMode === 'code' || (text && text.length > 80))) {
+                    window._lubaTimeoutRetried = true;
+                    isGenerating = false;
+                    abortController = null;
+                    forceStopGeneration = false;
+                    setSendButtonMode('send');
+                    if (studyModeBtn) studyModeBtn.disabled = false;
+                    // Retry same task once (Gemini often still fine; client wait limit hit)
+                    const retryPayload = {
+                        retryText: text,
+                        retryMedia: (typeof mediaList !== 'undefined' && mediaList && mediaList.length) ? mediaList : null
+                    };
+                    setTimeout(function(){
+                        try { sendMessage(retryPayload); } catch (_) {}
+                    }, 500);
+                    return;
+                }
+                window._lubaTimeoutRetried = false;
+                const timeoutMsg = "That took too long on the connection. Tap Retry — Gemini was still working; this is not you stopping the reply.";
                 showErrorWithRetry(timeoutMsg);
                 if (!alreadySavedUserAt(time)) {
 
