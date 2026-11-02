@@ -2328,6 +2328,171 @@
         }
 
         /* Fullscreen preview overlay */
+        
+        /* ========== LUBA FORGE (separate builder studio) ========== */
+        
+        #forge-open-fab {
+            display: none !important;
+            position: fixed;
+            right: 14px;
+            bottom: 88px;
+            z-index: 40;
+            border: none;
+            cursor: pointer;
+            padding: 12px 16px;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: 13px;
+            letter-spacing: .03em;
+            color: #042f2e;
+            background: linear-gradient(135deg, #22d3ee, #a78bfa);
+            box-shadow: 0 8px 24px rgba(34,211,238,.35);
+        }
+        #forge-open-fab:active { transform: scale(.97); }
+        body.forge-hidden-fab #forge-open-fab { display: none; }
+
+        #forge-studio {
+            display: none;
+            position: fixed; inset: 0; z-index: 12000;
+            background: #0c0e12;
+            color: #e8eaed;
+            flex-direction: column;
+            font-family: Inter, system-ui, -apple-system, sans-serif;
+        }
+        #forge-studio.open { display: flex; pointer-events: auto; }
+        #forge-studio .forge-close, #forge-studio #forge-send, #forge-studio .forge-tool { pointer-events: auto; position: relative; z-index: 5; }
+        .forge-top {
+            height: 52px; flex-shrink: 0;
+            display: flex; align-items: center; gap: 10px;
+            padding: 0 12px;
+            background: #12151c;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+        }
+        .forge-logo {
+            font-weight: 900; font-size: 15px; letter-spacing: .04em;
+            color: #67e8f9;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .forge-logo span {
+            background: linear-gradient(135deg,#22d3ee,#a78bfa);
+            -webkit-background-clip: text; background-clip: text;
+            color: transparent;
+        }
+        .forge-pill {
+            font-size: 10px; font-weight: 800;
+            padding: 3px 8px; border-radius: 999px;
+            background: rgba(34,211,238,.12); color: #67e8f9;
+            border: 1px solid rgba(34,211,238,.35);
+        }
+        .forge-status {
+            flex: 1; font-size: 12px; color: rgba(255,255,255,.45);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .forge-close {
+            width: 36px; height: 36px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.1); background: #1a1f2a;
+            color: #fff; font-size: 20px; cursor: pointer;
+        }
+        .forge-body {
+            flex: 1; min-height: 0;
+            display: flex; flex-direction: column;
+        }
+        @media (min-width: 900px) {
+            .forge-body { flex-direction: row; }
+        }
+        .forge-viewport-wrap {
+            flex: 1.2; min-height: 42vh; position: relative;
+            background: #07090d;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+        }
+        @media (min-width: 900px) {
+            .forge-viewport-wrap {
+                border-bottom: none;
+                border-right: 1px solid rgba(255,255,255,.06);
+                min-height: 0;
+            }
+        }
+        #forge-canvas {
+            width: 100%; height: 100%; display: block;
+            touch-action: none;
+        }
+        .forge-viewport-label {
+            position: absolute; left: 12px; top: 12px;
+            font-size: 11px; font-weight: 700;
+            color: rgba(255,255,255,.4);
+            pointer-events: none;
+        }
+        .forge-tools {
+            position: absolute; left: 12px; bottom: 12px;
+            display: flex; gap: 6px; flex-wrap: wrap;
+        }
+        .forge-tool {
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(18,21,28,.9);
+            color: #dbe4ff; font-size: 11px; font-weight: 700;
+            padding: 8px 12px; border-radius: 10px; cursor: pointer;
+        }
+        .forge-tool.primary {
+            background: #22d3ee; color: #042f2e; border-color: transparent;
+        }
+        .forge-side {
+            flex: 1; min-height: 0;
+            display: flex; flex-direction: column;
+            background: #0f1218;
+        }
+        #forge-chat {
+            flex: 1; overflow-y: auto; padding: 12px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .forge-msg {
+            max-width: 95%;
+            padding: 10px 12px; border-radius: 14px;
+            font-size: 13px; line-height: 1.45;
+        }
+        .forge-msg.ai {
+            align-self: flex-start;
+            background: #1a2030;
+            border: 1px solid rgba(103,232,249,.15);
+            color: #e2e8f0;
+        }
+        .forge-msg.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg,#0891b2,#7c3aed);
+            color: #fff;
+        }
+        .forge-msg .forge-play {
+            margin-top: 10px;
+            display: inline-block;
+            border: none; cursor: pointer;
+            background: #ec4899; color: #fff;
+            font-weight: 800; font-size: 13px;
+            padding: 10px 18px; border-radius: 999px;
+        }
+        .forge-composer {
+            padding: 10px 12px 14px;
+            border-top: 1px solid rgba(255,255,255,.08);
+            display: flex; gap: 8px; align-items: flex-end;
+        }
+        #forge-input {
+            flex: 1; min-height: 44px; max-height: 120px;
+            resize: none; border-radius: 14px;
+            border: 1px solid rgba(103,232,249,.25);
+            background: #161b26; color: #fff;
+            padding: 12px 14px; font-size: 14px;
+            outline: none;
+        }
+        #forge-send {
+            border: none; cursor: pointer;
+            background: #22d3ee; color: #042f2e;
+            font-weight: 900; border-radius: 14px;
+            padding: 12px 16px; height: 44px;
+        }
+        #forge-btn {
+            border: 1px solid rgba(34,211,238,.4) !important;
+            color: #67e8f9 !important;
+        }
+
+
         #preview-fullscreen {
             display: none;
             position: fixed;
@@ -2950,6 +3115,13 @@
                 ·
                 <button type="button" class="legal-link" id="settings-privacy-btn">Privacy Policy</button>
             </div>
+        </div>
+
+
+        <div style="margin:16px 0 8px;padding:14px;border-radius:14px;border:1px solid rgba(34,211,238,.35);background:rgba(34,211,238,.08);">
+            <div style="font-weight:800;font-size:14px;margin-bottom:6px;color:#67e8f9;">◈ Luba Forge</div>
+            <p style="font-size:12px;opacity:.75;margin:0 0 10px;line-height:1.4;">Builder studio — empty scene, AI builds full HTML/games you can Play.</p>
+            <button type="button" class="small-btn" id="settings-open-forge" style="background:linear-gradient(135deg,#22d3ee,#a78bfa);color:#042f2e;font-weight:800;border:none;width:100%;">Open Luba Forge</button>
         </div>
 
         <div class="modal-buttons" style="margin-top:16px;">
@@ -11288,6 +11460,572 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             try { chatContainer.scrollTop = chatContainer.scrollHeight; } catch (_) {}
         }
     }
+
+    // ============================================================
+    // LUBA FORGE — separate builder studio (empty scene + AI build)
+    // ============================================================
+    window.__forge = window.__forge || { open: false, renderer: null, scene: null, camera: null, anim: 0, lastBuild: null };
+
+    function forgeSetStatus(s) {
+        const el = document.getElementById('forge-status');
+        if (el) el.textContent = s || '';
+    }
+
+    function forgeAppend(role, htmlOrText, isHtml) {
+        const chat = document.getElementById('forge-chat');
+        if (!chat) return;
+        const div = document.createElement('div');
+        div.className = 'forge-msg ' + (role === 'user' ? 'user' : 'ai');
+        if (isHtml) div.innerHTML = htmlOrText;
+        else div.textContent = htmlOrText;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function forgeInitViewport() {
+        const canvas = document.getElementById('forge-canvas');
+        if (!canvas) return;
+        const F = window.__forge;
+        function boot() {
+            if (typeof THREE === 'undefined') {
+                forgeSetStatus('Loading engine…');
+                return;
+            }
+            try {
+                if (F.renderer) {
+                    try { cancelAnimationFrame(F.anim); } catch (_) {}
+                    try { F.renderer.dispose(); } catch (_) {}
+                }
+                const parent = canvas.parentElement;
+                const w = parent.clientWidth || window.innerWidth;
+                const h = parent.clientHeight || Math.floor(window.innerHeight * 0.42);
+                const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                renderer.setSize(w, h, false);
+                renderer.setClearColor(0x0a0c10, 1);
+                const scene = new THREE.Scene();
+                scene.fog = new THREE.Fog(0x0a0c10, 12, 55);
+                const camera = new THREE.PerspectiveCamera(55, w / Math.max(h, 1), 0.05, 200);
+                camera.position.set(6, 4, 8);
+                camera.lookAt(0, 0, 0);
+                // Infinite-style grid floor (like Blender/Unity empty scene)
+                const grid = new THREE.GridHelper(80, 80, 0x22d3ee, 0x1e293b);
+                grid.position.y = 0;
+                scene.add(grid);
+                const hemi = new THREE.HemisphereLight(0xb1e1ff, 0x1a1a22, 0.9);
+                scene.add(hemi);
+                const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+                sun.position.set(8, 16, 6);
+                scene.add(sun);
+                // subtle origin marker
+                const dot = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.08, 12, 12),
+                    new THREE.MeshBasicMaterial({ color: 0x22d3ee })
+                );
+                scene.add(dot);
+                F.renderer = renderer;
+                F.scene = scene;
+                F.camera = camera;
+                F.dragging = false;
+                F.lx = 0; F.ly = 0;
+                canvas.onpointerdown = function(e) {
+                    F.dragging = true; F.lx = e.clientX; F.ly = e.clientY;
+                    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+                };
+                window.onpointerup = function() { F.dragging = false; };
+                canvas.onpointermove = function(e) {
+                    if (!F.dragging || !F.camera) return;
+                    const dx = (e.clientX - F.lx) * 0.01;
+                    const dy = (e.clientY - F.ly) * 0.01;
+                    F.lx = e.clientX; F.ly = e.clientY;
+                    const sph = new THREE.Spherical().setFromVector3(F.camera.position);
+                    sph.theta -= dx;
+                    sph.phi = Math.max(0.15, Math.min(Math.PI - 0.15, sph.phi - dy));
+                    F.camera.position.setFromSpherical(sph);
+                    F.camera.lookAt(0, 0, 0);
+                };
+                function loop() {
+                    F.anim = requestAnimationFrame(loop);
+                    if (F.renderer && F.scene && F.camera) F.renderer.render(F.scene, F.camera);
+                }
+                loop();
+                forgeSetStatus('Empty scene · infinite floor · ready');
+            } catch (e) {
+                console.warn('forge viewport', e);
+                forgeSetStatus('Viewport failed — still can chat builds');
+            }
+        }
+        if (typeof THREE === 'undefined') {
+            const s = document.createElement('script');
+            s.src = 'https://unpkg.com/three@0.149.0/build/three.min.js';
+            s.onload = boot;
+            s.onerror = function() { forgeSetStatus('Could not load 3D engine'); };
+            document.head.appendChild(s);
+        } else boot();
+        window.addEventListener('resize', function() {
+            if (!window.__forge.open || !window.__forge.renderer) return;
+            const parent = canvas.parentElement;
+            const w = parent.clientWidth || window.innerWidth;
+            const h = parent.clientHeight || 300;
+            window.__forge.camera.aspect = w / Math.max(h, 1);
+            window.__forge.camera.updateProjectionMatrix();
+            window.__forge.renderer.setSize(w, h, false);
+        });
+    }
+
+    function openForgeStudio() {
+        const st = document.getElementById('forge-studio');
+        if (!st) return;
+        st.classList.add('open');
+        st.setAttribute('aria-hidden', 'false');
+        window.__forge.open = true;
+        document.body.style.overflow = 'hidden';
+        try { document.body.classList.add('forge-hidden-fab'); } catch(_){}
+        const chat = document.getElementById('forge-chat');
+        if (chat && !chat.dataset.welcomed) {
+            chat.dataset.welcomed = '1';
+            forgeAppend('ai', 'Forge online. Empty scene — infinite floor, nothing else yet.\n\nWhat are we building? 2D game, 3D scene, tool UI… describe it (or attach a .glb in main chat first, then open Forge).');
+        }
+        forgeInitViewport();
+        try { document.getElementById('forge-input').focus(); } catch (_) {}
+    }
+
+    function closeForgeStudio() {
+        const st = document.getElementById('forge-studio');
+        if (!st) return;
+        st.classList.remove('open');
+        st.setAttribute('aria-hidden', 'true');
+        window.__forge.open = false;
+        document.body.style.overflow = '';
+        try { document.body.classList.remove('forge-hidden-fab'); } catch(_){}
+        try { cancelAnimationFrame(window.__forge.anim); } catch (_) {}
+    }
+
+    window.fetchWithTimeout = window.fetchWithTimeout || function(url, options, ms) {
+        const timeoutCtrl = new AbortController();
+        const timer = setTimeout(function(){ timeoutCtrl.abort(); }, ms || 60000);
+        const parent = options && options.signal;
+        const onParentAbort = function(){ timeoutCtrl.abort(); };
+        if (parent) {
+            if (parent.aborted) timeoutCtrl.abort();
+            else parent.addEventListener('abort', onParentAbort, { once: true });
+        }
+        return fetch(url, Object.assign({}, options || {}, { signal: timeoutCtrl.signal }))
+            .finally(function(){
+                clearTimeout(timer);
+                if (parent) parent.removeEventListener('abort', onParentAbort);
+            });
+    };
+
+    /** Live scene commands: place block/cube/sphere in the Forge viewport */
+    function forgeTryLivePlace(text) {
+        const F = window.__forge;
+        if (!F || !F.scene || typeof THREE === 'undefined') return null;
+        const t = String(text || '').toLowerCase();
+        const want =
+            /\b(place|add|put|spawn|create|drop)\b/.test(t) &&
+            /\b(block|cube|box|sphere|ball|cylinder|cone|tree|car|platform|wall|floor)\b/.test(t);
+        if (!want) return null;
+        let mesh = null;
+        let label = 'object';
+        const color = new THREE.Color().setHSL(Math.random(), 0.55, 0.55);
+        const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.45, metalness: 0.1 });
+        if (/\bsphere|ball\b/.test(t)) {
+            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.6, 24, 24), mat);
+            label = 'sphere';
+        } else if (/\bcylinder\b/.test(t)) {
+            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.2, 20), mat);
+            label = 'cylinder';
+        } else if (/\bcone\b/.test(t)) {
+            mesh = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.2, 20), mat);
+            label = 'cone';
+        } else if (/\bplatform|wall|floor\b/.test(t)) {
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(3, 0.25, 3), mat);
+            label = 'platform';
+        } else {
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+            label = 'block';
+        }
+        // Stack-ish placement near origin with slight offset
+        F._placeCount = (F._placeCount || 0) + 1;
+        const n = F._placeCount;
+        mesh.position.set((n % 5) - 2, 0.5 + Math.floor(n / 5) * 1.05, (Math.floor(n / 2) % 3) - 1);
+        mesh.castShadow = true;
+        mesh.name = 'forge_' + label + '_' + n;
+        F.scene.add(mesh);
+        // Load GLB as object if model attached and user asked for car/model
+        return { label: label, name: mesh.name, x: mesh.position.x, y: mesh.position.y, z: mesh.position.z };
+    }
+
+    async function forgeLoadModelIntoScene() {
+        const F = window.__forge;
+        if (!F || !F.scene || typeof THREE === 'undefined') return null;
+        const models = window.__forgeMedia || window.__lubaLastModels || [];
+        const m = models.find(function(x){ return x && x.isModel && x.dataUrl; }) || models[0];
+        if (!m || !m.dataUrl) return null;
+        if (!THREE.GLTFLoader) {
+            await new Promise(function(resolve) {
+                const s = document.createElement('script');
+                s.src = 'https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js';
+                s.onload = resolve;
+                s.onerror = resolve;
+                document.head.appendChild(s);
+            });
+        }
+        if (!THREE.GLTFLoader) return null;
+        return new Promise(function(resolve) {
+            const loader = new THREE.GLTFLoader();
+            const url = m.dataUrl;
+            function onOk(gltf) {
+                const root = gltf.scene || gltf.scenes[0];
+                if (!root) { resolve(null); return; }
+                const box = new THREE.Box3().setFromObject(root);
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z, 0.01);
+                root.scale.multiplyScalar(2 / maxDim);
+                box.setFromObject(root);
+                const center = box.getCenter(new THREE.Vector3());
+                root.position.sub(center);
+                root.position.y = 0.01;
+                F.scene.add(root);
+                F._placeCount = (F._placeCount || 0) + 1;
+                resolve({ label: m.name || 'model', name: 'forge_model_' + F._placeCount });
+            }
+            function onErr() { resolve(null); }
+            try {
+                if (String(url).indexOf('data:') === 0) {
+                    fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
+                        loader.parse(buf, '', onOk, onErr);
+                    }).catch(onErr);
+                } else loader.load(url, onOk, undefined, onErr);
+            } catch (_) { onErr(); }
+        });
+    }
+
+    async function forgeSendBuild() {
+        if (!currentUser) { alert('Log in first'); return; }
+        const input = document.getElementById('forge-input');
+        const text = (input && input.value || '').trim();
+        if (!text) return;
+        if (input) input.value = '';
+        forgeAppend('user', text);
+        forgeSetStatus('Luba is building…');
+        const sendBtn = document.getElementById('forge-send');
+        if (sendBtn) sendBtn.disabled = true;
+
+        // Optional quick primitives ONLY when clearly "place/add a block|cube|sphere"
+        try {
+            const placed = forgeTryLivePlace(text);
+            if (placed) {
+                forgeAppend('ai', 'Here is your ' + placed.label + ' on the floor at (' +
+                    placed.x.toFixed(1) + ', ' + placed.y.toFixed(1) + ', ' + placed.z.toFixed(1) +
+                    '). For real games / UI / cars, describe the full thing — I will write the HTML package and give you Play.');
+                forgeSetStatus('Quick place · ' + placed.label);
+                if (sendBtn) sendBtn.disabled = false;
+                return;
+            }
+            if (/\b(place|add|put|spawn|load)\b/i.test(text) && /\b(car|model|glb|mesh)\b/i.test(text)) {
+                forgeSetStatus('Loading model…');
+                const loaded = await forgeLoadModelIntoScene();
+                if (loaded) {
+                    forgeAppend('ai', 'Your model (' + loaded.label + ') is on the infinite floor. Describe a full game/app around it and I will build a Playable HTML package.');
+                    forgeSetStatus('Model in scene');
+                    if (sendBtn) sendBtn.disabled = false;
+                    return;
+                }
+            }
+        } catch (liveErr) {
+            console.warn('forge live', liveErr);
+        }
+
+        // FULL AI BUILD — same worker protocol as main Luba chat (NOT action:generate)
+        try {
+            const system = (typeof BUILDER_MODE_INSTRUCTIONS !== 'undefined' ? BUILDER_MODE_INSTRUCTIONS : '') +
+                '\n\nYou are Luba inside LUBA FORGE (builder studio). The viewport starts as an empty infinite floor. ' +
+                'When the user asks to build a game, tool, UI, or scene: output a COMPLETE single-file HTML document in ONE ```html fence. ' +
+                'Include <!-- BUILD_TITLE: Name -->. Prefer Three.js from CDN for 3D. Make it playable. Talk briefly then the code.';
+            let msg = text;
+            try {
+                if ((window.__forgeMedia && window.__forgeMedia.length) || (window.__lubaLastModels && window.__lubaLastModels.length)) {
+                    msg += '\n\n[USER ATTACHED MEDIA/3D MODEL — embed with LUBA_MODELS[0] / LUBA_IMGS placeholders if relevant]';
+                }
+            } catch (_) {}
+
+            const token = typeof getAuthToken === 'function' ? (getAuthToken() || '') : '';
+            const model = 'gemini-2.5-flash';
+            const payload = {
+                contents: [{ role: 'user', parts: [{ text: msg }] }],
+                systemInstruction: { parts: [{ text: system }] },
+                generationConfig: { temperature: 0.35, maxOutputTokens: 8192 }
+            };
+            const fetchTO = window.fetchWithTimeout || function(url, opt) { return fetch(url, opt); };
+            const res = await fetchTO(WORKER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: model,
+                    payload: payload,
+                    token: token,
+                    coinCost: 1,
+                    username: currentUser.username
+                })
+            }, 120000);
+            let data = null;
+            try { data = await res.json(); } catch (_) { data = null; }
+
+            let reply = '';
+            if (data) {
+                if (data.error) {
+                    reply = (data.error.message || data.error || 'AI error').toString();
+                } else if (data.reply) reply = data.reply;
+                else if (data.text) reply = data.text;
+                else if (data.message) reply = data.message;
+                else if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                    try {
+                        reply = (data.candidates[0].content.parts || []).map(function(p){ return p.text || ''; }).join('');
+                    } catch (_) {}
+                }
+            }
+            if (!reply) reply = 'No response from AI. Check coins / connection and try again.';
+
+            let buildCode = '';
+            try { buildCode = extractHtmlCodeFromReply(reply); } catch (_) {}
+            if (buildCode) {
+                try {
+                    const media = (window.__forgeMedia && window.__forgeMedia.length) ? window.__forgeMedia : (window.__lubaLastModels || window.__lubaPendingMedia || []);
+                    if (media.length) buildCode = injectUserImagesIntoHtml(buildCode, media);
+                } catch (_) {}
+                try { buildCode = ensureReliableGltfViewer(buildCode); } catch (_) {}
+                let v = { ok: true, issues: [] };
+                try { v = verifyBuildHtml(buildCode); } catch (_) {}
+                const title = extractBuildTitle(buildCode, 'Forge Build');
+                window.__forge.lastBuild = { code: buildCode, title: title, verified: v.ok };
+                window.__lubaLastBuild = window.__forge.lastBuild;
+                const playId = 'forge-play-' + Date.now().toString(36);
+                const note = v.ok ? 'Build ready' : ('Notes: ' + (v.issues || []).join('; '));
+                // Show short AI text without dumping whole HTML
+                let brief = reply.replace(/```[\s\S]*?```/g, '').trim().slice(0, 600);
+                forgeAppend('ai',
+                    (brief ? escapeHtmlText(brief) + '<br><br>' : '') +
+                    '<div><b>' + escapeHtmlText(title) + '</b> · ' + escapeHtmlText(note) +
+                    '<br><button type="button" class="forge-play" id="' + playId + '">▶ Play</button></div>', true);
+                setTimeout(function() {
+                    const b = document.getElementById(playId);
+                    if (b) b.onclick = function() { forgePlayBuild(); };
+                }, 0);
+                const playLast = document.getElementById('forge-play-last');
+                if (playLast) playLast.style.display = 'inline-block';
+                forgeSetStatus('Build ready · ' + title);
+            } else {
+                forgeAppend('ai', String(reply).slice(0, 5000));
+                forgeSetStatus('Reply ready');
+            }
+        } catch (e) {
+            console.warn(e);
+            forgeAppend('ai', 'Build failed: ' + (e && e.message ? e.message : 'network error'));
+            forgeSetStatus('Build error');
+        }
+        if (sendBtn) sendBtn.disabled = false;
+    }
+
+    function forgePlayBuild() {
+        const pack = window.__forge.lastBuild || window.__lubaLastBuild;
+        if (!pack || !pack.code) {
+            alert('No build yet — describe what to build first');
+            return;
+        }
+        // Use fullscreen preview system
+        let fs = document.getElementById('preview-fullscreen');
+        if (!fs) {
+            fs = document.createElement('div');
+            fs.id = 'preview-fullscreen';
+            fs.innerHTML = '<div class="fs-bar"><div class="fs-title">Forge Play</div><button type="button" class="fs-close" aria-label="Close">×</button></div><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; autoplay; fullscreen" src="about:blank"></iframe>';
+            document.body.appendChild(fs);
+            fs.querySelector('.fs-close').addEventListener('click', closePreviewFullscreen);
+        }
+        fs.querySelector('.fs-title').textContent = pack.title || 'Forge Play';
+        const fsFrame = fs.querySelector('iframe');
+        try {
+            if (fsFrame._lubaBlobSrc) { try { URL.revokeObjectURL(fsFrame._lubaBlobSrc); } catch (_) {} }
+            const blob = new Blob([pack.code], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            fsFrame._lubaBlobSrc = url;
+            fsFrame.src = url;
+        } catch (_) {
+            fsFrame.srcdoc = pack.code;
+        }
+        fs.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    window.openForgeStudio = openForgeStudio;
+    window.closeForgeStudio = closeForgeStudio;
+    window.forgeSendBuild = forgeSendBuild;
+    window.forgePlayBuild = forgePlayBuild;
+    window.forgeResetScene = function() {
+        forgeInitViewport();
+        forgeSetStatus('Scene reset · infinite floor');
+        forgeAppend('ai', 'Scene reset to empty infinite floor. What are we building next?');
+    };
+
+    function wireForgeControls() {
+        const openBtn = document.getElementById('forge-btn') || document.getElementById('forge-open-fab') || document.getElementById('settings-open-forge');
+        const settingsForge = document.getElementById('settings-open-forge');
+        if (settingsForge) settingsForge.onclick = function(e) {
+            try { e.preventDefault(); e.stopPropagation(); } catch(_){}
+            try {
+                const modal = document.getElementById('settings-modal') || document.querySelector('.settings-modal') || document.getElementById('settings-overlay');
+                // close settings if open
+                const closeB = document.getElementById('close-settings-btn');
+                if (closeB) closeB.click();
+                else {
+                    const m = document.getElementById('settings-modal');
+                    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+                }
+            } catch(_){}
+            openForgeStudio();
+        };
+        const fab = document.getElementById('forge-open-fab');
+        if (fab) fab.onclick = function(e) { try { e.preventDefault(); e.stopPropagation(); } catch(_){} openForgeStudio(); };
+        const closeBtn = document.getElementById('forge-close');
+        const sendBtn = document.getElementById('forge-send');
+        const input = document.getElementById('forge-input');
+        const resetBtn = document.getElementById('forge-reset-scene');
+        const playLast = document.getElementById('forge-play-last');
+        if (openBtn) openBtn.onclick = function(e) { try { e.preventDefault(); e.stopPropagation(); } catch(_){} openForgeStudio(); };
+        if (closeBtn) closeBtn.onclick = function(e) { try { e.preventDefault(); e.stopPropagation(); } catch(_){} closeForgeStudio(); };
+        if (sendBtn) sendBtn.onclick = function(e) { try { e.preventDefault(); e.stopPropagation(); } catch(_){} forgeSendBuild(); };
+        if (playLast) playLast.onclick = function(e) { try { e.preventDefault(); e.stopPropagation(); } catch(_){} forgePlayBuild(); };
+        if (resetBtn) resetBtn.onclick = function(e) { try { e.preventDefault(); e.stopPropagation(); } catch(_){} window.forgeResetScene(); };
+        if (input && !input.dataset.forgeKey) {
+            input.dataset.forgeKey = '1';
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    forgeSendBuild();
+                }
+            });
+        }
+
+        const photoBtn = document.getElementById('forge-pick-photo');
+        const fileBtn = document.getElementById('forge-pick-file');
+        const photoIn = document.getElementById('forge-photo-input');
+        const fileIn = document.getElementById('forge-file-input');
+        if (photoBtn && photoIn) photoBtn.onclick = function() { photoIn.click(); };
+        if (fileBtn && fileIn) fileBtn.onclick = function() { fileIn.click(); };
+        if (photoIn && !photoIn.dataset.wired) {
+            photoIn.dataset.wired = '1';
+            photoIn.onchange = async function() {
+                const files = photoIn.files;
+                if (!files || !files.length) return;
+                window.__forgeMedia = window.__forgeMedia || [];
+                for (let i = 0; i < files.length; i++) {
+                    try {
+                        const du = await readFileAsDataUrl(files[i]);
+                        window.__forgeMedia.push({ dataUrl: du, isVideo: /^video\//.test(files[i].type), isModel: false, name: files[i].name });
+                    } catch (_) {}
+                }
+                forgeSetStatus('Attached ' + window.__forgeMedia.length + ' media item(s)');
+                forgeAppend('ai', 'Got your photo(s). Say what to do with them, or build a scene that uses them.');
+                photoIn.value = '';
+            };
+        }
+        if (fileIn && !fileIn.dataset.wired) {
+            fileIn.dataset.wired = '1';
+            fileIn.onchange = async function() {
+                const f = fileIn.files && fileIn.files[0];
+                if (!f) return;
+                window.__forgeMedia = window.__forgeMedia || [];
+                try {
+                    let isModel = /\.(glb|gltf)$/i.test(f.name) || /model\/gltf/i.test(f.type || '');
+                    if (!isModel && typeof isProbablyGltfModel === 'function') {
+                        try { isModel = await isProbablyGltfModel(f); } catch (_) {}
+                    }
+                    if (isModel) {
+                        let modelUrl = f.size > 20 * 1024 * 1024 ? URL.createObjectURL(f) : await readFileAsDataUrl(f);
+                        if (typeof modelUrl === 'string' && modelUrl.indexOf('data:application/octet-stream') === 0) {
+                            modelUrl = modelUrl.replace('data:application/octet-stream', 'data:model/gltf-binary');
+                        }
+                        const item = { dataUrl: modelUrl, isModel: true, name: f.name || 'model.glb', size: f.size, mime: 'model/gltf-binary' };
+                        window.__forgeMedia.push(item);
+                        window.__lubaLastModels = [item];
+                        forgeAppend('ai', '3D model attached: ' + (f.name || 'model') + '. Say "place the car/model" to drop it on the floor, or describe a full build.');
+                        forgeSetStatus('Model attached');
+                    } else {
+                        forgeAppend('ai', 'That file is not a .glb/.gltf model. Use the paperclip for 3D models.');
+                    }
+                } catch (err) {
+                    forgeAppend('ai', 'Could not attach file');
+                }
+                fileIn.value = '';
+            };
+        }
+
+    }
+    // Bind now and again when DOM is ready (Forge HTML may load after this script)
+    try { wireForgeControls(); } catch (_) {}
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { try { wireForgeControls(); } catch (_) {} });
+    }
+    setTimeout(function() { try { wireForgeControls(); } catch (_) {} }, 0);
+    setTimeout(function() { try { wireForgeControls(); } catch (_) {} }, 500);
+    // Event delegation backup — always works even if ids rebind
+    document.addEventListener('click', function(e) {
+        var t = e.target;
+        if (!t) return;
+        var id = t.id || (t.closest && t.closest('[id]') && t.closest('[id]').id);
+        if (id === 'forge-btn' || id === 'forge-open-fab' || id === 'settings-open-forge' || (t.closest && (t.closest('#forge-btn') || t.closest('#forge-open-fab') || t.closest('#settings-open-forge')))) {
+            e.preventDefault();
+            openForgeStudio();
+        } else if (id === 'forge-close' || (t.closest && t.closest('#forge-close'))) {
+            e.preventDefault();
+            closeForgeStudio();
+        } else if (id === 'forge-send' || (t.closest && t.closest('#forge-send'))) {
+            e.preventDefault();
+            forgeSendBuild();
+        } else if (id === 'forge-reset-scene' || (t.closest && t.closest('#forge-reset-scene'))) {
+            e.preventDefault();
+            window.forgeResetScene();
+        } else if (id === 'forge-play-last' || (t.closest && t.closest('#forge-play-last'))) {
+            e.preventDefault();
+            forgePlayBuild();
+        }
+    }, true);
+
+
 </script>
+
+<!-- Luba Forge — separate builder studio -->
+<div id="forge-studio" aria-hidden="true">
+  <div class="forge-top">
+    <div class="forge-logo">◈ <span>LUBA FORGE</span></div>
+    <span class="forge-pill">DEMO</span>
+    <div class="forge-status" id="forge-status">Empty scene · infinite floor</div>
+    <button type="button" class="forge-close" id="forge-close" title="Exit Forge" onclick="window.closeForgeStudio&&window.closeForgeStudio()">×</button>
+  </div>
+  <div class="forge-body">
+    <div class="forge-viewport-wrap">
+      <div class="forge-viewport-label">Viewport · drag to orbit</div>
+      <canvas id="forge-canvas"></canvas>
+      <div class="forge-tools">
+        <button type="button" class="forge-tool" id="forge-reset-scene" onclick="window.forgeResetScene&&window.forgeResetScene()">Reset scene</button>
+        <button type="button" class="forge-tool primary" id="forge-play-last" style="display:none" onclick="window.forgePlayBuild&&window.forgePlayBuild()">Play build</button>
+      </div>
+    </div>
+    <div class="forge-side">
+      <div id="forge-chat"></div>
+      <div class="forge-attach-row" id="forge-attach-row" style="display:none;padding:6px 12px 0;gap:8px;flex-wrap:wrap;align-items:center"></div>
+      <div class="forge-composer">
+        <button type="button" class="forge-tool" id="forge-pick-photo" title="Photo" style="padding:10px 12px">📷</button>
+        <button type="button" class="forge-tool" id="forge-pick-file" title="3D / file" style="padding:10px 12px">📎</button>
+        <input type="file" id="forge-photo-input" accept="image/*,video/*" multiple style="display:none" />
+        <input type="file" id="forge-file-input" accept="*/*" style="display:none" />
+        <textarea id="forge-input" rows="1" placeholder="What are we building? e.g. place a block"></textarea>
+        <button type="button" id="forge-send" onclick="window.forgeSendBuild&&window.forgeSendBuild()">Build</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
