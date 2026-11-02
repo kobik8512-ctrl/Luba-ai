@@ -462,6 +462,57 @@
         .ai .content {
             padding-right: 76px; /* room for copy + speak */
         }
+        .memory-section {
+            margin-bottom: 14px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            background: rgba(124, 58, 237, 0.06);
+        }
+        .memory-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .memory-count { font-size: 11px; opacity: 0.6; font-weight: 600; }
+        .memory-list {
+            display: flex; flex-direction: column; gap: 6px;
+            max-height: 180px; overflow-y: auto; margin-bottom: 8px;
+        }
+        .memory-empty { font-size: 12px; opacity: 0.55; padding: 6px 0; }
+        .memory-item {
+            display: flex; align-items: flex-start; gap: 8px;
+            background: var(--input-bg); border: 1px solid var(--border);
+            border-radius: 10px; padding: 8px 10px; font-size: 13px; line-height: 1.4;
+        }
+        .memory-item-text { flex: 1; word-break: break-word; }
+        .memory-del {
+            background: transparent; border: none; color: #ff6b8a;
+            font-size: 15px; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0;
+        }
+        .memory-add-row { display: flex; gap: 6px; }
+        .memory-add-row input {
+            flex: 1; margin-bottom: 0 !important;
+            padding: 8px 10px !important; font-size: 13px !important;
+        }
+        .source-chips {
+            display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+            padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); align-items: center;
+        }
+        .source-chips-label {
+            font-size: 11px; opacity: 0.55; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.04em; margin-right: 2px;
+        }
+        .src-chip {
+            font-size: 11px; padding: 4px 10px; border-radius: 999px;
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text); text-decoration: none; font-weight: 600;
+        }
+        body.light .src-chip { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); }
+        .src-chip:hover { border-color: var(--accent); }
         .coins-card {
             display: flex;
             align-items: center;
@@ -2728,6 +2779,18 @@
                 <div class="username-status empty" id="verify-request-status" style="margin-top:6px;"></div>
             </div>
 
+            <div class="memory-section" id="memory-section">
+                <div class="memory-header">
+                    <span>🧠 What Luba remembers about you</span>
+                    <span class="memory-count" id="memory-count"></span>
+                </div>
+                <div class="memory-list" id="memory-list"></div>
+                <div class="memory-add-row">
+                    <input type="text" id="memory-add-input" maxlength="300" placeholder="Add something to remember…">
+                    <button type="button" class="small-btn" id="memory-add-btn">+ Add</button>
+                </div>
+            </div>
+
             <div class="coins-card" id="coins-card">
                 <div class="coins-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none">
@@ -4876,6 +4939,49 @@ async function spendCoin(username, cost) {
         storageSet('luba_device_accounts', JSON.stringify(list));
     }
 
+    function renderMemoryList() {
+        const listEl = document.getElementById('memory-list');
+        const countEl = document.getElementById('memory-count');
+        if (!listEl || !currentUser) return;
+        const list = getMemories(currentUser.username);
+        if (countEl) countEl.textContent = list.length ? (list.length + ' / ' + MAX_MEMORIES) : '';
+        if (!list.length) {
+            listEl.innerHTML = '<div class="memory-empty">Nothing yet. Say “remember …” in chat, or add one below.</div>';
+            return;
+        }
+        listEl.innerHTML = list.slice().reverse().map(m =>
+            '<div class="memory-item">' +
+                '<span class="memory-item-text">' + escapeHtml(m.text) + '</span>' +
+                '<button type="button" class="memory-del" data-mem-id="' + m.id + '" title="Delete">×</button>' +
+            '</div>'
+        ).join('');
+        listEl.querySelectorAll('.memory-del').forEach(btn => {
+            btn.onclick = () => {
+                const id = btn.getAttribute('data-mem-id');
+                removeMemory(currentUser.username, id);
+                renderMemoryList();
+            };
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const addBtn = document.getElementById('memory-add-btn');
+        const addInput = document.getElementById('memory-add-input');
+        if (addBtn && addInput) {
+            addBtn.onclick = () => {
+                if (!currentUser) return;
+                const v = addInput.value.trim();
+                if (!v) return;
+                addMemory(currentUser.username, v);
+                addInput.value = '';
+                renderMemoryList();
+            };
+            addInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
+            });
+        }
+    });
+
     function renderDeviceAccounts() {
         const wrap = document.getElementById('device-accounts');
         const listEl = document.getElementById('device-accounts-list');
@@ -5210,7 +5316,7 @@ async function spendCoin(username, cost) {
 
     function saveUserPrefs(username, prefs) {
         localStorage.setItem('luba_prefs_' + userKey(username), JSON.stringify(prefs));
-        // Sync personality / theme / mode to server (all phones)
+        // Sync personality / theme / mode / memories to server (all phones)
         const token = getAuthToken();
         if (token) {
             cloudPost({
@@ -5220,10 +5326,54 @@ async function spendCoin(username, cost) {
                     systemPrompt: prefs.systemPrompt || '',
                     theme: prefs.theme || 'dark',
                     activeMode: prefs.activeMode || 'normal',
-                    studyMode: !!prefs.studyMode
+                    studyMode: !!prefs.studyMode,
+                    memories: Array.isArray(prefs.memories) ? prefs.memories.slice(0, 40) : []
                 }
             }).catch(() => {});
         }
+    }
+
+    // ============================================================
+    // Memory — per-user facts (local + cloud via prefs)
+    // ============================================================
+    const MAX_MEMORIES = 40;
+    function getMemories(username) {
+        if (!username) return [];
+        const prefs = loadUserPrefs(username);
+        const list = Array.isArray(prefs.memories) ? prefs.memories : [];
+        return list.filter(m => m && typeof m.text === 'string' && m.text.trim());
+    }
+    function saveMemories(username, list) {
+        if (!username) return;
+        const prefs = loadUserPrefs(username);
+        prefs.memories = (list || []).slice(0, MAX_MEMORIES);
+        saveUserPrefs(username, prefs);
+    }
+    function addMemory(username, text) {
+        const clean = String(text || '').trim().slice(0, 300);
+        if (!clean) return null;
+        const list = getMemories(username);
+        const key = clean.toLowerCase();
+        if (list.some(m => String(m.text).trim().toLowerCase() === key)) return null;
+        const entry = {
+            id: 'mem_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+            text: clean,
+            at: Date.now()
+        };
+        list.push(entry);
+        while (list.length > MAX_MEMORIES) list.shift();
+        saveMemories(username, list);
+        return entry;
+    }
+    function removeMemory(username, id) {
+        const list = getMemories(username).filter(m => m.id !== id);
+        saveMemories(username, list);
+    }
+    function formatMemoriesBlock(username) {
+        const list = getMemories(username);
+        if (!list.length) return '';
+        const lines = list.map(m => '- ' + String(m.text).replace(/\n/g, ' ')).join('\n');
+        return '\n\nTHINGS YOU REMEMBER ABOUT THIS USER (saved by them, across chats and devices — use naturally, don\'t dump the list back at them unless they ask):\n' + lines;
     }
 
     async function pullCloudPrefs() {
@@ -5240,6 +5390,17 @@ async function spendCoin(username, cost) {
         if (cloud.theme === 'light' || cloud.theme === 'dark') merged.theme = cloud.theme;
         if (cloud.activeMode) merged.activeMode = cloud.activeMode;
         if (typeof cloud.studyMode === 'boolean') merged.studyMode = cloud.studyMode;
+        if (Array.isArray(cloud.memories)) {
+            // Prefer longer cloud list if both exist; merge unique by text
+            const byKey = new Map();
+            (merged.memories || []).forEach(m => {
+                if (m && m.text) byKey.set(String(m.text).trim().toLowerCase(), m);
+            });
+            cloud.memories.forEach(m => {
+                if (m && m.text) byKey.set(String(m.text).trim().toLowerCase(), m);
+            });
+            merged.memories = Array.from(byKey.values()).slice(0, MAX_MEMORIES);
+        }
         // write local only (don't re-push loop)
         try {
             localStorage.setItem('luba_prefs_' + userKey(currentUser.username), JSON.stringify(merged));
@@ -6335,6 +6496,8 @@ TikTok accounts (spell exactly):
 
 You know yourself: if someone asks what you can do, what modes exist, about coins/messages, verified, Ledger Life, HTML preview, fullscreen, camera in apps, who made you, or anything about this Luba app — answer from your real identity knowledge, clearly and accurately. Do not pretend you have no idea about your own features.
 
+You have tools: calculator (always for math), generate_image (when they want a picture), save_memory (when they ask you to remember a lasting fact about them), and web_search (MUST use for news, scores, prices, weather, release dates, or anything that might be outdated — do not guess current facts).
+
 Understand short or casual requests without needing a huge brief. Infer what they want, ask at most one clarifying question only if truly blocked, otherwise just deliver. When building code or HTML, aim for production-quality completeness, not thin demos.
 
 When the user asks for interactive demos, games, 3D models they can rotate, animations, or anything that should RUN in a browser: reply with ONE complete single-file HTML document inside a markdown code block labeled html (opening fence must be three backticks then the word html). The file must work alone — include libraries via CDN (three.js from https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js is fine). Polished result: dark background, short on-screen instructions, pointer drag to rotate, scroll to zoom. Do NOT dump bare JavaScript fragments, partial scripts, or assembly steps.
@@ -6383,14 +6546,21 @@ BUILDING AI / CHAT APPS:
 19) Do not copy the same chatbot layout every time. Vary structure, colors, name, and features so each request feels new — not the same template with a different title.
 
 2D / 3D / GAMES:
-20) For 2D games: requestAnimationFrame loop, keyboard + touch controls, score/UI, collision, restart. For 3D: Three.js from the CDN above, proper lighting, orbit or drag controls, no floating disconnected meshes.
+20) For 2D games: requestAnimationFrame loop, keyboard + touch controls (on-screen buttons for mobile), score/UI, collision, restart. For 3D: Three.js from the CDN above, proper lighting, orbit or drag controls, no floating disconnected meshes.
 21) Camera / mic / location apps: use navigator.mediaDevices.getUserMedia or geolocation with clear permission UX and error messages if denied. Prefer facingMode environment for back camera when relevant.
+22) DETAILED GAME SPECS ARE LAW: When the user lists features (e.g. 2-player, tanks, walls, place blocks, controls, health, map editor), implement EVERY listed feature as real working systems — not placeholders. Different units must look and control like real game objects (not two plain colored squares). Walls/map must be placeable or present as solid collisions. Both players need clear controls (keyboard and/or touch). If they gave a long brief, treat it as a checklist and satisfy it end-to-end.
+23) CONTROLS ARE MANDATORY for games: visible on-screen buttons or clear keys (WASD / arrows / touch zones), documented on screen. A game with no way to move is a failed build — never ship that.
+
+ITERATION / MEMORY OF THE SAME PROJECT (critical):
+24) If the user asks to fix a bug, add a feature, change colors, improve controls, or "make X better" AFTER you already built a game/app in this chat, you MUST continue THAT same project. Do not invent a new unrelated game. Keep the same theme, mechanics, layout, and code structure; only apply the requested change.
+25) When iterating: start from the previous HTML you produced in this conversation (use the chat history). Preserve working systems. Add or fix only what they asked. Never reset to a tiny demo version of a different idea.
+26) If they say "add walls", "fix controls", "make it 2 player", etc., patch the existing build — do not replace a tank game with a platformer or a blank page.
 
 FREEDOM & THINKING:
-22) You are free to design. Quality and a working result matter more than following a fixed template.
-23) Short requests are enough — expand them into a full app with good defaults. Do not wait for a long brief.
-24) Avoid repeating the exact same app structure when the user asks again. Change layout, features, and style.
-25) Prefer one complete, clean HTML file that runs in the preview over half-broken code spilled as text.`;
+27) You are free to design when the request is open-ended. When the request is detailed, follow the detail first — creativity fills gaps, it does not delete requirements.
+28) Short requests are enough — expand them into a full app with good defaults. Do not wait for a long brief.
+29) Avoid repeating the exact same app structure when the user asks for a brand-new separate project. Change layout, features, and style for new projects only.
+30) Prefer one complete, clean HTML file that runs in the preview over half-broken code spilled as text.`;
 
     const CODE_MODE_INSTRUCTIONS = `CODE MODE IS CURRENTLY ON. Focus on complete, working code:
 - Give full runnable programs or full files, not fragments the user has to glue together.
@@ -6483,7 +6653,8 @@ Every substantive answer ends with:
         }
 
         const modeBlock = modeInstructions(activeMode);
-        let prompt = identityBlock + nameBlock + "\n\n" + customPersonality + (modeBlock ? "\n\n" + modeBlock : "");
+        const memoryBlock = (currentUser && currentUser.username) ? formatMemoriesBlock(currentUser.username) : '';
+        let prompt = identityBlock + nameBlock + memoryBlock + "\n\n" + customPersonality + (modeBlock ? "\n\n" + modeBlock : "");
         // Owner account: rule goes last so it wins over ragebait / mean personalities
         if (owner) {
             prompt += "\n\n" + KOBI_OWNER_OVERRIDE;
@@ -7152,6 +7323,19 @@ Every substantive answer ends with:
         }
         const el = document.getElementById('typing-indicator');
         if (el) el.remove();
+    }
+
+    // Update the thinking bubble text temporarily (e.g. while web search runs)
+    function setTypingStatus(text) {
+        const el = document.querySelector('#typing-indicator .thinking-text');
+        if (!el) return;
+        el.style.opacity = '0.35';
+        setTimeout(() => {
+            if (el && document.getElementById('typing-indicator')) {
+                el.textContent = String(text || 'Working…');
+                el.style.opacity = '0.9';
+            }
+        }, 100);
     }
 
     function initDefaultChat() {
@@ -8143,6 +8327,7 @@ Every substantive answer ends with:
             settingsUsername.classList.remove('username-locked');
             settingsUsername.readOnly = false;
         }
+        renderMemoryList();
         modalOverlay.style.display = 'flex';
     }
 
@@ -8854,6 +9039,28 @@ Every substantive answer ends with:
                     },
                     required: ["prompt"]
                 }
+            },
+            {
+                name: "save_memory",
+                description: "Saves a durable fact about the user so you remember it in future chats (name, preferences, important context). Only call this when the user explicitly asks you to remember something, or states a stable personal fact ('my name is…', 'I like…', 'I'm allergic to…'). Do NOT save transient chat details, questions, or things about other people.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        text: { type: "STRING", description: "The short fact to remember, e.g. 'Likes the color blue' or 'Lives in Tbilisi, Georgia'." }
+                    },
+                    required: ["text"]
+                }
+            },
+            {
+                name: "web_search",
+                description: "Searches the live web for current information. MUST use this for recent events, news, prices, sports scores, weather, releases, or anything you are unsure is still current. Do not guess — search.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        query: { type: "STRING", description: "Search query, e.g. 'Minecraft 1.22 release date'." }
+                    },
+                    required: ["query"]
+                }
             }
         ]
     }];
@@ -8868,6 +9075,40 @@ Every substantive answer ends with:
         } catch (err) {
             return "Error: could not evaluate expression.";
         }
+    }
+
+    // Web search — via Cloudflare worker (DuckDuckGo)
+    async function runWebSearch(query) {
+        const q = String(query || '').trim().slice(0, 400);
+        if (!q) return { ok: false, error: 'empty query' };
+        try {
+            const data = await cloudPost({ action: 'web_search', query: q });
+            if (!data || data.ok === false || !Array.isArray(data.results) || !data.results.length) {
+                return { ok: false, error: (data && data.error) || 'no results' };
+            }
+            const top = data.results.slice(0, 5);
+            const summary = top.map((r, i) =>
+                (i + 1) + '. ' + (r.title || 'Untitled') + ' — ' + (r.url || '') + '\n' +
+                (r.snippet ? String(r.snippet).replace(/\s+/g, ' ').slice(0, 280) : '')
+            ).join('\n\n');
+            window._lubaLastSources = top;
+            return { ok: true, summary: 'WEB RESULTS for "' + q + '":\n\n' + summary };
+        } catch (e) {
+            return { ok: false, error: 'network' };
+        }
+    }
+
+    function renderSourceChips() {
+        const srcs = window._lubaLastSources;
+        if (!Array.isArray(srcs) || !srcs.length) return '';
+        const chips = srcs.slice(0, 5).map(r => {
+            const safeUrl = String(r.url || '').replace(/"/g, '');
+            const host = (() => { try { return new URL(safeUrl).hostname.replace(/^www\./, ''); } catch { return safeUrl; } })();
+            const safeTitle = String(r.title || host).slice(0, 60).replace(/</g, '&lt;');
+            return '<a class="src-chip" href="' + safeUrl + '" target="_blank" rel="noopener" title="' + safeTitle.replace(/"/g, '&quot;') + '">' + host + '</a>';
+        }).join('');
+        window._lubaLastSources = null;
+        return '<div class="source-chips"><span class="source-chips-label">Sources</span>' + chips + '</div>';
     }
 
     function buildImageUrl(prompt) {
@@ -9207,6 +9448,24 @@ Every substantive answer ends with:
     async function sendMessage(opts) {
         if (!currentUser) return;
 
+        // Auto-memory: "remember X" / "don't forget X" / "/remember X" (only when not already generating)
+        if (!isGenerating && !opts && currentUser) {
+            const rawMem = (userInput && userInput.value) ? userInput.value.trim() : '';
+            const memMatch = rawMem.match(/^(?:\/remember\s+|remember(?:\s+that)?\s+|don'?t forget(?:\s+that)?\s+)(.+)$/i);
+            if (memMatch && memMatch[1] && memMatch[1].length <= 300) {
+                const saved = addMemory(currentUser.username, memMatch[1]);
+                const t = getTime();
+                const txt = saved
+                    ? '🧠 Got it — I\'ll remember: “' + saved.text + '”'
+                    : '🧠 I already have that one saved.';
+                appendMessage('ai', txt, t);
+                chatHistory.push({ role: 'assistant', content: txt, time: t });
+                saveChat();
+                userInput.value = '';
+                return;
+            }
+        }
+
         // If nothing is generating, never treat this as Stop — clear stuck latch
         // (bug: after "You stopped the reply", forceStopGeneration stayed true and blocked all sends)
         if (!isGenerating) {
@@ -9409,15 +9668,31 @@ Every substantive answer ends with:
         if (/\b(5\s*k|5000|thousands? of lines|full game|complete game|big game|entire app|full app)\b/i.test(msgText)
             || /\b(make|build|create|write)\b[\s\S]{0,80}\b(game|html app|tycoon|simulator)\b/i.test(msgText)
             || activeMode === 'html' || activeMode === 'code') {
-            systemPrompt += "\n\nLARGE BUILD RULES: Produce complete working code at maximum depth and visual quality, not a short demo. Implement real systems (UI, state, loops, saves, multiple features, win/lose, realistic data). No TODO stubs. Every button must work and change the UI. If output hits the length limit, stop cleanly — continue resumes the same file. Prefer one full HTML document for games/apps. Never ship a hollow 300-line shell or a single big button when the user asked for a real app (VPN, dashboard, bank, tool, game, etc.). Match the richness a top AI would deliver: many interactive controls, polished theme, status animations, and real-feeling data.";
+            systemPrompt += "\n\nLARGE BUILD RULES: Produce complete working code at maximum depth and visual quality, not a short demo. Implement real systems (UI, state, loops, saves, multiple features, win/lose, realistic data). No TODO stubs. Every button must work and change the UI. If output hits the length limit, stop cleanly — continue resumes the same file. Prefer one full HTML document for games/apps. Never ship a hollow 300-line shell or a single big button when the user asked for a real app (VPN, dashboard, bank, tool, game, etc.). Match the richness a top AI would deliver: many interactive controls, polished theme, status animations, and real-feeling data. DETAILED SPECS: if the user listed features (2 players, tanks, walls, controls, etc.), implement each one for real — not colored squares without controls. ITERATION: if they are asking to fix/add onto a game you already made in this chat, continue THAT same game; do not replace it with a different project.";
         }
+
+        // User is iterating on a previous build — force continuity
+        const isIterateMsg = /\b(fix|bug|add|also|now make|update|improve|change|can you|walls?|controls?|again|same game|same app)\b/i.test(msgText)
+            && (activeMode === 'html' || activeMode === 'code'
+                || /\b(game|app|html|button|player|tank|wall|level)\b/i.test(msgText)
+                || chatHistory.some(m => m.role === 'assistant' && /<!DOCTYPE html|/i.test(String(m.content || ''))));
+        if (isIterateMsg) {
+            systemPrompt += "\n\nPROJECT CONTINUITY (MANDATORY): The user is modifying a project already built in this chat. You MUST continue the SAME HTML game/app from history. Keep theme, mechanics, and structure. Apply only their new fix/feature. Do NOT start a different game from scratch. Do NOT drop controls, players, or systems that already worked unless they asked to remove them.";
+        }
+
         const needsImageTool = /\b(draw|generate|create|make|paint|show)\b.{0,40}\b(image|picture|photo|art|artwork|illustration|wallpaper|logo)\b|\b(image|picture|photo)\b.{0,20}\b(of|for)\b/i.test(msgText);
         const needsCalcTool = /[\d]+\s*[+\-*/x×÷]\s*[\d]|calculate|what(?:'s| is)\s+\d|solve\s+\d/i.test(msgText);
-        const needsTools = !!(needsImageTool || needsCalcTool);
+        const needsSearchTool = /\b(search|look up|google|news|score|weather|price|latest|current|who won|release date|today|yesterday)\b/i.test(msgText)
+            || /\b(what(?:'s| is) the (?:score|weather|price|news))\b/i.test(msgText);
+        // Tools for image/calc/search; also allow tools on normal non-trivial chats so save_memory / web_search can fire
+        const needsTools = !!(needsImageTool || needsCalcTool || needsSearchTool || activeMode === 'html' || activeMode === 'code' || (!isIterateMsg && msgText.length >= 80));
         const isSimpleChat = !imageToSend && !needsTools && msgText.length > 0 && msgText.length < 120
             && activeMode === 'normal';
 
-        const historyLimit = isSimpleChat ? 4 : (text && text.length > 12000 ? 6 : 12);
+        // More history when iterating so the previous HTML stays in context
+        const historyLimit = isSimpleChat ? 4
+            : (isIterateMsg ? 20
+            : (text && text.length > 12000 ? 8 : 14));
         const recent = chatHistory.slice(-historyLimit);
 
         const contents = recent.map(m => ({
@@ -9615,6 +9890,20 @@ Every substantive answer ends with:
                             const url = buildImageUrl(args.prompt || text || "an image");
                             generatedImageUrls.push(url);
                             result = { result: "Image generated and will be shown to the user automatically." };
+                        } else if (name === "save_memory") {
+                            const saved = addMemory(currentUser && currentUser.username, args.text || "");
+                            result = { result: saved ? "Saved: " + saved.text : "Already known or empty — nothing saved." };
+                        } else if (name === "web_search") {
+                            try {
+                                const qShow = String(args.query || text || '').trim().slice(0, 80);
+                                setTypingStatus(qShow ? ('Searching the web for “' + qShow + '”…') : 'Searching the web…');
+                                const ws = await runWebSearch(args.query || text || "");
+                                setTypingStatus(ws.ok ? 'Reading search results…' : 'Search had an issue — finishing reply…');
+                                result = { result: ws.ok ? ws.summary : ("Search failed: " + (ws.error || "unknown")) };
+                            } catch (e) {
+                                setTypingStatus('Search failed — finishing reply…');
+                                result = { result: "Search failed." };
+                            }
                         } else {
                             result = { result: "Error: unknown tool." };
                         }
@@ -9701,7 +9990,11 @@ Every substantive answer ends with:
                     if (hasImages) {
                         displayReply += generatedImageUrls.map(u => buildGeneratedImageHTML(u)).join('');
                     }
-                    const useHtml = hasImages || formatted.hasCode;
+                    const sourceChips = renderSourceChips();
+                    if (sourceChips) {
+                        displayReply += sourceChips;
+                    }
+                    const useHtml = hasImages || formatted.hasCode || !!sourceChips;
                     appendMessage('ai', displayReply, getTime(), useHtml);
 
                     if (!alreadySavedUserAt(time)) {
