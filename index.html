@@ -6237,13 +6237,13 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 2, 2026
+        const TERMS_TEXT = `Last updated: November 2, 2026 (slash /add /webadd)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer), slash commands (/truth, /copy, /search, and others), live web search, interactive HTML/game previews, embedding your photos into generated apps, speech, generated images, coins/message limits, verification, and linked tools we add over time.
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer), slash commands (/truth, /copy, /add, /webadd, /search, and others), live web search for facts or public textures/assets, interactive HTML/game previews, embedding your photos into generated apps, speech, generated images, coins/message limits, verification, and linked tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
@@ -6281,7 +6281,7 @@ This Privacy Policy explains what Luba AI collects, stores, and uses. Some data 
 We may store username, password hash, profile photo, preferences (including mode settings), verification status, coin/message counters, and session tokens.
 
 3. Chat and media
-When you send a message (and optional image, short video, or file), content is sent through our secure proxy to an AI provider so Luba can reply. Live web search may send your search query to a search provider to fetch current results. On your device we may keep chat history and media in localStorage and IndexedDB so videos and photos can return after refresh. When you generate an HTML preview that uses your photo (for example with /copy), the image may be embedded as a data URL inside that preview on your device. When cloud sync is enabled, recent messages may also be stored on our servers for multi-device access. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
+When you send a message (and optional image, short video, or file), content is sent through our secure proxy to an AI provider so Luba can reply. Live web search (including /search and /webadd) may send your search query to a search provider to fetch current results or publicly available asset links (textures, demos, documentation). On your device we may keep chat history and media in localStorage and IndexedDB so videos and photos can return after refresh. When you generate an HTML preview that uses your photo (for example with /copy), the image may be embedded as a data URL inside that preview on your device. Generated previews may also load public CDN images/textures you or Luba request. When cloud sync is enabled, recent messages may also be stored on our servers for multi-device access. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
 
 4. Device storage
 Clearing site data removes local copies on that device. Large videos and image-heavy previews depend on available storage.
@@ -6554,6 +6554,8 @@ You know yourself: if someone asks what you can do, what modes exist, about coin
 Slash commands (type / in the chat box for autocomplete — these are NOT the same as Modes):
 - /truth — brutal honesty, no fake compliments (works with photos)
 - /copy — use the user's exact attached photo or exact description in what you build (no redraw). Placeholders __LUBA_IMG_0__ etc. become their real image data in the preview.
+- /add — add something to the CURRENT project in chat (e.g. /add trees, /add more features). Do not start a different game.
+- /webadd — search the web for textures / public 3D assets and add them into the CURRENT project (buildings, guns, props, etc.). Prefer real CDN/example texture URLs over crude self-made meshes when quality matters.
 - /search — force a live web search
 - /short — short answers
 - /detailed — thorough answers
@@ -9033,6 +9035,8 @@ Every substantive answer ends with:
     const SLASH_COMMANDS = [
         { cmd: '/truth', desc: 'Brutal honesty — no sugarcoating (works with photos too)' },
         { cmd: '/copy', desc: 'Use the exact photo/text — no redraw, no remix' },
+        { cmd: '/add', desc: 'Add something to the current game/app/text (trees, features…)' },
+        { cmd: '/webadd', desc: 'Search web for textures/3D assets and add them into the build' },
         { cmd: '/search', desc: 'Force a live web search for your question' },
         { cmd: '/short', desc: 'Answer short and direct — no long essays' },
         { cmd: '/detailed', desc: 'Long, thorough answer with full detail' },
@@ -9046,6 +9050,8 @@ Every substantive answer ends with:
     let pendingTruthMode = false;
     let pendingForceSearch = false;
     let pendingCopyMode = false;
+    let pendingAddMode = false;
+    let pendingWebAddMode = false;
     let pendingShortMode = false;
     let pendingDetailedMode = false;
     let pendingRoastMode = false;
@@ -9748,6 +9754,8 @@ Every substantive answer ends with:
         pendingTruthMode = false;
         pendingForceSearch = false;
         pendingCopyMode = false;
+        pendingAddMode = false;
+        pendingWebAddMode = false;
         pendingShortMode = false;
         pendingDetailedMode = false;
         pendingRoastMode = false;
@@ -9771,6 +9779,13 @@ Every substantive answer ends with:
             } else if (sp.cmd === '/copy') {
                 pendingCopyMode = true;
                 text = sp.rest || 'Copy this exactly into what you build.';
+            } else if (sp.cmd === '/add') {
+                pendingAddMode = true;
+                text = sp.rest || 'Add more polished features to the previous project in this chat.';
+            } else if (sp.cmd === '/webadd') {
+                pendingWebAddMode = true;
+                pendingForceSearch = true;
+                text = sp.rest || 'Find good public web assets (textures/models) and add them into the previous project.';
             } else if (sp.cmd === '/search') {
                 pendingForceSearch = true;
                 text = sp.rest || text.replace(/^\/search\s*/i, '').trim();
@@ -9997,6 +10012,18 @@ Every substantive answer ends with:
         if (pendingFixMode) {
             systemPrompt += "\n\nFIX MODE: Continue the SAME previous game/app from this chat. Fix bugs and apply improvements. Do not start a different project.";
         }
+        if (pendingAddMode) {
+            systemPrompt += "\n\nADD MODE (/add) IS ON: Continue the SAME previous project in this chat (game, HTML app, or text). ADD what the user asked for (trees, enemies, UI, features, paragraphs, etc.). Do not rebuild a different project from scratch. Keep existing systems working and integrate the new pieces cleanly. If they said \"more features\", invent several fun, working additions that fit the same project.";
+        }
+        if (pendingWebAddMode) {
+            systemPrompt += "\n\nWEBADD MODE (/webadd) IS ON: Continue the SAME previous project. The user wants real web assets (textures, sprites, HDRIs, or simple GLTF/GLB when appropriate) — not crude self-drawn cubes when a public URL will look better.\n" +
+                "- Use LIVE WEB SEARCH RESULTS when provided to find suitable public asset URLs or known public CDN paths.\n" +
+                "- Prefer reliable public CDNs / demo assets, e.g. Three.js example textures (https://threejs.org/examples/textures/...), Kenney-style public packs when linked, or other freely usable image textures via https URLs.\n" +
+                "- For 3D: load textures with THREE.TextureLoader; for 2D use <img> or canvas drawImage from https URLs. Always set crossOrigin when needed and provide a solid-color fallback if load fails.\n" +
+                "- Do NOT pretend a broken URL is fine — pick paths that commonly work, or use well-known Three.js example texture files.\n" +
+                "- Integrate the asset into the EXISTING game/app (buildings, guns, trees, etc. as requested). Do not start a new unrelated project.\n" +
+                "- Still output one complete HTML file with the additions working.";
+        }
 
         // Fast path for easy chat ("hi", short questions) — less history, no tools, smaller output
         const msgText = (text || '').trim();
@@ -10042,9 +10069,15 @@ Every substantive answer ends with:
 
         // Pre-search: actually hit the web, then feed results into the model
         let forcedSearchBlock = '';
-        if ((needsSearchTool || pendingForceSearch) && !imageToSend) {
+        if ((needsSearchTool || pendingForceSearch || pendingWebAddMode) && !imageToSend) {
             try {
-                const searchQ = buildSearchQuery(msgText);
+                let searchQ = buildSearchQuery(msgText);
+                if (pendingWebAddMode) {
+                    searchQ = (searchQ || msgText || 'game texture').slice(0, 120);
+                    if (!/texture|model|gltf|sprite|cdn|three\.js|asset/i.test(searchQ)) {
+                        searchQ = searchQ + ' free texture OR sprite OR gltf three.js example assets';
+                    }
+                }
                 setTypingStatus(searchQ ? ('Searching the web for “' + searchQ.slice(0, 60) + '”…') : 'Searching the web…');
                 const ws = await runWebSearch(searchQ);
                 if (ws && ws.ok && ws.summary) {
