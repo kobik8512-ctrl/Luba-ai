@@ -6565,7 +6565,7 @@ Slash commands (type / in the chat box for autocomplete — these are NOT the sa
 - /help — list slash commands
 Modes (Normal, Study, HTML, Code, Creative, Lawyer) are chosen from the Modes button, not slash commands.
 When building HTML games/apps you can use public CDN textures and Three.js. When the user attaches a photo and wants it in the project (especially with /copy), embed it via __LUBA_IMG_N__ placeholders so the client can inject the real image data URL.
-Users can also attach 3D models (.glb / .gltf, max about 20MB). Use __LUBA_MODEL_0__ (or window.LUBA_MODELS[0] after inject) with THREE.GLTFLoader — do not replace a real attached car/gun model with a cube. Photo button accepts images, videos, and GLB/GLTF.
+Users can also attach 3D models (.glb / .gltf, max about 100MB via blob URLs — not base64). Use __LUBA_MODEL_0__ (or window.LUBA_MODELS[0] after inject) with THREE.GLTFLoader — do not replace a real attached car/gun model with a cube. Photo button accepts images, videos, and GLB/GLTF.
 
 You have tools: calculator (always for math), generate_image (when they want a picture), save_memory (when they ask you to remember a lasting fact about them), and web_search (MUST use for news, scores, prices, net worth, stocks, sports results, weather, population, richest people, release dates, or anything that changes over time — never guess current numbers from memory; search first).
 
@@ -7023,7 +7023,22 @@ Every substantive answer ends with:
                         code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
                     }
                 } catch (_) {}
-                frame.srcdoc = code;
+                // If 3D blob: URLs are in the page, prefer blob-HTML so the iframe is same-origin and can load blobs
+                var hasBlobModel = /blob:/.test(code) && /LUBA_MODEL|GLTFLoader|\.glb|gltf/i.test(code);
+                if (hasBlobModel) {
+                    try {
+                        if (frame._lubaBlobSrc) { try { URL.revokeObjectURL(frame._lubaBlobSrc); } catch (_) {} }
+                        var htmlBlob = new Blob([code], { type: 'text/html' });
+                        var htmlUrl = URL.createObjectURL(htmlBlob);
+                        frame._lubaBlobSrc = htmlUrl;
+                        frame.removeAttribute('srcdoc');
+                        frame.src = htmlUrl;
+                    } catch (e2) {
+                        frame.srcdoc = code;
+                    }
+                } else {
+                    frame.srcdoc = code;
+                }
                 frame.dataset.hydrated = '1';
                 frame.removeAttribute('data-srcdoc-b64');
             } catch (err) {
@@ -8097,6 +8112,13 @@ Every substantive answer ends with:
     let mediaLoadError = null;
 
     function clearMediaPreview() {
+        try {
+            (selectedMediaItems || []).forEach(function(m) {
+                if (m && m.isModel && m.dataUrl && String(m.dataUrl).indexOf('blob:') === 0) {
+                    try { URL.revokeObjectURL(m.dataUrl); } catch (_) {}
+                }
+            });
+        } catch (_) {}
         selectedMediaItems = [];
         selectedImageBase64 = null;
         mediaLoading = false;
@@ -8146,7 +8168,8 @@ Every substantive answer ends with:
             if (m.isModel) {
                 var box = document.createElement('div');
                 box.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#1a1a22;color:#c4b5fd;font-size:11px;font-weight:800;text-align:center;padding:6px;';
-                box.textContent = '3D\n' + (m.name || 'model');
+                var mb = m.size ? (m.size / (1024 * 1024)).toFixed(1) + 'MB' : '';
+                box.textContent = '3D ' + mb + '\n' + (m.name || 'model');
                 wrap.appendChild(box);
                 var badge = document.createElement('span');
                 badge.className = 'vid-badge';
@@ -8174,7 +8197,10 @@ Every substantive answer ends with:
             x.textContent = '\u00d7';
             x.onclick = function (ev) {
                 try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
-                selectedMediaItems.splice(idx, 1);
+                var removed = selectedMediaItems.splice(idx, 1)[0];
+                if (removed && removed.isModel && removed.dataUrl && String(removed.dataUrl).indexOf('blob:') === 0) {
+                    try { URL.revokeObjectURL(removed.dataUrl); } catch (_) {}
+                }
                 selectedImageBase64 = selectedMediaItems.length ? selectedMediaItems[0].dataUrl : null;
                 renderMediaThumbs();
             };
@@ -8183,7 +8209,7 @@ Every substantive answer ends with:
         });
         var c = countMediaTypes();
         if (label) {
-            label.textContent = c.photos + '/' + MAX_PHOTOS + ' photos · ' + c.videos + '/' + MAX_VIDEOS + ' videos · ' + c.models + ' 3D'';
+            label.textContent = c.photos + '/' + MAX_PHOTOS + ' photos · ' + c.videos + '/' + MAX_VIDEOS + ' videos · ' + c.models + ' 3D';
         }
         selectedImageBase64 = selectedMediaItems[0].dataUrl;
     }
@@ -8256,21 +8282,34 @@ Every substantive answer ends with:
                 skipped.push('photo limit');
                 continue;
             }
-            // Models: 20MB hard limit — larger files (e.g. 70MB) break mobile preview as base64
-            var maxBytes = isModel ? 20 * 1024 * 1024 : (isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024);
+            // Models: up to 100MB via Blob URL (NOT base64 — base64 would explode memory)
+            var maxBytes = isModel ? 100 * 1024 * 1024 : (isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024);
             if (file.size > maxBytes) {
-                skipped.push((file.name || 'file') + ' too big (3D max 20MB — compress/export smaller GLB)');
+                skipped.push((file.name || 'file') + ' too big (3D max 100MB)');
                 continue;
             }
             try {
-                var dataUrl = await readFileAsDataUrl(file);
-                selectedMediaItems.push({
-                    dataUrl: dataUrl,
-                    isVideo: !!isVideo,
-                    isModel: !!isModel,
-                    name: file.name || (isModel ? 'model.glb' : 'file'),
-                    mime: file.type || (isModel ? 'model/gltf-binary' : '')
-                });
+                if (isModel) {
+                    var blobUrl = URL.createObjectURL(file);
+                    selectedMediaItems.push({
+                        dataUrl: blobUrl, // blob: URL — lightweight, works with GLTFLoader
+                        blob: file,
+                        isVideo: false,
+                        isModel: true,
+                        name: file.name || 'model.glb',
+                        mime: file.type || 'model/gltf-binary',
+                        size: file.size
+                    });
+                } else {
+                    var dataUrl = await readFileAsDataUrl(file);
+                    selectedMediaItems.push({
+                        dataUrl: dataUrl,
+                        isVideo: !!isVideo,
+                        isModel: false,
+                        name: file.name || 'file',
+                        mime: file.type || ''
+                    });
+                }
                 added++;
             } catch (_) {
                 skipped.push(file.name || 'unreadable');
@@ -8287,7 +8326,7 @@ Every substantive answer ends with:
         } catch (_) {}
 
         if (!added && skipped.length) {
-            alert('Could not add media. Check type/size. 3D models: .glb/.gltf max 20MB. Photos/videos have separate limits.');
+            alert('Could not add media. Check type/size. 3D models: .glb/.gltf max 100MB. Photos/videos have separate limits.');
         } else if (skipped.length) {
             var c = countMediaTypes();
             alert('Added ' + added + '. Skipped: ' + skipped.slice(0, 3).join(', ') + (skipped.length > 3 ? '…' : '') + '. Now: ' + c.photos + ' photos, ' + c.videos + ' videos, ' + c.models + ' 3D.');
@@ -10184,7 +10223,7 @@ Every substantive answer ends with:
                 "Include Three.js 0.149 + GLTFLoader from unpkg (UMD). Example pattern:\n" +
                 "const loader = new THREE.GLTFLoader(); loader.load(__LUBA_MODEL_0__ or window.LUBA_MODELS[0], (gltf) => { scene.add(gltf.scene); }, undefined, (e)=>console.warn(e));\n" +
                 "Scale/position the model to fit the existing game. Do NOT replace their car with a box if they attached a GLB. Keep controls working." +
-                (hasModel ? "\nA real .glb/.gltf is attached — you MUST load it with GLTFLoader, not draw a primitive stand-in." : "");
+                (hasModel ? "\nA real .glb/.gltf is attached — you MUST load it with GLTFLoader from the placeholder/window.LUBA_MODELS[0] (may be a blob: URL). Not a primitive stand-in. Do not convert the model to base64 yourself." : "");
         }
 
         const currentParts = [{
