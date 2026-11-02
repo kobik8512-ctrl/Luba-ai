@@ -6237,13 +6237,13 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: October 26, 2026
+        const TERMS_TEXT = `Last updated: November 2, 2026
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Optional features may include speech, code previews, generated images, coins, and linked tools we add over time.
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer), slash commands (/truth, /copy, /search, and others), live web search, interactive HTML/game previews, embedding your photos into generated apps, speech, generated images, coins/message limits, verification, and linked tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
@@ -6251,16 +6251,16 @@ The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do 
 You are responsible for your username and password. Do not share your password. You must be old enough under the laws where you live, or use the app only with a parent or guardian's permission. We may suspend or remove accounts that break these Terms, abuse the service, or harm others.
 
 4. Acceptable use
-You agree not to threaten, harass, exploit, or harm people (especially minors); break into accounts or systems; spam, scam, or spread malware; upload illegal content; abuse limits or bugs; or present AI output as licensed professional advice when it is not.
+You agree not to threaten, harass, exploit, or harm people (especially minors); break into accounts or systems; spam, scam, or spread malware; upload illegal content; abuse limits or bugs; or present AI output as licensed professional advice when it is not. Slash modes like /truth and /roast are for honest or humorous chat — do not use the service to target or harass real private individuals with harmful content.
 
 5. Messages, media, and limits
-Messages and media you send are processed so Luba can reply. Videos and images may be stored on your device (including IndexedDB) and, when sync is available, on our servers for your account. Large files may be limited by device storage or network rules. Message limits, coins, or verification rules may apply and can change.
+Messages and media you send are processed so Luba can reply. Images you attach may be embedded into HTML previews you generate (for example with /copy) as data on your device. Videos and images may be stored on your device (including IndexedDB) and, when sync is available, on our servers for your account. Large files may be limited by device storage or network rules. Message limits, coins, or verification rules may apply and can change.
 
 6. Ownership
 You keep rights to content you create and own. You give us permission to process that content to run Luba AI. The Luba name, branding, and app code are owned by Kobi / Luba AI unless stated otherwise.
 
 7. AI output
-AI replies are generated automatically and may be incomplete or incorrect. You use them at your own risk.
+AI replies and generated code/previews are produced automatically and may be incomplete or incorrect. You use them at your own risk.
 
 8. Service changes
 We may update, pause, or discontinue features. Keep your own backups of important work.
@@ -6272,19 +6272,19 @@ Questions: lubaai.official@gmail.com (creator: Kobi).
 We may update these Terms. Continued use after changes means you accept the updated version.
 `;
 
-    const PRIVACY_TEXT = `Last updated: October 26, 2026
+    const PRIVACY_TEXT = `Last updated: November 2, 2026
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
 
 2. Account data
-We may store username, password hash, profile photo, preferences, verification status, and session tokens.
+We may store username, password hash, profile photo, preferences (including mode settings), verification status, coin/message counters, and session tokens.
 
 3. Chat and media
-When you send a message (and optional image, short video, or file), content is sent through our secure proxy to an AI provider so Luba can reply. On your device we may keep chat history and media in localStorage and IndexedDB so videos and photos can return after refresh. When cloud sync is enabled, recent messages may also be stored on our servers for multi-device access. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
+When you send a message (and optional image, short video, or file), content is sent through our secure proxy to an AI provider so Luba can reply. Live web search may send your search query to a search provider to fetch current results. On your device we may keep chat history and media in localStorage and IndexedDB so videos and photos can return after refresh. When you generate an HTML preview that uses your photo (for example with /copy), the image may be embedded as a data URL inside that preview on your device. When cloud sync is enabled, recent messages may also be stored on our servers for multi-device access. Do not put passwords, government IDs, or other highly sensitive secrets in chat.
 
 4. Device storage
-Clearing site data removes local copies on that device. Large videos depend on available storage.
+Clearing site data removes local copies on that device. Large videos and image-heavy previews depend on available storage.
 
 5. Moderation and safety
 The backend may store recent message logs, ban records, basic connection metadata, message-limit/coin/verification records, and verification request text — only to operate Luba AI, stop abuse, and handle support — not to sell advertising profiles.
@@ -6550,6 +6550,19 @@ TikTok accounts (spell exactly):
     const defaultPersonality = `You are Luba — warm, friendly, playful, and genuinely caring. Talk like a real friend, not a dry FAQ bot. Be curious about the person you're talking to, react to what they say, and show personality. Short dry one-liners are fine sometimes, but overall you should feel alive, kind, and interested. Use emojis when they fit. Keep answers clear and natural. When analyzing images, be careful and honest. If something looks AI-generated, say so. You have access to a "calculator" tool for any arithmetic, no matter how simple it looks — always use it instead of computing math in your head, because manual math is unreliable. You also have a "generate_image" tool — whenever the user asks you to draw, generate, create, make, or show them a picture, image, photo, artwork, wallpaper, or illustration of something, call generate_image with a clear, detailed English prompt describing exactly what to draw. The image will be shown to the user automatically, so just reply with a short friendly caption — don't describe the image in words instead of generating it. For any math, equations, or formulas, always write them using LaTeX: $...$ for inline math and $$...$$ for a bigger displayed equation on its own line. The app automatically renders this as proper math symbols (fractions, summations, square roots, exponents, etc), so always use real LaTeX rather than typing math out with plain slashes, carets, or parentheses.
 
 You know yourself: if someone asks what you can do, what modes exist, about coins/messages, verified, Ledger Life, HTML preview, fullscreen, camera in apps, who made you, or anything about this Luba app — answer from your real identity knowledge, clearly and accurately. Do not pretend you have no idea about your own features.
+
+Slash commands (type / in the chat box for autocomplete — these are NOT the same as Modes):
+- /truth — brutal honesty, no fake compliments (works with photos)
+- /copy — use the user's exact attached photo or exact description in what you build (no redraw). Placeholders __LUBA_IMG_0__ etc. become their real image data in the preview.
+- /search — force a live web search
+- /short — short answers
+- /detailed — thorough answers
+- /roast — savage funny roast
+- /eli5 — explain simply like age 5
+- /fix — continue/fix the previous game or app in this chat
+- /help — list slash commands
+Modes (Normal, Study, HTML, Code, Creative, Lawyer) are chosen from the Modes button, not slash commands.
+When building HTML games/apps you can use public CDN textures and Three.js. When the user attaches a photo and wants it in the project (especially with /copy), embed it via __LUBA_IMG_N__ placeholders so the client can inject the real image data URL.
 
 You have tools: calculator (always for math), generate_image (when they want a picture), save_memory (when they ask you to remember a lasting fact about them), and web_search (MUST use for news, scores, prices, net worth, stocks, sports results, weather, population, richest people, release dates, or anything that changes over time — never guess current numbers from memory; search first).
 
@@ -6831,6 +6844,11 @@ Every substantive answer ends with:
 
     function buildPreviewBlock(code) {
         code = fixHtmlDemo(code);
+        try {
+            if (window.__lubaPendingMedia && window.__lubaPendingMedia.length) {
+                code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
+            }
+        } catch (_) {}
         const codeId = storeCodeBlock(code);
         // data-srcdoc holds base64 to avoid attribute breakage; hydrate sets real srcdoc
         let b64 = '';
@@ -6996,7 +7014,12 @@ Every substantive answer ends with:
             const b64 = frame.getAttribute('data-srcdoc-b64') || '';
             if (!b64) return;
             try {
-                const code = decodeURIComponent(escape(atob(b64)));
+                let code = decodeURIComponent(escape(atob(b64)));
+                try {
+                    if (window.__lubaPendingMedia && window.__lubaPendingMedia.length) {
+                        code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
+                    }
+                } catch (_) {}
                 frame.srcdoc = code;
                 frame.dataset.hydrated = '1';
                 frame.removeAttribute('data-srcdoc-b64');
@@ -9089,20 +9112,61 @@ Every substantive answer ends with:
         slashFiltered = [];
     }
 
-    /** Replace __LUBA_IMG_N__ placeholders with real attached data URLs */
+    /** Embed real attached photos into generated HTML (data URLs), same idea as pasting base64 into a script. */
     function injectUserImagesIntoHtml(html, mediaItems) {
         if (!html || !mediaItems || !mediaItems.length) return html;
-        let out = html;
+        let out = String(html);
+        const urls = [];
         mediaItems.forEach((m, i) => {
             if (!m || !m.dataUrl) return;
+            const url = m.dataUrl;
+            urls.push(url);
             const token = '__LUBA_IMG_' + i + '__';
-            // replace all occurrences
-            out = out.split(token).join(m.dataUrl);
-            // also common alt patterns the model might emit
-            out = out.split('__USER_IMAGE_' + i + '__').join(m.dataUrl);
+            out = out.split(token).join(url);
+            out = out.split('__USER_IMAGE_' + i + '__').join(url);
+            out = out.split('LUBA_IMG_' + i).join(url);
+            // quoted placeholder variants
+            out = out.replace(new RegExp('(["\'`])__LUBA_IMG_' + i + '__\\1', 'g'), '$1' + url + '$1');
         });
+        if (!urls.length) return out;
+
+        // Common AI mistakes: src="character.png", src="Character", src="", src="./player.png"
+        if (urls[0]) {
+            out = out.replace(/\bsrc\s*=\s*["'](?:character|player|hero|sprite|user|photo|image|avatar)(?:\.(?:png|jpg|jpeg|gif|webp))?["']/gi,
+                'src="' + urls[0] + '"');
+            out = out.replace(/\bsrc\s*=\s*["']\s*["']/gi, 'src="' + urls[0] + '"');
+            // CSS url(character.png)
+            out = out.replace(/url\(\s*['"]?(?:character|player|hero|sprite|user|photo|image|avatar)(?:\.(?:png|jpg|jpeg|gif|webp))?['"]?\s*\)/gi,
+                'url(' + urls[0] + ')');
+        }
+
+        // Inject a global array so game JS can use LUBA_IMGS[0] if the model referenced it
+        const arrLit = '[' + urls.map(u => JSON.stringify(u)).join(',') + ']';
+        const boot = '<script>window.LUBA_IMGS=' + arrLit + ';window.__LUBA_IMGS=window.LUBA_IMGS;<' + '/script>';
+        if (/<head[^>]*>/i.test(out)) {
+            out = out.replace(/<head([^>]*)>/i, '<head$1>' + boot);
+        } else if (/<body[^>]*>/i.test(out)) {
+            out = out.replace(/<body([^>]*)>/i, '<body$1>' + boot);
+        } else if (/<!DOCTYPE/i.test(out)) {
+            out = boot + out;
+        } else {
+            out = boot + out;
+        }
+
+        // If there is still no data:image in the file but there is an <img>, force first img src
+        if (urls[0] && !/data:image\//i.test(out) && /<img\b/i.test(out)) {
+            out = out.replace(/<img\b([^>]*?)>/i, function(full, attrs) {
+                if (/\bsrc\s*=/.test(attrs)) {
+                    return '<img' + attrs.replace(/\bsrc\s*=\s*(["'])[\s\S]*?\1/i, 'src="' + urls[0] + '"') + '>';
+                }
+                return '<img src="' + urls[0] + '"' + attrs + '>';
+            });
+        }
         return out;
     }
+
+    // Media from the last send — used when building/hydrating previews
+    window.__lubaPendingMedia = window.__lubaPendingMedia || [];
 
     userInput.addEventListener('keydown', e => {
         const menu = document.getElementById('slash-menu');
@@ -9747,6 +9811,14 @@ Every substantive answer ends with:
         }
         if (!isRetry && !text && !(selectedMediaItems && selectedMediaItems.length) && !pendingCodeFile) return;
         if (isRetry && !text && !retryMedia) return;
+
+        // Keep attachments for HTML preview embedding (exact photo in games)
+        try {
+            const med = isRetry && retryMedia
+                ? (Array.isArray(retryMedia) ? retryMedia : [retryMedia])
+                : (selectedMediaItems || []).slice();
+            window.__lubaPendingMedia = (med || []).filter(function(m){ return m && m.dataUrl; });
+        } catch (_) { window.__lubaPendingMedia = []; }
 
         // Merge attached file into the message Luba actually receives (FULL content)
         let attachedFileSnapshot = null;
