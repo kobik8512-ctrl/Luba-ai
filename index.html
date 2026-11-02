@@ -6496,7 +6496,7 @@ TikTok accounts (spell exactly):
 
 You know yourself: if someone asks what you can do, what modes exist, about coins/messages, verified, Ledger Life, HTML preview, fullscreen, camera in apps, who made you, or anything about this Luba app — answer from your real identity knowledge, clearly and accurately. Do not pretend you have no idea about your own features.
 
-You have tools: calculator (always for math), generate_image (when they want a picture), save_memory (when they ask you to remember a lasting fact about them), and web_search (MUST use for news, scores, prices, weather, release dates, or anything that might be outdated — do not guess current facts).
+You have tools: calculator (always for math), generate_image (when they want a picture), save_memory (when they ask you to remember a lasting fact about them), and web_search (MUST use for news, scores, prices, net worth, stocks, sports results, weather, population, richest people, release dates, or anything that changes over time — never guess current numbers from memory; search first).
 
 Understand short or casual requests without needing a huge brief. Infer what they want, ask at most one clarifying question only if truly blocked, otherwise just deliver. When building code or HTML, aim for production-quality completeness, not thin demos.
 
@@ -9053,7 +9053,7 @@ Every substantive answer ends with:
             },
             {
                 name: "web_search",
-                description: "Searches the live web for current information. MUST use this for recent events, news, prices, sports scores, weather, releases, or anything you are unsure is still current. Do not guess — search.",
+                description: "Searches the live web for current information. MUST use for net worth, billionaire rankings, stock prices, sports scores, news, weather, release dates, population, and any number that changes over time. Never answer those from memory alone — search first.",
                 parameters: {
                     type: "OBJECT",
                     properties: {
@@ -9682,12 +9682,45 @@ Every substantive answer ends with:
 
         const needsImageTool = /\b(draw|generate|create|make|paint|show)\b.{0,40}\b(image|picture|photo|art|artwork|illustration|wallpaper|logo)\b|\b(image|picture|photo)\b.{0,20}\b(of|for)\b/i.test(msgText);
         const needsCalcTool = /[\d]+\s*[+\-*/x×÷]\s*[\d]|calculate|what(?:'s| is)\s+\d|solve\s+\d/i.test(msgText);
-        const needsSearchTool = /\b(search|look up|google|news|score|weather|price|latest|current|who won|release date|today|yesterday)\b/i.test(msgText)
-            || /\b(what(?:'s| is) the (?:score|weather|price|news))\b/i.test(msgText);
+        // Broad: anything that needs live/current facts (net worth, prices, scores, news, etc.)
+        // Explicit "search the web / search for X / look this up" commands
+        const explicitSearch = /\b((?:please\s+)?(?:can you\s+)?(?:search|google|look\s*up|find)\s+(?:(?:in|on)\s+(?:the\s+)?web\s+)?(?:for\s+)?|search\s+it|search\s+this|web\s*search)\b/i.test(msgText);
+        const needsSearchTool = explicitSearch
+            || /\b(search|look\s*up|google|news|score|weather|price|priced|pricing|latest|current|who won|release date|today|yesterday|net\s*worth|worth|stock|shares|market|billion|million|richest|poorest|population|how many|unemployment|inflation|gdp|crypto|bitcoin|ethereum|gold price|oil price|exchange rate|currency|live|trending|breaking|election|poll|forecast)\b/i.test(msgText)
+            || /\b(what(?:'s| is)|whats|how much|how many)\b.{0,60}\b(worth|price|cost|score|salary|age|population|height)\b/i.test(msgText)
+            || (/\b(elon|musk|trump|biden|celebrity|billionaire)\b/i.test(msgText) && /\b(worth|rich|money|wealth|fortune)\b/i.test(msgText));
         // Tools for image/calc/search; also allow tools on normal non-trivial chats so save_memory / web_search can fire
         const needsTools = !!(needsImageTool || needsCalcTool || needsSearchTool || activeMode === 'html' || activeMode === 'code' || (!isIterateMsg && msgText.length >= 80));
         const isSimpleChat = !imageToSend && !needsTools && msgText.length > 0 && msgText.length < 120
             && activeMode === 'normal';
+
+        // Build a clean search query (strip "search the web for" fluff)
+        function buildSearchQuery(raw) {
+            let q = String(raw || '').trim();
+            q = q.replace(/^\s*(?:please\s+)?(?:can you\s+)?(?:search|google|look\s*up|find)(?:\s+(?:in|on)\s+(?:the\s+)?web)?(?:\s+for)?\s+/i, '');
+            q = q.replace(/^\s*(?:search\s+it|search\s+this|web\s*search)\s*[:\-]?\s*/i, '');
+            q = q.replace(/[?!.]+$/g, '').trim();
+            if (!q || q.length < 2) q = String(raw || '').trim();
+            return q.slice(0, 200);
+        }
+
+        // Pre-search: actually hit the web, then feed results into the model
+        let forcedSearchBlock = '';
+        if (needsSearchTool && !imageToSend) {
+            try {
+                const searchQ = buildSearchQuery(msgText);
+                setTypingStatus(searchQ ? ('Searching the web for “' + searchQ.slice(0, 60) + '”…') : 'Searching the web…');
+                const ws = await runWebSearch(searchQ);
+                if (ws && ws.ok && ws.summary) {
+                    forcedSearchBlock = '\n\nLIVE WEB SEARCH RESULTS for "' + searchQ + '" (use these as the main source; give the best clear answer; do not invent older figures):\n' + ws.summary;
+                    setTypingStatus('Reading search results…');
+                } else {
+                    setTypingStatus('Search limited — answering carefully…');
+                }
+            } catch (_) {
+                setTypingStatus('Search unavailable — answering carefully…');
+            }
+        }
 
         // More history when iterating so the previous HTML stays in context
         const historyLimit = isSimpleChat ? 4
@@ -9701,12 +9734,16 @@ Every substantive answer ends with:
         }));
 
         const visionItems = (mediaList || []).filter(function(m){ return m && m.dataUrl; }).slice(0, 10);
+        if (forcedSearchBlock) {
+            systemPrompt += "\n\nWhen LIVE WEB SEARCH RESULTS are provided with the user message, you MUST use them as the main source. Give the best clear, direct answer (numbers, dates, names). Prefer search results over training memory. If results conflict, say so briefly and pick the most credible source. Do not pretend you did not search.";
+        }
+
         const currentParts = [{
-            text: text || (visionItems.length
+            text: (text || (visionItems.length
                 ? (visionItems.length === 1
                     ? (visionItems[0].isVideo ? "Describe this video and what happens in it." : "What do you see in this image?")
                     : ("I sent " + visionItems.length + " files. Look at all of them and answer."))
-                : "")
+                : "")) + (forcedSearchBlock || "")
         }];
         visionItems.forEach(function(m) {
             try {
