@@ -5320,7 +5320,17 @@ async function spendCoin(username, cost) {
     function compactHistoryForStorage(history) {
         return (history || []).map(function(msg) {
             const m = Object.assign({}, msg);
-            if (m.displayHtml) m.displayHtml = stripHeavyMediaHtml(m.displayHtml);
+            if (m.displayHtml) {
+                // Keep interactive preview shells (data-code-id); only strip giant base64 payloads
+                let h = String(m.displayHtml);
+                if (/data-code-id=/.test(h)) {
+                    h = h.replace(/data-srcdoc-b64="[^"]*"/gi, '');
+                    h = h.replace(/data:image\/[^"']{200,}/gi, 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==');
+                    m.displayHtml = h;
+                } else {
+                    m.displayHtml = stripHeavyMediaHtml(m.displayHtml);
+                }
+            }
             if (typeof m.content === 'string' && m.content.indexOf('data:video/') !== -1) {
                 m.content = m.content.indexOf('(sent a video)') !== -1 ? m.content : '(sent a video)';
             }
@@ -6778,7 +6788,39 @@ Every substantive answer ends with:
     function storeCodeBlock(code) {
         const id = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
         window.__lubaCodeStore[id] = code;
+        try { persistCodeBlock(id, code); } catch (_) {}
         return id;
+    }
+    function persistCodeBlock(id, code) {
+        try {
+            openMediaDb().then(function(db) {
+                if (!db) return;
+                try {
+                    const tx = db.transaction([LUBA_MEDIA_STORE], 'readwrite');
+                    tx.objectStore(LUBA_MEDIA_STORE).put(code, 'code:' + id);
+                } catch (_) {}
+            });
+        } catch (_) {}
+    }
+    function loadCodeBlock(id) {
+        if (window.__lubaCodeStore && window.__lubaCodeStore[id]) {
+            return Promise.resolve(window.__lubaCodeStore[id]);
+        }
+        return openMediaDb().then(function(db) {
+            if (!db) return null;
+            return new Promise(function(resolve) {
+                try {
+                    const tx = db.transaction([LUBA_MEDIA_STORE], 'readonly');
+                    const req = tx.objectStore(LUBA_MEDIA_STORE).get('code:' + id);
+                    req.onsuccess = function() {
+                        const v = req.result || null;
+                        if (v) window.__lubaCodeStore[id] = v;
+                        resolve(v);
+                    };
+                    req.onerror = function() { resolve(null); };
+                } catch (_) { resolve(null); }
+            });
+        }).catch(function(){ return null; });
     }
 
     // Turn AI markdown code fences into readable blocks + live HTML preview when possible
@@ -6880,13 +6922,19 @@ Every substantive answer ends with:
             }
         } catch (_) {}
         const codeId = storeCodeBlock(code);
-        // data-srcdoc holds base64 to avoid attribute breakage; hydrate sets real srcdoc
+        // Large pages (embedded GLB) skip base64 attribute — hydrate from code store / IDB
         let b64 = '';
-        try {
-            b64 = btoa(unescape(encodeURIComponent(code)));
-        } catch (_) {
-            b64 = '';
+        if (code.length < 350000) {
+            try {
+                b64 = btoa(unescape(encodeURIComponent(code)));
+            } catch (_) {
+                b64 = '';
+            }
         }
+        const srcAttr = b64 ? ('data-srcdoc-b64="' + b64 + '"') : '';
+        const lightSource = code.length > 150000
+            ? escapeHtmlText('// Large preview (3D model embedded). Use Copy code / stored preview id: ' + codeId)
+            : escapeHtmlText(code);
         return `<div class="code-preview-wrap">
                     <div class="code-preview-bar">
                         <span>Interactive preview</span>
@@ -6896,8 +6944,8 @@ Every substantive answer ends with:
                             <button type="button" class="small-btn" onclick="openPreviewFullscreen(this)">Fullscreen</button>
                         </div>
                     </div>
-                    <iframe class="code-preview-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; accelerometer *; gyroscope *; magnetometer *; autoplay; fullscreen; clipboard-read; clipboard-write" allowusermedia data-srcdoc-b64="${b64}" src="about:blank"></iframe>
-                    <pre class="code-preview-source" style="display:none"><code>${escapeHtmlText(code)}</code></pre>
+                    <iframe class="code-preview-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; accelerometer *; gyroscope *; magnetometer *; autoplay; fullscreen; clipboard-read; clipboard-write" allowusermedia data-code-id="${codeId}" ${srcAttr} src="about:blank"></iframe>
+                    <pre class="code-preview-source" style="display:none"><code>${lightSource}</code></pre>
                 </div>`;
     }
 
@@ -7037,40 +7085,61 @@ Every substantive answer ends with:
         return { html: hasCode ? html : raw, hasCode };
     }
 
-    window.hydrateCodePreviews = function (root) {
-        const scope = root || document;
-        scope.querySelectorAll('iframe.code-preview-frame[data-srcdoc-b64]').forEach((frame) => {
-            if (frame.dataset.hydrated === '1') return;
-            const b64 = frame.getAttribute('data-srcdoc-b64') || '';
-            if (!b64) return;
+    function finishHydrateFrame(frame, code) {
+        try {
             try {
-                let code = decodeURIComponent(escape(atob(b64)));
+                if (window.__lubaPendingMedia && window.__lubaPendingMedia.length) {
+                    code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
+                }
+            } catch (_) {}
+            var hasBlobModel = /blob:/.test(code) && /LUBA_MODEL|GLTFLoader|\.glb|gltf/i.test(code);
+            var isHuge = code.length > 400000;
+            if (hasBlobModel || isHuge) {
                 try {
-                    if (window.__lubaPendingMedia && window.__lubaPendingMedia.length) {
-                        code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
-                    }
-                } catch (_) {}
-                // If 3D blob: URLs are in the page, prefer blob-HTML so the iframe is same-origin and can load blobs
-                var hasBlobModel = /blob:/.test(code) && /LUBA_MODEL|GLTFLoader|\.glb|gltf/i.test(code);
-                if (hasBlobModel) {
-                    try {
-                        if (frame._lubaBlobSrc) { try { URL.revokeObjectURL(frame._lubaBlobSrc); } catch (_) {} }
-                        var htmlBlob = new Blob([code], { type: 'text/html' });
-                        var htmlUrl = URL.createObjectURL(htmlBlob);
-                        frame._lubaBlobSrc = htmlUrl;
-                        frame.removeAttribute('srcdoc');
-                        frame.src = htmlUrl;
-                    } catch (e2) {
-                        frame.srcdoc = code;
-                    }
-                } else {
+                    if (frame._lubaBlobSrc) { try { URL.revokeObjectURL(frame._lubaBlobSrc); } catch (_) {} }
+                    var htmlBlob = new Blob([code], { type: 'text/html' });
+                    var htmlUrl = URL.createObjectURL(htmlBlob);
+                    frame._lubaBlobSrc = htmlUrl;
+                    frame.removeAttribute('srcdoc');
+                    frame.src = htmlUrl;
+                } catch (e2) {
                     frame.srcdoc = code;
                 }
-                frame.dataset.hydrated = '1';
-                frame.removeAttribute('data-srcdoc-b64');
-            } catch (err) {
-                console.warn('preview hydrate failed', err);
+            } else {
+                frame.srcdoc = code;
             }
+            frame.dataset.hydrated = '1';
+            frame.removeAttribute('data-srcdoc-b64');
+        } catch (err) {
+            console.warn('preview hydrate failed', err);
+        }
+    }
+
+    window.hydrateCodePreviews = function (root) {
+        const scope = root || document;
+        scope.querySelectorAll('iframe.code-preview-frame').forEach((frame) => {
+            if (frame.dataset.hydrated === '1') return;
+            const b64 = frame.getAttribute('data-srcdoc-b64') || '';
+            const codeId = frame.getAttribute('data-code-id') || '';
+            let code = '';
+            try {
+                if (b64) {
+                    code = decodeURIComponent(escape(atob(b64)));
+                } else if (codeId && window.__lubaCodeStore && window.__lubaCodeStore[codeId]) {
+                    code = window.__lubaCodeStore[codeId];
+                }
+            } catch (err) {
+                console.warn('preview decode failed', err);
+            }
+            if (!code && codeId) {
+                loadCodeBlock(codeId).then(function(c) {
+                    if (!c || frame.dataset.hydrated === '1') return;
+                    finishHydrateFrame(frame, c);
+                }).catch(function(){});
+                return;
+            }
+            if (!code) return;
+            finishHydrateFrame(frame, code);
         });
     };
 
@@ -8271,7 +8340,18 @@ Every substantive answer ends with:
         return new Promise(function (resolve, reject) {
             var reader = new FileReader();
             reader.onerror = function () { reject(new Error('read failed')); };
-            reader.onload = function (ev) { resolve(ev.target.result); };
+            reader.onload = function (ev) {
+                var r = ev.target.result;
+                try {
+                    if (file && /\.glb$/i.test(file.name || '') && typeof r === 'string' && r.indexOf('data:application/octet-stream') === 0) {
+                        r = r.replace('data:application/octet-stream', 'data:model/gltf-binary');
+                    }
+                    if (file && /\.gltf$/i.test(file.name || '') && typeof r === 'string' && r.indexOf('data:application/octet-stream') === 0) {
+                        r = r.replace('data:application/octet-stream', 'data:model/gltf+json');
+                    }
+                } catch (_) {}
+                resolve(r);
+            };
             reader.readAsDataURL(file);
         });
     }
@@ -8318,7 +8398,7 @@ Every substantive answer ends with:
             try {
                 if (isModel) {
                     var modelUrl;
-                    var useBlob = file.size > 30 * 1024 * 1024;
+                    var useBlob = file.size > 20 * 1024 * 1024;
                     if (useBlob) {
                         modelUrl = URL.createObjectURL(file);
                     } else {
@@ -9757,7 +9837,7 @@ Every substantive answer ends with:
                     if (counts.models >= 2) { alert('Max 2 3D models per message'); return; }
                     (async function() {
                         try {
-                            var useBlob = f.size > 30 * 1024 * 1024;
+                            var useBlob = f.size > 20 * 1024 * 1024;
                             var modelUrl = useBlob ? URL.createObjectURL(f) : await readFileAsDataUrl(f);
                             selectedMediaItems.push({
                                 dataUrl: modelUrl,
