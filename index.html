@@ -8416,6 +8416,11 @@ Every substantive answer ends with:
                         mime: file.type || 'model/gltf-binary',
                         size: file.size
                     });
+                    try {
+                        window.__lubaLastModels = selectedMediaItems.filter(function(m){ return m && m.isModel && m.dataUrl; }).map(function(m){
+                            return { dataUrl: m.dataUrl, name: m.name, isModel: true, size: m.size, mime: m.mime };
+                        });
+                    } catch (_) {}
                 } else {
                     var dataUrl = await readFileAsDataUrl(file);
                     selectedMediaItems.push({
@@ -9304,8 +9309,26 @@ Every substantive answer ends with:
     function ensureReliableGltfViewer(html) {
         if (!html) return html;
         let out = String(html);
-        if (!/LUBA_MODELS|__LUBA_MODEL_|GLTFLoader|gltf-binary|\.glb/i.test(out)) return out;
         const closeScr = '<' + '/script>';
+        // ALWAYS inject model bytes from last attach if present
+        try {
+            var pool = [];
+            try { (window.__lubaLastModels || []).forEach(function(m){ if (m && m.dataUrl) pool.push(m); }); } catch (_) {}
+            try { (window.__lubaPendingMedia || []).forEach(function(m){ if (m && m.dataUrl && (m.isModel || /model\/gltf|octet-stream/i.test(String(m.dataUrl).slice(0,90)))) pool.push(m); }); } catch (_) {}
+            // dedupe
+            var seen = {};
+            pool = pool.filter(function(m){ if (seen[m.dataUrl]) return false; seen[m.dataUrl]=1; return true; });
+            if (pool.length) {
+                var lit = '[' + pool.map(function(m){ return JSON.stringify(m.dataUrl); }).join(',') + ']';
+                if (!/LUBA_MODELS\s*=/.test(out)) {
+                    var bootM = '<script>window.LUBA_MODELS=' + lit + ';window.__LUBA_MODELS=window.LUBA_MODELS;<' + '/script>';
+                    if (/<head[^>]*>/i.test(out)) out = out.replace(/<head([^>]*)>/i, '<head$1>' + bootM);
+                    else if (/<body[^>]*>/i.test(out)) out = out.replace(/<body([^>]*)>/i, '<body$1>' + bootM);
+                    else out = bootM + out;
+                }
+            }
+        } catch (_) {}
+        if (!/LUBA_MODELS|__LUBA_MODEL_|GLTFLoader|gltf-binary|\.glb/i.test(out)) return out;
         if (!/three\.min\.js/i.test(out)) {
             const inj = '<script src="https://unpkg.com/three@0.149.0/build/three.min.js">' + closeScr + '\n';
             if (/<\/head>/i.test(out)) out = out.replace(/<\/head>/i, inj + '</head>');
@@ -9327,7 +9350,13 @@ Every substantive answer ends with:
 
     /** Embed real attached photos into generated HTML (data URLs), same idea as pasting base64 into a script. */
     function injectUserImagesIntoHtml(html, mediaItems) {
-        if (!html || !mediaItems || !mediaItems.length) return html;
+        if (!html) return html;
+        try {
+            if ((!mediaItems || !mediaItems.length) && window.__lubaLastModels && window.__lubaLastModels.length) {
+                mediaItems = window.__lubaLastModels;
+            }
+        } catch (_) {}
+        if (!mediaItems || !mediaItems.length) return html;
         let out = String(html);
         const urls = [];
         mediaItems.forEach((m, i) => {
@@ -9874,6 +9903,11 @@ Every substantive answer ends with:
                                 mime: f.type || 'model/gltf-binary',
                                 size: f.size
                             });
+                            try {
+                                window.__lubaLastModels = selectedMediaItems.filter(function(m){ return m && m.isModel && m.dataUrl; }).map(function(m){
+                                    return { dataUrl: m.dataUrl, name: m.name, isModel: true, size: m.size, mime: m.mime };
+                                });
+                            } catch (_) {}
                             renderMediaThumbs();
                             if (input) {
                                 input.placeholder = 'Tell Luba how to use this 3D model (e.g. /copy add as the car)...';
@@ -10099,7 +10133,19 @@ Every substantive answer ends with:
             const med = isRetry && retryMedia
                 ? (Array.isArray(retryMedia) ? retryMedia : [retryMedia])
                 : (selectedMediaItems || []).slice();
-            window.__lubaPendingMedia = (med || []).filter(function(m){ return m && m.dataUrl; });
+            let list = (med || []).filter(function(m){ return m && m.dataUrl; });
+            try {
+                (window.__lubaLastModels || []).forEach(function(m) {
+                    if (!m || !m.dataUrl) return;
+                    if (!list.some(function(x){ return x.dataUrl === m.dataUrl; })) {
+                        list.push({ dataUrl: m.dataUrl, isModel: true, name: m.name, size: m.size, mime: m.mime });
+                    }
+                });
+            } catch (_) {}
+            window.__lubaPendingMedia = list;
+            window.__lubaLastModels = list.filter(function(m){ return m.isModel; }).map(function(m){
+                return { dataUrl: m.dataUrl, name: m.name, isModel: true, size: m.size, mime: m.mime };
+            });
         } catch (_) { window.__lubaPendingMedia = []; }
 
         // Merge attached file into the message Luba actually receives (FULL content)
