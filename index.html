@@ -7087,33 +7087,53 @@ Every substantive answer ends with:
     }
 
     function finishHydrateFrame(frame, code) {
-        try {
+        function paint(code) {
             try {
-                if (window.__lubaPendingMedia && window.__lubaPendingMedia.length) {
-                    code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
-                }
-            } catch (_) {}
-            try { code = ensureReliableGltfViewer(code); } catch (_) {}
-            var hasBlobModel = /blob:/.test(code) && /LUBA_MODEL|GLTFLoader|\.glb|gltf/i.test(code);
-            var isHuge = code.length > 400000;
-            if (hasBlobModel || isHuge) {
-                try {
-                    if (frame._lubaBlobSrc) { try { URL.revokeObjectURL(frame._lubaBlobSrc); } catch (_) {} }
-                    var htmlBlob = new Blob([code], { type: 'text/html' });
-                    var htmlUrl = URL.createObjectURL(htmlBlob);
-                    frame._lubaBlobSrc = htmlUrl;
-                    frame.removeAttribute('srcdoc');
-                    frame.src = htmlUrl;
-                } catch (e2) {
+                var hasBlobModel = /blob:/.test(code) && /LUBA_MODEL|GLTFLoader|\.glb|gltf/i.test(code);
+                var isHuge = code.length > 400000 || /LUBA_MODELS\s*=/.test(code);
+                if (hasBlobModel || isHuge) {
+                    try {
+                        if (frame._lubaBlobSrc) { try { URL.revokeObjectURL(frame._lubaBlobSrc); } catch (_) {} }
+                        var htmlBlob = new Blob([code], { type: 'text/html' });
+                        var htmlUrl = URL.createObjectURL(htmlBlob);
+                        frame._lubaBlobSrc = htmlUrl;
+                        frame.removeAttribute('srcdoc');
+                        frame.src = htmlUrl;
+                    } catch (e2) {
+                        frame.srcdoc = code;
+                    }
+                } else {
                     frame.srcdoc = code;
                 }
-            } else {
-                frame.srcdoc = code;
+                frame.dataset.hydrated = '1';
+                frame.removeAttribute('data-srcdoc-b64');
+            } catch (err) {
+                console.warn('preview hydrate failed', err);
             }
-            frame.dataset.hydrated = '1';
-            frame.removeAttribute('data-srcdoc-b64');
+        }
+        try {
+            var media = (window.__lubaPendingMedia && window.__lubaPendingMedia.length)
+                ? window.__lubaPendingMedia
+                : (window.__lubaLastModels || []);
+            try {
+                if (media && media.length) code = injectUserImagesIntoHtml(code, media);
+            } catch (_) {}
+            try { code = ensureReliableGltfViewer(code); } catch (_) {}
+            if (!/LUBA_MODELS\s*=\s*\[/.test(code)) {
+                loadActiveModelFromIdb().then(function(m) {
+                    if (m && m.dataUrl) {
+                        window.__lubaLastModels = [m];
+                        try { code = injectUserImagesIntoHtml(code, [m]); } catch (_) {}
+                        try { code = ensureReliableGltfViewer(code); } catch (_) {}
+                    }
+                    paint(code);
+                }).catch(function(){ paint(code); });
+                return;
+            }
+            paint(code);
         } catch (err) {
             console.warn('preview hydrate failed', err);
+            paint(code);
         }
     }
 
@@ -8358,6 +8378,73 @@ Every substantive answer ends with:
         });
     }
 
+    /** GLB files start with magic ASCII "glTF" */
+    function readFileHeaderText(file, n) {
+        return new Promise(function(resolve) {
+            try {
+                var blob = file.slice(0, n || 8);
+                var r = new FileReader();
+                r.onload = function() {
+                    try {
+                        var buf = new Uint8Array(r.result || []);
+                        var s = '';
+                        for (var i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i]);
+                        resolve(s);
+                    } catch (_) { resolve(''); }
+                };
+                r.onerror = function() { resolve(''); };
+                r.readAsArrayBuffer(blob);
+            } catch (_) { resolve(''); }
+        });
+    }
+    async function isProbablyGltfModel(file) {
+        if (!file) return false;
+        var name = file.name || '';
+        var type = file.type || '';
+        if (/\.(glb|gltf)$/i.test(name)) return true;
+        if (/model\/gltf/i.test(type)) return true;
+        // Android often gives application/octet-stream + weird names
+        try {
+            var head = await readFileHeaderText(file, 4);
+            if (head === 'glTF') return true; // binary GLB
+            if (head.charAt(0) === '{') {
+                var more = await readFileHeaderText(file, 64);
+                if (/gltf/i.test(more)) return true;
+            }
+        } catch (_) {}
+        return false;
+    }
+    function rememberLastModelsFromSelected() {
+        try {
+            window.__lubaLastModels = (selectedMediaItems || []).filter(function(m){ return m && m.isModel && m.dataUrl; }).map(function(m){
+                return { dataUrl: m.dataUrl, name: m.name, isModel: true, size: m.size, mime: m.mime };
+            });
+            // Persist first model in IDB for hydrate after async gaps
+            if (window.__lubaLastModels[0] && window.__lubaLastModels[0].dataUrl) {
+                openMediaDb().then(function(db) {
+                    if (!db) return;
+                    try {
+                        var tx = db.transaction([LUBA_MEDIA_STORE], 'readwrite');
+                        tx.objectStore(LUBA_MEDIA_STORE).put(window.__lubaLastModels[0], 'luba_active_model');
+                    } catch (_) {}
+                });
+            }
+        } catch (_) {}
+    }
+    function loadActiveModelFromIdb() {
+        return openMediaDb().then(function(db) {
+            if (!db) return null;
+            return new Promise(function(resolve) {
+                try {
+                    var tx = db.transaction([LUBA_MEDIA_STORE], 'readonly');
+                    var req = tx.objectStore(LUBA_MEDIA_STORE).get('luba_active_model');
+                    req.onsuccess = function() { resolve(req.result || null); };
+                    req.onerror = function() { resolve(null); };
+                } catch (_) { resolve(null); }
+            });
+        }).catch(function(){ return null; });
+    }
+
     async function handleImageInputChange(e) {
         const inputEl = e && e.target ? e.target : imageInputEl;
         const files = inputEl && inputEl.files ? Array.prototype.slice.call(inputEl.files) : [];
@@ -8374,6 +8461,10 @@ Every substantive answer ends with:
             var isVideo = (file.type || '').startsWith('video/') || /\.(mp4|mov|webm|m4v|avi)$/i.test(file.name || '');
             var isImage = (file.type || '').startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(file.name || '');
             var isModel = /model\/gltf|model\/gltf-binary/i.test(file.type || '') || /\.(glb|gltf)$/i.test(file.name || '');
+            if (!isVideo && !isImage && !isModel) {
+                // Android: often no extension / octet-stream — sniff GLB magic
+                try { isModel = await isProbablyGltfModel(file); } catch (_) {}
+            }
             if (!isVideo && !isImage && !isModel) {
                 skipped.push(file.name || 'file');
                 continue;
@@ -8416,11 +8507,7 @@ Every substantive answer ends with:
                         mime: file.type || 'model/gltf-binary',
                         size: file.size
                     });
-                    try {
-                        window.__lubaLastModels = selectedMediaItems.filter(function(m){ return m && m.isModel && m.dataUrl; }).map(function(m){
-                            return { dataUrl: m.dataUrl, name: m.name, isModel: true, size: m.size, mime: m.mime };
-                        });
-                    } catch (_) {}
+                    try { rememberLastModelsFromSelected(); } catch (_) {}
                 } else {
                     var dataUrl = await readFileAsDataUrl(file);
                     selectedMediaItems.push({
@@ -9867,9 +9954,7 @@ Every substantive answer ends with:
 
         if (no) no.onclick = function() {
             closeAttachFileModal();
-            // Do NOT dump huge text into the box — freezes the phone
             if (_pasteAttachBuffer && _pasteAttachBuffer.length > 8000) {
-                // Still attach as file so user doesn't lose the paste
                 setPendingCodeFile(guessFileName(_pasteAttachBuffer), _pasteAttachBuffer);
                 if (input) input.value = '';
                 alert('Text was very long, so it was attached as a file instead (avoids freezing). Type a short note and hit Send.');
@@ -9885,56 +9970,62 @@ Every substantive answer ends with:
                 const f = fileInput.files && fileInput.files[0];
                 fileInput.value = '';
                 if (!f) return;
-                const isModel = /\.(glb|gltf)$/i.test(f.name || '') || /model\/gltf/i.test(f.type || '');
-                if (isModel) {
-                    if (f.size > 100 * 1024 * 1024) { alert('3D model max 100MB'); return; }
-                    var counts = countMediaTypes();
-                    if (counts.models >= 2) { alert('Max 2 3D models per message'); return; }
-                    (async function() {
-                        try {
+                (async function() {
+                    try {
+                        var isModel = /\.(glb|gltf)$/i.test(f.name || '') || /model\/gltf/i.test(f.type || '');
+                        if (!isModel) {
+                            try { isModel = await isProbablyGltfModel(f); } catch (_) {}
+                        }
+                        if (isModel) {
+                            if (f.size > 100 * 1024 * 1024) { alert('3D model max 100MB'); return; }
+                            var counts = countMediaTypes();
+                            if (counts.models >= 2) { alert('Max 2 3D models per message'); return; }
                             var useBlob = f.size > 20 * 1024 * 1024;
                             var modelUrl = useBlob ? URL.createObjectURL(f) : await readFileAsDataUrl(f);
+                            if (typeof modelUrl === 'string' && modelUrl.indexOf('data:application/octet-stream') === 0) {
+                                modelUrl = modelUrl.replace('data:application/octet-stream', 'data:model/gltf-binary');
+                            }
                             selectedMediaItems.push({
                                 dataUrl: modelUrl,
                                 blob: useBlob ? f : null,
                                 isVideo: false,
                                 isModel: true,
                                 name: f.name || 'model.glb',
-                                mime: f.type || 'model/gltf-binary',
+                                mime: 'model/gltf-binary',
                                 size: f.size
                             });
-                            try {
-                                window.__lubaLastModels = selectedMediaItems.filter(function(m){ return m && m.isModel && m.dataUrl; }).map(function(m){
-                                    return { dataUrl: m.dataUrl, name: m.name, isModel: true, size: m.size, mime: m.mime };
-                                });
-                            } catch (_) {}
+                            try { rememberLastModelsFromSelected(); } catch (_) {}
                             renderMediaThumbs();
+                            try {
+                                alert('3D model attached: ' + (f.name || 'model.glb') + ' (' + (f.size / 1024 / 1024).toFixed(1) + 'MB). Now type your message and Send.');
+                            } catch (_) {}
                             if (input) {
-                                input.placeholder = 'Tell Luba how to use this 3D model (e.g. /copy add as the car)...';
+                                input.placeholder = 'Tell Luba how to use this 3D model (e.g. /copy showcase this tree)...';
                                 try { input.focus(); } catch (_) {}
                             }
-                        } catch (err) {
-                            alert('Could not attach 3D model');
+                            return;
                         }
-                    })();
-                    return;
-                }
-                if (f.size > 900000) {
-                    alert('Code/text file max ~900KB. For 3D models use .glb/.gltf (up to 100MB).');
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = function() {
-                    const text = String(reader.result || '');
-                    if (!text.trim()) { alert('Empty file'); return; }
-                    setPendingCodeFile(f.name || 'file.txt', text);
-                    if (input) {
-                        input.value = '';
-                        input.placeholder = 'Add a note about this file (optional)...';
+                        if (f.size > 900000) {
+                            alert('Code/text file max ~900KB. For 3D models use .glb/.gltf (up to 100MB).');
+                            return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            const text = String(reader.result || '');
+                            if (!text.trim()) { alert('Empty file'); return; }
+                            setPendingCodeFile(f.name || 'file.txt', text);
+                            if (input) {
+                                input.value = '';
+                                input.placeholder = 'Add a note about this file (optional)...';
+                            }
+                        };
+                        reader.onerror = function() { alert('Could not read file'); };
+                        reader.readAsText(f);
+                    } catch (err) {
+                        console.warn(err);
+                        alert('Could not attach file');
                     }
-                };
-                reader.onerror = function() { alert('Could not read file'); };
-                reader.readAsText(f);
+                })();
             };
         }
 
@@ -9953,19 +10044,16 @@ Every substantive answer ends with:
         };
 
         if (input) {
-            // CRITICAL: capture paste BEFORE text enters the textarea (stops freeze)
             input.addEventListener('paste', function(e) {
                 try {
                     const cd = e.clipboardData || window.clipboardData;
                     if (!cd) return;
                     const pasted = cd.getData('text') || cd.getData('text/plain') || '';
                     if (!pasted) return;
-                    // Any sizable paste → don't put it in the chat box
                     if (pasted.length >= 1500 || looksLikeFullFile(pasted)) {
                         e.preventDefault();
                         e.stopPropagation();
                         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
-                        // Clear anything that might have leaked in
                         setTimeout(function() {
                             if (input.value && input.value.length > 1500) input.value = '';
                         }, 0);
@@ -9973,9 +10061,8 @@ Every substantive answer ends with:
                         return false;
                     }
                 } catch (_) {}
-            }, true); // capture phase = runs first
+            }, true);
 
-            // Safety net: if huge text still lands in the box, yank it out
             input.addEventListener('input', function() {
                 const v = input.value || '';
                 if (v.length >= 1500 && !pendingCodeFile) {
