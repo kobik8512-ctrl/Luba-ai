@@ -7647,10 +7647,20 @@ Every substantive answer ends with:
             return false;
         }
 
+        // After user clears chat, do NOT let an older longer cloud thread jump back in
+        const clearedAt = window.__lubaChatClearedAt || 0;
+        const recentlyCleared = clearedAt && (Date.now() - clearedAt < 120000);
+        if (recentlyCleared && cloudLen > localLen) {
+            // Push cleared local up again and ignore cloud restore
+            cloudPost({ action: 'save_chat', token, messages: chatHistory }).catch(() => {});
+            lastCloudChatUpdatedAt = Date.now();
+            return false;
+        }
+
         const shouldApply =
-            cloudLen > localLen ||
+            (!recentlyCleared && cloudLen > localLen) ||
             (cloudLen === localLen && cloudUpdated && cloudUpdated > (lastCloudChatUpdatedAt || 0) + 300) ||
-            (opts.force && cloudLen >= localLen);
+            (opts.force && !recentlyCleared && cloudLen >= localLen);
 
         if (!shouldApply) {
             if (cloudUpdated) lastCloudChatUpdatedAt = cloudUpdated;
@@ -9295,11 +9305,30 @@ Every substantive answer ends with:
     clearChatBtn.onclick = async () => {
         if (!currentUser) return;
         if (await enforceLiveBan(true)) return;
-        if (confirm("Clear all messages?")) {
+        if (!confirm("Clear all messages?")) return;
+        try {
+            // Stop cloud from instantly re-applying the old thread
+            window.__lubaChatClearedAt = Date.now();
             chatHistory = [];
-            localStorage.removeItem('luba_chat_' + userKey(currentUser.username));
+            try {
+                localStorage.removeItem('luba_chat_' + userKey(currentUser.username));
+                localStorage.removeItem('luba_chat_' + currentUser.username);
+            } catch (_) {}
             chatContainer.innerHTML = '';
-            initDefaultChat();
+            initDefaultChat(); // greeting only + local saveChat
+            lastCloudChatUpdatedAt = Date.now();
+            // Force server to store the cleared chat so other devices / poll don't restore old messages
+            const token = getAuthToken();
+            if (token) {
+                try {
+                    await cloudPost({ action: 'save_chat', token, messages: chatHistory.slice() });
+                    lastCloudChatUpdatedAt = Date.now();
+                } catch (_) {}
+            }
+            try { saveUserChatHistory(currentUser.username, chatHistory); } catch (_) {}
+        } catch (err) {
+            console.warn('clear chat failed', err);
+            alert('Could not clear chat. Try again.');
         }
     };
 
