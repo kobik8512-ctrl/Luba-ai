@@ -6921,6 +6921,7 @@ Every substantive answer ends with:
                 code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
             }
         } catch (_) {}
+        try { code = ensureReliableGltfViewer(code); } catch (_) {}
         const codeId = storeCodeBlock(code);
         // Large pages (embedded GLB) skip base64 attribute — hydrate from code store / IDB
         let b64 = '';
@@ -7092,6 +7093,7 @@ Every substantive answer ends with:
                     code = injectUserImagesIntoHtml(code, window.__lubaPendingMedia);
                 }
             } catch (_) {}
+            try { code = ensureReliableGltfViewer(code); } catch (_) {}
             var hasBlobModel = /blob:/.test(code) && /LUBA_MODEL|GLTFLoader|\.glb|gltf/i.test(code);
             var isHuge = code.length > 400000;
             if (hasBlobModel || isHuge) {
@@ -9297,6 +9299,30 @@ Every substantive answer ends with:
         const menu = document.getElementById('slash-menu');
         if (menu) { menu.classList.remove('open'); menu.innerHTML = ''; }
         slashFiltered = [];
+    }
+
+    function ensureReliableGltfViewer(html) {
+        if (!html) return html;
+        let out = String(html);
+        if (!/LUBA_MODELS|__LUBA_MODEL_|GLTFLoader|gltf-binary|\.glb/i.test(out)) return out;
+        const closeScr = '<' + '/script>';
+        if (!/three\.min\.js/i.test(out)) {
+            const inj = '<script src="https://unpkg.com/three@0.149.0/build/three.min.js">' + closeScr + '\n';
+            if (/<\/head>/i.test(out)) out = out.replace(/<\/head>/i, inj + '</head>');
+            else out = inj + out;
+        }
+        if (!/GLTFLoader\.js/i.test(out)) {
+            const inj2 = '<script src="https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js">' + closeScr + '\n';
+            if (/<\/head>/i.test(out)) out = out.replace(/<\/head>/i, inj2 + '</head>');
+            else out = inj2 + out;
+        }
+        if (!/__lubaGltfBooted/.test(out)) {
+            const boot = "(function(){\nfunction lubaHideLoading(){\n  try{\n    document.querySelectorAll('body *').forEach(function(el){\n      var t=(el.textContent||'').trim();\n      if(t.length<80 && /loading/i.test(t) && el.children.length===0){ el.style.display='none'; }\n    });\n  }catch(e){}\n}\nfunction lubaShowErr(msg){\n  lubaHideLoading();\n  var d=document.getElementById('luba-gltf-err');\n  if(!d){ d=document.createElement('div'); d.id='luba-gltf-err';\n    d.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#3f1d1d;color:#fecaca;padding:12px 14px;border-radius:12px;font:13px/1.4 system-ui;border:1px solid #f87171';\n    document.body.appendChild(d);\n  }\n  d.textContent=String(msg||'Load failed');\n}\nfunction lubaGetUrl(){\n  try{\n    if(window.LUBA_MODELS&&window.LUBA_MODELS[0]) return window.LUBA_MODELS[0];\n    if(window.__LUBA_MODELS&&window.__LUBA_MODELS[0]) return window.__LUBA_MODELS[0];\n  }catch(e){}\n  return '';\n}\nfunction lubaBoot(){\n  if(window.__lubaGltfBooted) return;\n  window.__lubaGltfBooted=true;\n  var url=lubaGetUrl();\n  if(!url){ lubaShowErr('No 3D model data in this preview. Re-attach the .glb and send again.'); return; }\n  if(typeof THREE==='undefined'){ lubaShowErr('Three.js failed to load. Check internet and retry.'); return; }\n  if(!THREE.GLTFLoader){ lubaShowErr('GLTFLoader missing.'); return; }\n  var loader=new THREE.GLTFLoader();\n  function onOk(gltf){\n    try{\n      if(!window.lubaForcedViewer){\n        window.lubaForcedViewer=true;\n        var scene=new THREE.Scene();\n        scene.background=new THREE.Color(0x0b1220);\n        var cam=new THREE.PerspectiveCamera(60,innerWidth/Math.max(innerHeight,1),0.05,500);\n        var ren=new THREE.WebGLRenderer({antialias:true,alpha:false});\n        ren.setPixelRatio(Math.min(window.devicePixelRatio||1,2));\n        ren.setSize(innerWidth,innerHeight);\n        ren.domElement.style.cssText='position:fixed;inset:0;z-index:2;touch-action:none';\n        document.body.appendChild(ren.domElement);\n        scene.add(new THREE.HemisphereLight(0xffffff,0x334455,1.15));\n        var dl=new THREE.DirectionalLight(0xffffff,0.95); dl.position.set(4,10,3); scene.add(dl);\n        var root=gltf.scene; scene.add(root);\n        var box=new THREE.Box3().setFromObject(root);\n        var size=box.getSize(new THREE.Vector3());\n        var center=box.getCenter(new THREE.Vector3());\n        root.position.sub(center);\n        var maxDim=Math.max(size.x,size.y,size.z,0.01);\n        cam.position.set(maxDim*1.5, maxDim*0.95, maxDim*1.7);\n        cam.lookAt(0,0,0);\n        var dragging=false,lx=0,ly=0;\n        ren.domElement.addEventListener('pointerdown',function(e){dragging=true;lx=e.clientX;ly=e.clientY; try{ren.domElement.setPointerCapture(e.pointerId)}catch(x){}});\n        window.addEventListener('pointerup',function(){dragging=false;});\n        window.addEventListener('pointermove',function(e){\n          if(!dragging)return;\n          var dx=(e.clientX-lx)*0.01, dy=(e.clientY-ly)*0.01; lx=e.clientX; ly=e.clientY;\n          var sph=new THREE.Spherical().setFromVector3(cam.position);\n          sph.theta-=dx; sph.phi=Math.max(0.12,Math.min(Math.PI-0.12,sph.phi-dy));\n          cam.position.setFromSpherical(sph); cam.lookAt(0,0,0);\n        });\n        window.addEventListener('resize',function(){ cam.aspect=innerWidth/Math.max(innerHeight,1); cam.updateProjectionMatrix(); ren.setSize(innerWidth,innerHeight); });\n        (function loop(){ requestAnimationFrame(loop); ren.render(scene,cam); })();\n      }\n    }catch(e){ lubaShowErr('Display error: '+(e&&e.message?e.message:e)); return; }\n    lubaHideLoading();\n  }\n  function onErr(e){ lubaShowErr('Could not load 3D model: '+(e&&e.message?e.message:e)+'. Try under 5MB and open in Chrome.'); }\n  try{\n    if(String(url).indexOf('data:')===0){\n      fetch(url).then(function(r){return r.arrayBuffer();}).then(function(buf){ loader.parse(buf,'',onOk,onErr); }).catch(onErr);\n    } else {\n      loader.load(url,onOk,undefined,onErr);\n    }\n  }catch(e){ onErr(e); }\n  setTimeout(function(){\n    var el=document.getElementById('luba-gltf-err');\n    if(el) return;\n    var still=false;\n    try{ document.querySelectorAll('body *').forEach(function(n){ var t=(n.textContent||'').trim(); if(t.length<90&&/loading/i.test(t)&&n.children.length===0&&n.style.display!=='none') still=true; }); }catch(x){}\n    if(still) lubaShowErr('Still loading after 12s \u2014 too heavy for this WebView. Use a smaller GLB or Chrome.');\n  },12000);\n}\nif(document.readyState==='loading') document.addEventListener('DOMContentLoaded',lubaBoot);\nelse lubaBoot();\nsetTimeout(lubaBoot,500);\n})();";
+            const tag = '<script>' + boot + closeScr;
+            if (/<\/body>/i.test(out)) out = out.replace(/<\/body>/i, tag + '</body>');
+            else out = out + tag;
+        }
+        return out;
     }
 
     /** Embed real attached photos into generated HTML (data URLs), same idea as pasting base64 into a script. */
