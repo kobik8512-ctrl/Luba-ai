@@ -2757,10 +2757,10 @@
     </div>
     <div class="slash-menu" id="slash-menu" role="listbox" aria-label="Commands"></div>
     <div id="input-container">
-        <button class="action-btn" id="photo-btn" title="Photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        <button class="action-btn" id="photo-btn" title="Photo, video, or 3D model (.glb/.gltf)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
         <button class="action-btn" id="btn-attach-file" title="Attach HTML / code file"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
-        <input type="file" id="image-input" accept="image/*,video/*" multiple style="display:none">
-        <input type="file" id="code-file-input" accept=".html,.htm,.css,.js,.json,.txt,.md,.svg,.xml,.py,.ts,.tsx,.jsx,text/*" style="display:none">
+        <input type="file" id="image-input" accept="image/*,video/*,.glb,.gltf,model/gltf-binary,model/gltf+json" multiple style="display:none">
+        <input type="file" id="code-file-input" accept=".html,.htm,.css,.js,.json,.txt,.md,.svg,.xml,.py,.ts,.tsx,.jsx,.glb,.gltf,text/*" style="display:none">
         <textarea id="user-input" placeholder="Add a note or ask to fix something..."></textarea>
         <button class="send-btn" id="send-btn">Send</button>
     </div>
@@ -6243,7 +6243,7 @@ async function spendCoin(username, cost) {
 Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer), slash commands (/truth, /copy, /add, /webadd, /search, and others), live web search for facts or public textures/assets, interactive HTML/game previews, embedding your photos into generated apps, speech, generated images, coins/message limits, verification, and linked tools we add over time.
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer), slash commands (/truth, /copy, /add, /webadd, /search, and others), live web search for facts or public textures/assets, interactive HTML/game previews, embedding your photos or .glb/.gltf 3D models into generated apps, speech, generated images, coins/message limits, verification, and linked tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
@@ -6565,6 +6565,7 @@ Slash commands (type / in the chat box for autocomplete — these are NOT the sa
 - /help — list slash commands
 Modes (Normal, Study, HTML, Code, Creative, Lawyer) are chosen from the Modes button, not slash commands.
 When building HTML games/apps you can use public CDN textures and Three.js. When the user attaches a photo and wants it in the project (especially with /copy), embed it via __LUBA_IMG_N__ placeholders so the client can inject the real image data URL.
+Users can also attach 3D models (.glb / .gltf, max about 20MB). Use __LUBA_MODEL_0__ (or window.LUBA_MODELS[0] after inject) with THREE.GLTFLoader — do not replace a real attached car/gun model with a cube. Photo button accepts images, videos, and GLB/GLTF.
 
 You have tools: calculator (always for math), generate_image (when they want a picture), save_memory (when they ask you to remember a lasting fact about them), and web_search (MUST use for news, scores, prices, net worth, stocks, sports results, weather, population, richest people, release dates, or anything that changes over time — never guess current numbers from memory; search first).
 
@@ -8118,11 +8119,13 @@ Every substantive answer ends with:
     }
 
     function countMediaTypes() {
-        var photos = 0, videos = 0;
+        var photos = 0, videos = 0, models = 0;
         selectedMediaItems.forEach(function (m) {
-            if (m.isVideo) videos++; else photos++;
+            if (m.isModel) models++;
+            else if (m.isVideo) videos++;
+            else photos++;
         });
-        return { photos: photos, videos: videos };
+        return { photos: photos, videos: videos, models: models };
     }
 
     function renderMediaThumbs() {
@@ -8140,7 +8143,16 @@ Every substantive answer ends with:
         selectedMediaItems.forEach(function (m, idx) {
             var wrap = document.createElement('div');
             wrap.className = 'preview-thumb';
-            if (m.isVideo) {
+            if (m.isModel) {
+                var box = document.createElement('div');
+                box.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#1a1a22;color:#c4b5fd;font-size:11px;font-weight:800;text-align:center;padding:6px;';
+                box.textContent = '3D\n' + (m.name || 'model');
+                wrap.appendChild(box);
+                var badge = document.createElement('span');
+                badge.className = 'vid-badge';
+                badge.textContent = '3D';
+                wrap.appendChild(badge);
+            } else if (m.isVideo) {
                 var v = document.createElement('video');
                 v.src = m.dataUrl;
                 v.muted = true;
@@ -8171,7 +8183,7 @@ Every substantive answer ends with:
         });
         var c = countMediaTypes();
         if (label) {
-            label.textContent = c.photos + '/' + MAX_PHOTOS + ' photos \u00b7 ' + c.videos + '/' + MAX_VIDEOS + ' videos';
+            label.textContent = c.photos + '/' + MAX_PHOTOS + ' photos · ' + c.videos + '/' + MAX_VIDEOS + ' videos · ' + c.models + ' 3D'';
         }
         selectedImageBase64 = selectedMediaItems[0].dataUrl;
     }
@@ -8183,7 +8195,7 @@ Every substantive answer ends with:
             const fresh = document.createElement('input');
             fresh.type = 'file';
             fresh.id = 'image-input';
-            fresh.accept = 'image/*,video/*';
+            fresh.accept = 'image/*,video/*,.glb,.gltf,model/gltf-binary,model/gltf+json';
             fresh.multiple = true;
             fresh.style.display = 'none';
             try { fresh.setAttribute('multiple', 'multiple'); } catch (_) {}
@@ -8226,27 +8238,39 @@ Every substantive answer ends with:
             var file = files[i];
             var isVideo = (file.type || '').startsWith('video/') || /\.(mp4|mov|webm|m4v|avi)$/i.test(file.name || '');
             var isImage = (file.type || '').startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(file.name || '');
-            if (!isVideo && !isImage) {
+            var isModel = /model\/gltf|model\/gltf-binary/i.test(file.type || '') || /\.(glb|gltf)$/i.test(file.name || '');
+            if (!isVideo && !isImage && !isModel) {
                 skipped.push(file.name || 'file');
                 continue;
             }
             var counts = countMediaTypes();
+            if (isModel && counts.models >= 2) {
+                skipped.push('3D model limit (max 2)');
+                continue;
+            }
             if (isVideo && counts.videos >= MAX_VIDEOS) {
                 skipped.push('video limit');
                 continue;
             }
-            if (!isVideo && counts.photos >= MAX_PHOTOS) {
+            if (isImage && counts.photos >= MAX_PHOTOS) {
                 skipped.push('photo limit');
                 continue;
             }
-            var maxBytes = isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024;
+            // Models: 20MB hard limit — larger files (e.g. 70MB) break mobile preview as base64
+            var maxBytes = isModel ? 20 * 1024 * 1024 : (isVideo ? 25 * 1024 * 1024 : 12 * 1024 * 1024);
             if (file.size > maxBytes) {
-                skipped.push((file.name || 'file') + ' too big');
+                skipped.push((file.name || 'file') + ' too big (3D max 20MB — compress/export smaller GLB)');
                 continue;
             }
             try {
                 var dataUrl = await readFileAsDataUrl(file);
-                selectedMediaItems.push({ dataUrl: dataUrl, isVideo: !!isVideo });
+                selectedMediaItems.push({
+                    dataUrl: dataUrl,
+                    isVideo: !!isVideo,
+                    isModel: !!isModel,
+                    name: file.name || (isModel ? 'model.glb' : 'file'),
+                    mime: file.type || (isModel ? 'model/gltf-binary' : '')
+                });
                 added++;
             } catch (_) {
                 skipped.push(file.name || 'unreadable');
@@ -8263,10 +8287,10 @@ Every substantive answer ends with:
         } catch (_) {}
 
         if (!added && skipped.length) {
-            alert('Could not add media. Max ' + MAX_PHOTOS + ' photos / ' + MAX_VIDEOS + ' videos.');
+            alert('Could not add media. Check type/size. 3D models: .glb/.gltf max 20MB. Photos/videos have separate limits.');
         } else if (skipped.length) {
             var c = countMediaTypes();
-            alert('Added ' + added + '. Some skipped (limits/size). Now: ' + c.photos + ' photos, ' + c.videos + ' videos.');
+            alert('Added ' + added + '. Skipped: ' + skipped.slice(0, 3).join(', ') + (skipped.length > 3 ? '…' : '') + '. Now: ' + c.photos + ' photos, ' + c.videos + ' videos, ' + c.models + ' 3D.');
         }
     }
 
@@ -9167,6 +9191,32 @@ Every substantive answer ends with:
                 }
                 return '<img src="' + urls[0] + '"' + attrs + '>';
             });
+        }
+
+        // 3D models (.glb/.gltf) as data URLs
+        const models = (mediaItems || []).filter(function(m){ return m && m.isModel && m.dataUrl; });
+        if (models.length) {
+            models.forEach(function(m, i) {
+                const token = '__LUBA_MODEL_' + i + '__';
+                out = out.split(token).join(m.dataUrl);
+                out = out.split('__USER_MODEL_' + i + '__').join(m.dataUrl);
+            });
+            const modelLit = '[' + models.map(function(m){ return JSON.stringify(m.dataUrl); }).join(',') + ']';
+            const modelBoot = '<script>window.LUBA_MODELS=' + modelLit + ';window.__LUBA_MODELS=window.LUBA_MODELS;<' + '/script>';
+            // GLTFLoader helper from CDN + load first model helper
+            const loaderBoot = '<script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"><' + '/script>';
+            // Note: modules path may vary — also inject a safe loader snippet using dynamic import alternative in prompt
+            if (/<head[^>]*>/i.test(out)) {
+                out = out.replace(/<head([^>]*)>/i, '<head$1>' + modelBoot);
+            } else if (/<body[^>]*>/i.test(out)) {
+                out = out.replace(/<body([^>]*)>/i, '<body$1>' + modelBoot);
+            } else {
+                out = modelBoot + out;
+            }
+            // Replace common placeholder filenames
+            if (models[0]) {
+                out = out.replace(/["'](?:car|vehicle|model|weapon|gun|building)\.glb["']/gi, JSON.stringify(models[0].dataUrl));
+            }
         }
         return out;
     }
@@ -10123,10 +10173,18 @@ Every substantive answer ends with:
         const mediaForBuild = (typeof selectedMediaItems !== 'undefined' && selectedMediaItems) ? selectedMediaItems : [];
         const wantsExactImage = pendingCopyMode || (mediaForBuild.length && /\b(use|put|place|add|insert|exact|this|photo|picture|image|sprite|texture|copy)\b/i.test(msgText)
             && (activeMode === 'html' || activeMode === 'code' || /\b(game|app|html|sprite|texture|background|character|logo)\b/i.test(msgText)));
-        if (pendingCopyMode || wantsExactImage || (mediaForBuild.length && (activeMode === 'html' || /\b(make|build)\b/i.test(msgText)))) {
-            const lines = mediaForBuild.map((m, i) => '__LUBA_IMG_' + i + '__ = user attachment ' + (i + 1) + (m.isVideo ? ' (video poster/frame if needed)' : ' (image)'));
-            systemPrompt += "\n\nUSER ATTACHMENTS TO EMBED EXACTLY (do not redraw):\n" + lines.join('\n') +
-                "\nIn any HTML you output, set img/texture src to these exact placeholder strings (e.g. src=\"__LUBA_IMG_0__\"). The client replaces them with the real files. Never substitute a drawn approximation when the user asked to use their photo.";
+        if (pendingCopyMode || wantsExactImage || (mediaForBuild.length && (activeMode === 'html' || /\b(make|build|car|model|3d|glb|gltf)\b/i.test(msgText)))) {
+            const lines = mediaForBuild.map((m, i) => {
+                if (m.isModel) return '__LUBA_MODEL_' + i + '__ = user 3D model file ' + (m.name || 'model.glb') + ' (GLB/GLTF data URL after inject)';
+                return '__LUBA_IMG_' + i + '__ = user attachment ' + (i + 1) + (m.isVideo ? ' (video)' : ' (image)');
+            });
+            const hasModel = mediaForBuild.some(function(m){ return m && m.isModel; });
+            systemPrompt += "\n\nUSER ATTACHMENTS TO EMBED EXACTLY (do not redraw / do not rebuild a fake version):\n" + lines.join('\n') +
+                "\nFor images: use src=\"__LUBA_IMG_N__\". For 3D models: use the placeholder string __LUBA_MODEL_N__ as the URL passed to GLTFLoader (or THREE.GLTFLoader). " +
+                "Include Three.js 0.149 + GLTFLoader from unpkg (UMD). Example pattern:\n" +
+                "const loader = new THREE.GLTFLoader(); loader.load(__LUBA_MODEL_0__ or window.LUBA_MODELS[0], (gltf) => { scene.add(gltf.scene); }, undefined, (e)=>console.warn(e));\n" +
+                "Scale/position the model to fit the existing game. Do NOT replace their car with a box if they attached a GLB. Keep controls working." +
+                (hasModel ? "\nA real .glb/.gltf is attached — you MUST load it with GLTFLoader, not draw a primitive stand-in." : "");
         }
 
         const currentParts = [{
