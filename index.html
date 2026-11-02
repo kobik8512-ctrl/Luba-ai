@@ -6555,7 +6555,7 @@ Slash commands (type / in the chat box for autocomplete — these are NOT the sa
 - /truth — brutal honesty, no fake compliments (works with photos)
 - /copy — use the user's exact attached photo or exact description in what you build (no redraw). Placeholders __LUBA_IMG_0__ etc. become their real image data in the preview.
 - /add — add something to the CURRENT project in chat (e.g. /add trees, /add more features). Do not start a different game.
-- /webadd — search the web for textures / public 3D assets and add them into the CURRENT project (buildings, guns, props, etc.). Prefer real CDN/example texture URLs over crude self-made meshes when quality matters.
+- /webadd — add better props into the CURRENT project using known-good public textures (threejs.org example textures) and procedural meshes (e.g. real tree groups). Never ship broken external URLs that crash the preview.
 - /search — force a live web search
 - /short — short answers
 - /detailed — thorough answers
@@ -10013,16 +10013,25 @@ Every substantive answer ends with:
             systemPrompt += "\n\nFIX MODE: Continue the SAME previous game/app from this chat. Fix bugs and apply improvements. Do not start a different project.";
         }
         if (pendingAddMode) {
-            systemPrompt += "\n\nADD MODE (/add) IS ON: Continue the SAME previous project in this chat (game, HTML app, or text). ADD what the user asked for (trees, enemies, UI, features, paragraphs, etc.). Do not rebuild a different project from scratch. Keep existing systems working and integrate the new pieces cleanly. If they said \"more features\", invent several fun, working additions that fit the same project.";
+            systemPrompt += "\n\nADD MODE (/add) IS ON: Continue the SAME previous project in this chat (game, HTML app, or text). ADD what the user asked for (trees, enemies, UI, features, paragraphs, etc.). Do not rebuild a different project from scratch. Keep existing systems working and integrate the new pieces cleanly. If they said \"more features\", invent several fun, working additions that fit the same project.\n" +
+                "If they ask for trees/props in 3D: build them procedurally (trunk + foliage meshes, multiple instances with random scale/position) so they always appear — do not rely on external models that can fail. Keep the script error-free.";
         }
         if (pendingWebAddMode) {
-            systemPrompt += "\n\nWEBADD MODE (/webadd) IS ON: Continue the SAME previous project. The user wants real web assets (textures, sprites, HDRIs, or simple GLTF/GLB when appropriate) — not crude self-drawn cubes when a public URL will look better.\n" +
-                "- Use LIVE WEB SEARCH RESULTS when provided to find suitable public asset URLs or known public CDN paths.\n" +
-                "- Prefer reliable public CDNs / demo assets, e.g. Three.js example textures (https://threejs.org/examples/textures/...), Kenney-style public packs when linked, or other freely usable image textures via https URLs.\n" +
-                "- For 3D: load textures with THREE.TextureLoader; for 2D use <img> or canvas drawImage from https URLs. Always set crossOrigin when needed and provide a solid-color fallback if load fails.\n" +
-                "- Do NOT pretend a broken URL is fine — pick paths that commonly work, or use well-known Three.js example texture files.\n" +
-                "- Integrate the asset into the EXISTING game/app (buildings, guns, trees, etc. as requested). Do not start a new unrelated project.\n" +
-                "- Still output one complete HTML file with the additions working.";
+            systemPrompt += "\n\nWEBADD MODE (/webadd) IS ON: Continue the SAME previous project and ADD the requested thing (trees, buildings, guns, ground, sky, etc.).\n" +
+                "CRITICAL — DO NOT BREAK THE SCRIPT:\n" +
+                "1) Never use random or guessed texture/model URLs from search snippets if they might 404. Broken URLs must NOT crash the app.\n" +
+                "2) Prefer these KNOWN-GOOD public textures (copy exact URLs):\n" +
+                "   - Grass/ground: https://threejs.org/examples/textures/terrain/grasslight-big.jpg\n" +
+                "   - Bark/wood: https://threejs.org/examples/textures/hardwood2_diffuse.jpg\n" +
+                "   - Brick/building: https://threejs.org/examples/textures/brick_diffuse.jpg\n" +
+                "   - General grid/UV: https://threejs.org/examples/textures/uv_grid_opengl.jpg\n" +
+                "   - Water normals: https://threejs.org/examples/textures/waternormals.jpg\n" +
+                "   - Sky/env (equirect): https://threejs.org/examples/textures/2294472375_24a3b8ef46_o.jpg\n" +
+                "3) TREES: Do NOT depend on a single external GLTF that may fail. Build trees procedurally (cylinder trunk + cone/sphere foliage groups, instanced or cloned meshes). Optionally apply bark/grass textures from the list above with TextureLoader. Many trees (8–30) with slight random scale/rotation.\n" +
+                "4) TextureLoader: always set loader.setCrossOrigin('anonymous'); onError fall back to MeshStandardMaterial color (greens/browns) so the scene still runs.\n" +
+                "5) No uncaught promise rejections; wrap loads in try/catch or .catch(). Keep existing controls and game loop working.\n" +
+                "6) Output one complete working HTML file — trees/buildings must be VISIBLE after load, not missing because of a failed fetch.\n" +
+                "7) Do not replace the whole game with a demo; extend the previous project.";
         }
 
         // Fast path for easy chat ("hi", short questions) — less history, no tools, smaller output
@@ -10073,15 +10082,18 @@ Every substantive answer ends with:
             try {
                 let searchQ = buildSearchQuery(msgText);
                 if (pendingWebAddMode) {
-                    searchQ = (searchQ || msgText || 'game texture').slice(0, 120);
-                    if (!/texture|model|gltf|sprite|cdn|three\.js|asset/i.test(searchQ)) {
-                        searchQ = searchQ + ' free texture OR sprite OR gltf three.js example assets';
-                    }
+                    // Keep search light — we mainly use known-good CDN paths in the prompt
+                    searchQ = (searchQ || msgText || 'trees').slice(0, 80) + ' three.js texture example';
                 }
                 setTypingStatus(searchQ ? ('Searching the web for “' + searchQ.slice(0, 60) + '”…') : 'Searching the web…');
                 const ws = await runWebSearch(searchQ);
                 if (ws && ws.ok && ws.summary) {
-                    forcedSearchBlock = '\n\nLIVE WEB SEARCH RESULTS for "' + searchQ + '" (use these as the main source; give the best clear answer; do not invent older figures):\n' + ws.summary;
+                    if (pendingWebAddMode) {
+                        forcedSearchBlock = '\n\nWEBADD SEARCH NOTES for "' + searchQ + '":\n' + ws.summary +
+                            '\n\nREMINDER: Only use asset URLs if they are clearly public https image/texture links. Prefer the known-good threejs.org/examples/textures/ URLs from system instructions. If search results are pages (not direct .jpg/.png texture files), IGNORE them for loading and use procedural meshes + known-good textures instead. Never insert broken URLs that crash the app.';
+                    } else {
+                        forcedSearchBlock = '\n\nLIVE WEB SEARCH RESULTS for "' + searchQ + '" (use these as the main source; give the best clear answer; do not invent older figures):\n' + ws.summary;
+                    }
                     setTypingStatus('Reading search results…');
                 } else {
                     setTypingStatus('Search limited — answering carefully…');
