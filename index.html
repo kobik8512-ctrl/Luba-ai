@@ -2758,9 +2758,9 @@
     <div class="slash-menu" id="slash-menu" role="listbox" aria-label="Commands"></div>
     <div id="input-container">
         <button class="action-btn" id="photo-btn" title="Photo, video, or 3D model (.glb/.gltf)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
-        <button class="action-btn" id="btn-attach-file" title="Attach HTML / code file"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
-        <input type="file" id="image-input" accept="image/*,video/*,.glb,.gltf,model/gltf-binary,model/gltf+json" multiple style="display:none">
-        <input type="file" id="code-file-input" accept=".html,.htm,.css,.js,.json,.txt,.md,.svg,.xml,.py,.ts,.tsx,.jsx,.glb,.gltf,text/*" style="display:none">
+        <button class="action-btn" id="btn-attach-file" title="Attach file, code, or 3D (.glb)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+        <input type="file" id="image-input" accept="*/*" multiple style="display:none">
+        <input type="file" id="code-file-input" accept="*/*" style="display:none">
         <textarea id="user-input" placeholder="Add a note or ask to fix something..."></textarea>
         <button class="send-btn" id="send-btn">Send</button>
     </div>
@@ -8221,7 +8221,7 @@ Every substantive answer ends with:
             const fresh = document.createElement('input');
             fresh.type = 'file';
             fresh.id = 'image-input';
-            fresh.accept = 'image/*,video/*,.glb,.gltf,model/gltf-binary,model/gltf+json';
+            fresh.accept = '*/*';
             fresh.multiple = true;
             fresh.style.display = 'none';
             try { fresh.setAttribute('multiple', 'multiple'); } catch (_) {}
@@ -8340,17 +8340,20 @@ Every substantive answer ends with:
                 try { forceStopGeneration = false; } catch (_) {}
             }
             var counts = countMediaTypes();
-            if (counts.photos >= MAX_PHOTOS && counts.videos >= MAX_VIDEOS) {
-                alert('Limit: ' + MAX_PHOTOS + ' photos and ' + MAX_VIDEOS + ' videos per message.');
+            if (counts.photos >= MAX_PHOTOS && counts.videos >= MAX_VIDEOS && counts.models >= 2) {
+                alert('Media limit reached for this message.');
                 return false;
             }
             resetImageInputElement();
             setTimeout(function () {
                 try {
-                    if (imageInputEl) imageInputEl.click();
+                    if (imageInputEl) {
+                        try { imageInputEl.accept = '*/*'; } catch (_) {}
+                        imageInputEl.click();
+                    }
                 } catch (err) {
                     console.warn(err);
-                    alert('Could not open photo library. Re-open the app and try again.');
+                    alert('Could not open file picker. Use the paperclip and pick the .glb from Downloads / Files.');
                 }
             }, 0);
             return false;
@@ -9707,11 +9710,41 @@ Every substantive answer ends with:
         };
 
         if (fileInput) {
+            try { fileInput.accept = '*/*'; } catch (_) {}
             fileInput.onchange = function() {
                 const f = fileInput.files && fileInput.files[0];
                 fileInput.value = '';
                 if (!f) return;
-                if (f.size > 900000) { alert('File too large (max ~900KB)'); return; }
+                const isModel = /\.(glb|gltf)$/i.test(f.name || '') || /model\/gltf/i.test(f.type || '');
+                if (isModel) {
+                    if (f.size > 100 * 1024 * 1024) { alert('3D model max 100MB'); return; }
+                    var counts = countMediaTypes();
+                    if (counts.models >= 2) { alert('Max 2 3D models per message'); return; }
+                    try {
+                        var blobUrl = URL.createObjectURL(f);
+                        selectedMediaItems.push({
+                            dataUrl: blobUrl,
+                            blob: f,
+                            isVideo: false,
+                            isModel: true,
+                            name: f.name || 'model.glb',
+                            mime: f.type || 'model/gltf-binary',
+                            size: f.size
+                        });
+                        renderMediaThumbs();
+                        if (input) {
+                            input.placeholder = 'Tell Luba how to use this 3D model (e.g. /copy add as the car)...';
+                            try { input.focus(); } catch (_) {}
+                        }
+                    } catch (err) {
+                        alert('Could not attach 3D model');
+                    }
+                    return;
+                }
+                if (f.size > 900000) {
+                    alert('Code/text file max ~900KB. For 3D models use .glb/.gltf (up to 100MB).');
+                    return;
+                }
                 const reader = new FileReader();
                 reader.onload = function() {
                     const text = String(reader.result || '');
@@ -9732,6 +9765,7 @@ Every substantive answer ends with:
             fileBtn.onclick = function(e) {
                 e.preventDefault();
                 e.stopPropagation();
+                try { fileInput.accept = '*/*'; } catch (_) {}
                 fileInput.click();
             };
         }
