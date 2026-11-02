@@ -2757,9 +2757,9 @@
     </div>
     <div class="slash-menu" id="slash-menu" role="listbox" aria-label="Commands"></div>
     <div id="input-container">
-        <button class="action-btn" id="photo-btn" title="Photo, video, or 3D model (.glb/.gltf)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        <button class="action-btn" id="photo-btn" title="Photo or video (for 3D models use paperclip)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
         <button class="action-btn" id="btn-attach-file" title="Attach file, code, or 3D (.glb)"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
-        <input type="file" id="image-input" accept="*/*" multiple style="display:none">
+        <input type="file" id="image-input" accept="image/*,video/*" multiple style="display:none">
         <input type="file" id="code-file-input" accept="*/*" style="display:none">
         <textarea id="user-input" placeholder="Add a note or ask to fix something..."></textarea>
         <button class="send-btn" id="send-btn">Send</button>
@@ -6810,6 +6810,33 @@ Every substantive answer ends with:
         if (!c.trim()) return c;
         const closeScr = '<' + '/script>';
 
+        // Ensure Three + GLTFLoader when user 3D models are used
+        const needsGltf = /LUBA_MODEL|LUBA_MODELS|GLTFLoader|\.glb|gltf/i.test(c);
+        if (needsGltf) {
+            if (!/three(\.min)?\.js/i.test(c)) {
+                const inj = '<script src="https://unpkg.com/three@0.149.0/build/three.min.js">' + closeScr + '\n';
+                if (/<\/head>/i.test(c)) c = c.replace(/<\/head>/i, inj + '</head>');
+                else c = inj + c;
+            }
+            if (!/GLTFLoader\.js/i.test(c)) {
+                const inj2 = '<script src="https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js">' + closeScr + '\n';
+                if (/<\/head>/i.test(c)) c = c.replace(/<\/head>/i, inj2 + '</head>');
+                else c = inj2 + c;
+            }
+            // If model array missing but pending media has models, inject
+            if (!/LUBA_MODELS\s*=/.test(c) && window.__lubaPendingMedia && window.__lubaPendingMedia.length) {
+                try {
+                    const models = window.__lubaPendingMedia.filter(function(m){ return m && m.isModel && m.dataUrl; });
+                    if (models.length) {
+                        const lit = '[' + models.map(function(m){ return JSON.stringify(m.dataUrl); }).join(',') + ']';
+                        const boot = '<script>window.LUBA_MODELS=' + lit + ';window.__LUBA_MODELS=window.LUBA_MODELS;<' + '/script>';
+                        if (/<head[^>]*>/i.test(c)) c = c.replace(/<head([^>]*)>/i, '<head$1>' + boot);
+                        else c = boot + c;
+                    }
+                } catch (_) {}
+            }
+        }
+
         // Broken/empty script src tags
         c = c.replace(/<script\s+src\s*=\s*(["'])\s*\1\s*>\s*<\s*\/\s*script\s*>/gi, '');
         c = c.replace(/<script\s+src\s*=\s*(["'])\s*\1[^>]*>/gi, '');
@@ -8221,7 +8248,7 @@ Every substantive answer ends with:
             const fresh = document.createElement('input');
             fresh.type = 'file';
             fresh.id = 'image-input';
-            fresh.accept = '*/*';
+            fresh.accept = 'image/*,video/*';
             fresh.multiple = true;
             fresh.style.display = 'none';
             try { fresh.setAttribute('multiple', 'multiple'); } catch (_) {}
@@ -8290,10 +8317,17 @@ Every substantive answer ends with:
             }
             try {
                 if (isModel) {
-                    var blobUrl = URL.createObjectURL(file);
+                    var modelUrl;
+                    var useBlob = file.size > 30 * 1024 * 1024;
+                    if (useBlob) {
+                        modelUrl = URL.createObjectURL(file);
+                    } else {
+                        // data URL so preview/srcdoc can load GLB without blob-origin issues
+                        modelUrl = await readFileAsDataUrl(file);
+                    }
                     selectedMediaItems.push({
-                        dataUrl: blobUrl, // blob: URL — lightweight, works with GLTFLoader
-                        blob: file,
+                        dataUrl: modelUrl,
+                        blob: useBlob ? file : null,
                         isVideo: false,
                         isModel: true,
                         name: file.name || 'model.glb',
@@ -8348,12 +8382,13 @@ Every substantive answer ends with:
             setTimeout(function () {
                 try {
                     if (imageInputEl) {
-                        try { imageInputEl.accept = '*/*'; } catch (_) {}
+                        // Gallery for photos/videos only — 3D models: use paperclip
+                        try { imageInputEl.accept = 'image/*,video/*'; } catch (_) {}
                         imageInputEl.click();
                     }
                 } catch (err) {
                     console.warn(err);
-                    alert('Could not open file picker. Use the paperclip and pick the .glb from Downloads / Files.');
+                    alert('Could not open gallery.');
                 }
             }, 0);
             return false;
@@ -9720,25 +9755,28 @@ Every substantive answer ends with:
                     if (f.size > 100 * 1024 * 1024) { alert('3D model max 100MB'); return; }
                     var counts = countMediaTypes();
                     if (counts.models >= 2) { alert('Max 2 3D models per message'); return; }
-                    try {
-                        var blobUrl = URL.createObjectURL(f);
-                        selectedMediaItems.push({
-                            dataUrl: blobUrl,
-                            blob: f,
-                            isVideo: false,
-                            isModel: true,
-                            name: f.name || 'model.glb',
-                            mime: f.type || 'model/gltf-binary',
-                            size: f.size
-                        });
-                        renderMediaThumbs();
-                        if (input) {
-                            input.placeholder = 'Tell Luba how to use this 3D model (e.g. /copy add as the car)...';
-                            try { input.focus(); } catch (_) {}
+                    (async function() {
+                        try {
+                            var useBlob = f.size > 30 * 1024 * 1024;
+                            var modelUrl = useBlob ? URL.createObjectURL(f) : await readFileAsDataUrl(f);
+                            selectedMediaItems.push({
+                                dataUrl: modelUrl,
+                                blob: useBlob ? f : null,
+                                isVideo: false,
+                                isModel: true,
+                                name: f.name || 'model.glb',
+                                mime: f.type || 'model/gltf-binary',
+                                size: f.size
+                            });
+                            renderMediaThumbs();
+                            if (input) {
+                                input.placeholder = 'Tell Luba how to use this 3D model (e.g. /copy add as the car)...';
+                                try { input.focus(); } catch (_) {}
+                            }
+                        } catch (err) {
+                            alert('Could not attach 3D model');
                         }
-                    } catch (err) {
-                        alert('Could not attach 3D model');
-                    }
+                    })();
                     return;
                 }
                 if (f.size > 900000) {
@@ -10007,15 +10045,26 @@ Every substantive answer ends with:
         } else {
             mediaList = (selectedMediaItems || []).slice();
         }
-        const imageToSend = mediaList.length ? mediaList[0].dataUrl : null;
+        const imageToSend = (function(){
+            for (var i = 0; i < mediaList.length; i++) {
+                if (mediaList[i] && !mediaList[i].isModel && mediaList[i].dataUrl && String(mediaList[i].dataUrl).indexOf('data:') === 0)
+                    return mediaList[i].dataUrl;
+            }
+            return null;
+        })();
         const mediaIsVideo = !!(imageToSend && /^data:video\//i.test(imageToSend));
         let sentMediaId = null;
         const mediaSummary = mediaList.length ? (function(){
-            var p = 0, v = 0;
-            mediaList.forEach(function(m){ if (m.isVideo) v++; else p++; });
+            var p = 0, v = 0, md = 0;
+            mediaList.forEach(function(m){
+                if (m.isModel) md++;
+                else if (m.isVideo) v++;
+                else p++;
+            });
             var parts = [];
             if (p) parts.push(p + (p === 1 ? ' photo' : ' photos'));
             if (v) parts.push(v + (v === 1 ? ' video' : ' videos'));
+            if (md) parts.push(md + (md === 1 ? ' 3D model' : ' 3D models'));
             return '(sent ' + parts.join(' + ') + ')';
         })() : '';
         let display = text || mediaSummary;
@@ -10047,13 +10096,19 @@ Every substantive answer ends with:
                         try { await ensureMediaStored(mid, du); } catch (_) {}
                     }
                     var mediaTag = '';
-                    try {
-                        mediaTag = buildMediaTag(du, isVid, mid) || '';
-                    } catch (_) { mediaTag = ''; }
-                    if (!mediaTag) {
-                        mediaTag = isVid
-                            ? ('<div class="user-media-wrap"><video class="user-chat-video" data-media-id="' + (mid||'') + '" src="' + du + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>')
-                            : ('<div class="user-media-wrap"><img class="user-chat-image" data-media-id="' + (mid||'') + '" src="' + du + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>');
+                    if (item.isModel) {
+                        var nm = escapeHtml(item.name || 'model.glb');
+                        var sz = item.size ? (' · ' + (item.size / (1024*1024)).toFixed(1) + 'MB') : '';
+                        mediaTag = '<div class="user-media-wrap" style="padding:12px 14px;border-radius:12px;background:rgba(124,58,237,.25);border:1px solid rgba(167,139,250,.45);color:#e9e0ff;font-weight:700;font-size:13px">🧊 3D model: ' + nm + sz + '<div style="opacity:.75;font-weight:500;font-size:11px;margin-top:4px">Attached for this game — use with /copy</div></div>';
+                    } else {
+                        try {
+                            mediaTag = buildMediaTag(du, isVid, mid) || '';
+                        } catch (_) { mediaTag = ''; }
+                        if (!mediaTag) {
+                            mediaTag = isVid
+                                ? ('<div class="user-media-wrap"><video class="user-chat-video" data-media-id="' + (mid||'') + '" src="' + du + '" controls playsinline preload="metadata" style="max-width:100%;border-radius:12px"></video></div>')
+                                : ('<div class="user-media-wrap"><img class="user-chat-image" data-media-id="' + (mid||'') + '" src="' + du + '" alt="upload" style="max-width:100%;border-radius:12px"/></div>');
+                        }
                     }
                     mediaHtmlParts.push(mediaTag);
                 }
@@ -10066,7 +10121,7 @@ Every substantive answer ends with:
         }
         // Retry does not add another user bubble
         if (!isRetry) {
-            appendMessage('user', display, time, !!(imageToSend || attachedFileSnapshot));
+            appendMessage('user', display, time, !!(imageToSend || attachedFileSnapshot || mediaList.some(function(m){ return m && m.isModel; })));
             // Save user message NOW (with media id) so refresh keeps it even if AI is still thinking
             try {
                 var storedDisplay = imageToSend ? stripHeavyMediaHtml(display) : (attachedFileSnapshot ? display : null);
@@ -10237,13 +10292,13 @@ Every substantive answer ends with:
             parts: [{ text: m.content }]
         }));
 
-        const visionItems = (mediaList || []).filter(function(m){ return m && m.dataUrl; }).slice(0, 10);
+        const visionItems = (mediaList || []).filter(function(m){ return m && m.dataUrl && !m.isModel && String(m.dataUrl).indexOf('data:') === 0; }).slice(0, 10);
         if (forcedSearchBlock) {
             systemPrompt += "\n\nWhen LIVE WEB SEARCH RESULTS are provided with the user message, you MUST use them as the main source. Give the best clear, direct answer (numbers, dates, names). Prefer search results over training memory. If results conflict, say so briefly and pick the most credible source. Do not pretend you did not search.";
         }
 
         // If user attached images and wants them in a build, force exact-image placeholders
-        const mediaForBuild = (typeof selectedMediaItems !== 'undefined' && selectedMediaItems) ? selectedMediaItems : [];
+        const mediaForBuild = (window.__lubaPendingMedia && window.__lubaPendingMedia.length) ? window.__lubaPendingMedia : ((mediaList && mediaList.length) ? mediaList : []);
         const wantsExactImage = pendingCopyMode || (mediaForBuild.length && /\b(use|put|place|add|insert|exact|this|photo|picture|image|sprite|texture|copy)\b/i.test(msgText)
             && (activeMode === 'html' || activeMode === 'code' || /\b(game|app|html|sprite|texture|background|character|logo)\b/i.test(msgText)));
         if (pendingCopyMode || wantsExactImage || (mediaForBuild.length && (activeMode === 'html' || /\b(make|build|car|model|3d|glb|gltf)\b/i.test(msgText)))) {
@@ -10260,12 +10315,22 @@ Every substantive answer ends with:
                 (hasModel ? "\nA real .glb/.gltf is attached — you MUST load it with GLTFLoader from the placeholder/window.LUBA_MODELS[0] (may be a blob: URL). Not a primitive stand-in. Do not convert the model to base64 yourself." : "");
         }
 
+        // Tell the model about attached 3D files (binary is injected client-side into HTML)
+        var modelNote = '';
+        try {
+            const modelsOnly = (mediaForBuild || []).filter(function(m){ return m && m.isModel; });
+            if (modelsOnly.length) {
+                modelNote = '\n\n[SYSTEM] User attached ' + modelsOnly.length + ' 3D model file(s): ' +
+                    modelsOnly.map(function(m,i){ return (m.name || 'model.glb') + ' -> use loader.load(window.LUBA_MODELS[' + i + '] || "__LUBA_MODEL_' + i + '__", ...)'; }).join('; ') +
+                    '. You MUST output HTML that loads these with THREE.GLTFLoader. Do not say the user forgot to attach a model. Do not invent a different car.';
+            }
+        } catch (_) {}
         const currentParts = [{
             text: (text || (visionItems.length
                 ? (visionItems.length === 1
                     ? (visionItems[0].isVideo ? "Describe this video and what happens in it." : "What do you see in this image?")
                     : ("I sent " + visionItems.length + " files. Look at all of them and answer."))
-                : "")) + (forcedSearchBlock || "")
+                : "")) + modelNote + (forcedSearchBlock || "")
         }];
         visionItems.forEach(function(m) {
             try {
