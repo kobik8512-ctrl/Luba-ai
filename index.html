@@ -570,7 +570,61 @@
             color: #3dd68c;
         }
 
+
+        /* Slash command autocomplete */
+        .slash-menu {
+            display: none;
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            bottom: 100%;
+            margin-bottom: 6px;
+            max-height: 220px;
+            overflow-y: auto;
+            background: rgba(18, 18, 24, 0.98);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+            z-index: 40;
+            padding: 6px;
+        }
+        body.light .slash-menu {
+            background: rgba(255,255,255,0.98);
+            border-color: rgba(0,0,0,0.1);
+        }
+        .slash-menu.open { display: block; }
+        .slash-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            width: 100%;
+            text-align: left;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            padding: 10px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font: inherit;
+        }
+        .slash-item:hover, .slash-item.active {
+            background: rgba(124, 58, 237, 0.18);
+        }
+        .slash-item .scmd {
+            font-weight: 800;
+            font-size: 14px;
+            min-width: 72px;
+            color: #c4b5fd;
+        }
+        body.light .slash-item .scmd { color: #6d28d9; }
+        .slash-item .sdesc {
+            font-size: 12px;
+            opacity: 0.7;
+            line-height: 1.35;
+        }
+
         #input-wrapper {
+            position: relative;
             max-width: 800px;
             width: 100%;
             margin: 0 auto;
@@ -2701,6 +2755,7 @@
         <span class="fmeta" id="file-attach-meta"></span>
         <button type="button" id="file-attach-clear" title="Remove">✕</button>
     </div>
+    <div class="slash-menu" id="slash-menu" role="listbox" aria-label="Commands"></div>
     <div id="input-container">
         <button class="action-btn" id="photo-btn" title="Photo or video"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
         <button class="action-btn" id="btn-attach-file" title="Attach HTML / code file"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
@@ -6547,7 +6602,9 @@ BUILDING AI / CHAT APPS:
 
 2D / 3D / GAMES:
 20) For 2D games: requestAnimationFrame loop, keyboard + touch controls (on-screen buttons for mobile), score/UI, collision, restart. For 3D: Three.js from the CDN above, proper lighting, orbit or drag controls, no floating disconnected meshes.
+20b) EXTERNAL ASSETS (quality): Prefer real textures / skyboxes / models from public CDNs instead of flat colored cubes when it improves the result. Allowed examples: Three.js example textures (https://threejs.org/examples/textures/...), unpkg/jsDelivr hosted GLTF when appropriate, CSS gradients + image textures. Load with TextureLoader / img tags. Always handle load errors with a fallback color so the app still runs offline if a CDN fails.
 21) Camera / mic / location apps: use navigator.mediaDevices.getUserMedia or geolocation with clear permission UX and error messages if denied. Prefer facingMode environment for back camera when relevant.
+21b) USER-PROVIDED IMAGES: If the user attaches a photo/video and asks to put it in the game/app (sprite, texture, character, background, logo), you MUST embed that exact image — do not redraw or "recreate" it. Use placeholders exactly like __LUBA_IMG_0__, __LUBA_IMG_1__ as the src (e.g. <img src="__LUBA_IMG_0__"> or texture load). The app will replace placeholders with the real attached files. Never ignore an attached image the user asked to use.
 22) DETAILED GAME SPECS ARE LAW: When the user lists features (e.g. 2-player, tanks, walls, place blocks, controls, health, map editor), implement EVERY listed feature as real working systems — not placeholders. Different units must look and control like real game objects (not two plain colored squares). Walls/map must be placeable or present as solid collisions. Both players need clear controls (keyboard and/or touch). If they gave a long brief, treat it as a checklist and satisfy it end-to-end.
 23) CONTROLS ARE MANDATORY for games: visible on-screen buttons or clear keys (WASD / arrows / touch zones), documented on screen. A game with no way to move is a failed build — never ship that.
 
@@ -8946,9 +9003,136 @@ Every substantive answer ends with:
         }
     };
 
+
+    // ============================================================
+    // Slash commands (/truth, autocomplete menu)
+    // ============================================================
+    const SLASH_COMMANDS = [
+        { cmd: '/truth', desc: 'Brutal honesty — no sugarcoating (works with photos too)' },
+        { cmd: '/copy', desc: 'Use the exact photo/text — no redraw, no remix' },
+        { cmd: '/search', desc: 'Force a live web search for your question' },
+        { cmd: '/short', desc: 'Answer short and direct — no long essays' },
+        { cmd: '/detailed', desc: 'Long, thorough answer with full detail' },
+        { cmd: '/roast', desc: 'Savage funny roast energy (still honest)' },
+        { cmd: '/eli5', desc: 'Explain like I am 5 — super simple' },
+        { cmd: '/fix', desc: 'Fix/continue the previous game or app in this chat' },
+        { cmd: '/help', desc: 'List available slash commands' }
+    ];
+    let slashActiveIndex = 0;
+    let slashFiltered = [];
+    let pendingTruthMode = false;
+    let pendingForceSearch = false;
+    let pendingCopyMode = false;
+    let pendingShortMode = false;
+    let pendingDetailedMode = false;
+    let pendingRoastMode = false;
+    let pendingEli5Mode = false;
+    let pendingFixMode = false;
+
+    function parseSlashCommand(raw) {
+        const text = String(raw || '');
+        const m = text.match(/^(\/[a-zA-Z]+)(?:\s+([\s\S]*))?$/);
+        if (!m) return { cmd: null, rest: text, raw: text };
+        return { cmd: m[1].toLowerCase(), rest: (m[2] != null ? m[2] : '').trim(), raw: text };
+    }
+
+    function renderSlashMenu() {
+        const menu = document.getElementById('slash-menu');
+        if (!menu || !userInput) return;
+        const val = userInput.value;
+        // Only when starts with / and no space yet after full cmd OR still typing cmd
+        const m = val.match(/^(\/[a-zA-Z]*)$/);
+        if (!m) {
+            menu.classList.remove('open');
+            menu.innerHTML = '';
+            slashFiltered = [];
+            return;
+        }
+        const prefix = m[1].toLowerCase();
+        slashFiltered = SLASH_COMMANDS.filter(c => c.cmd.startsWith(prefix));
+        if (!slashFiltered.length) {
+            menu.classList.remove('open');
+            menu.innerHTML = '';
+            return;
+        }
+        if (slashActiveIndex >= slashFiltered.length) slashActiveIndex = 0;
+        menu.innerHTML = slashFiltered.map((c, i) =>
+            '<button type="button" class="slash-item' + (i === slashActiveIndex ? ' active' : '') + '" data-slash-idx="' + i + '">' +
+            '<span class="scmd">' + c.cmd + '</span>' +
+            '<span class="sdesc">' + c.desc + '</span></button>'
+        ).join('');
+        menu.classList.add('open');
+        menu.querySelectorAll('.slash-item').forEach(btn => {
+            btn.onmousedown = (e) => { e.preventDefault(); };
+            btn.onclick = () => {
+                const idx = parseInt(btn.getAttribute('data-slash-idx'), 10);
+                applySlashCommand(slashFiltered[idx].cmd);
+            };
+        });
+    }
+
+    function applySlashCommand(cmd) {
+        if (!userInput) return;
+        userInput.value = cmd + ' ';
+        userInput.focus();
+        const menu = document.getElementById('slash-menu');
+        if (menu) { menu.classList.remove('open'); menu.innerHTML = ''; }
+        try {
+            userInput.setSelectionRange(userInput.value.length, userInput.value.length);
+        } catch (_) {}
+        renderSlashMenu();
+    }
+
+    function closeSlashMenu() {
+        const menu = document.getElementById('slash-menu');
+        if (menu) { menu.classList.remove('open'); menu.innerHTML = ''; }
+        slashFiltered = [];
+    }
+
+    /** Replace __LUBA_IMG_N__ placeholders with real attached data URLs */
+    function injectUserImagesIntoHtml(html, mediaItems) {
+        if (!html || !mediaItems || !mediaItems.length) return html;
+        let out = html;
+        mediaItems.forEach((m, i) => {
+            if (!m || !m.dataUrl) return;
+            const token = '__LUBA_IMG_' + i + '__';
+            // replace all occurrences
+            out = out.split(token).join(m.dataUrl);
+            // also common alt patterns the model might emit
+            out = out.split('__USER_IMAGE_' + i + '__').join(m.dataUrl);
+        });
+        return out;
+    }
+
     userInput.addEventListener('keydown', e => {
+        const menu = document.getElementById('slash-menu');
+        const menuOpen = menu && menu.classList.contains('open') && slashFiltered.length;
+        if (menuOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                slashActiveIndex = (slashActiveIndex + 1) % slashFiltered.length;
+                renderSlashMenu();
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                slashActiveIndex = (slashActiveIndex - 1 + slashFiltered.length) % slashFiltered.length;
+                renderSlashMenu();
+                return;
+            }
+            if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && /^\/[a-zA-Z]*$/.test(userInput.value.trim()))) {
+                e.preventDefault();
+                applySlashCommand(slashFiltered[slashActiveIndex].cmd);
+                return;
+            }
+            if (e.key === 'Escape') {
+                closeSlashMenu();
+                return;
+            }
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
+            closeSlashMenu();
             if (!sendBtn.disabled) sendMessage();
             return;
         }
@@ -8959,6 +9143,7 @@ Every substantive answer ends with:
         enforceLiveBan(true).catch(() => {});
     });
     userInput.addEventListener('input', () => {
+        renderSlashMenu();
         enforceLiveBan(false).catch(() => {});
     });
     document.addEventListener('visibilitychange', () => {
@@ -9494,6 +9679,56 @@ Every substantive answer ends with:
         const isRetry = !!(opts && (opts.retryText != null || opts.retryMedia != null));
         let text = isRetry ? String(opts.retryText || '').trim() : userInput.value.trim();
         const retryMedia = isRetry ? (opts.retryMedia || null) : null;
+
+        // Slash commands (not the same as Modes — those stay in the Modes menu)
+        pendingTruthMode = false;
+        pendingForceSearch = false;
+        pendingCopyMode = false;
+        pendingShortMode = false;
+        pendingDetailedMode = false;
+        pendingRoastMode = false;
+        pendingEli5Mode = false;
+        pendingFixMode = false;
+        if (!isRetry && text) {
+            const sp = parseSlashCommand(text);
+            if (sp.cmd === '/help') {
+                const tHelp = getTime();
+                const helpTxt = 'Slash commands:\n' + SLASH_COMMANDS.map(c => c.cmd + ' — ' + c.desc).join('\n') + '\n\nType / to autocomplete. Modes (HTML, Study, etc.) stay in the Modes button.';
+                appendMessage('ai', helpTxt, tHelp);
+                chatHistory.push({ role: 'assistant', content: helpTxt, time: tHelp });
+                saveChat();
+                userInput.value = '';
+                closeSlashMenu();
+                return;
+            }
+            if (sp.cmd === '/truth') {
+                pendingTruthMode = true;
+                text = sp.rest || 'Be honest about what you see / what I asked.';
+            } else if (sp.cmd === '/copy') {
+                pendingCopyMode = true;
+                text = sp.rest || 'Copy this exactly into what you build.';
+            } else if (sp.cmd === '/search') {
+                pendingForceSearch = true;
+                text = sp.rest || text.replace(/^\/search\s*/i, '').trim();
+                if (!text) text = 'Search the web for the latest relevant info.';
+            } else if (sp.cmd === '/short') {
+                pendingShortMode = true;
+                text = sp.rest || text.replace(/^\/short\s*/i, '').trim();
+            } else if (sp.cmd === '/detailed') {
+                pendingDetailedMode = true;
+                text = sp.rest || text.replace(/^\/detailed\s*/i, '').trim();
+            } else if (sp.cmd === '/roast') {
+                pendingRoastMode = true;
+                text = sp.rest || 'Roast this.';
+            } else if (sp.cmd === '/eli5') {
+                pendingEli5Mode = true;
+                text = sp.rest || text.replace(/^\/eli5\s*/i, '').trim();
+            } else if (sp.cmd === '/fix') {
+                pendingFixMode = true;
+                text = sp.rest || 'Fix bugs and improve the previous game/app in this chat. Continue the same project.';
+            }
+        }
+        closeSlashMenu();
         // Long paste still in input? Offer attach once more on send
         if (!isRetry && !pendingCodeFile && looksLikeFullFile(text)) {
             openAttachFileModal(text);
@@ -9662,6 +9897,35 @@ Every substantive answer ends with:
 
         let systemPrompt = buildSystemPrompt();
 
+        if (pendingTruthMode) {
+            systemPrompt += "\n\nTRUTH MODE (/truth) IS ON FOR THIS MESSAGE ONLY: Be brutally honest. No flattery, no fake compliments, no softening to protect feelings. If they ask how they look or if something is good/bad, answer the real truth in plain language (you can swear if it fits the tone). If something is actually good, say so honestly — truth means accurate, not automatically mean. For photos: describe what you actually see. Do not refuse ordinary appearance questions in this mode.";
+        }
+        if (pendingCopyMode) {
+            systemPrompt += "\n\nCOPY MODE (/copy) IS ON FOR THIS MESSAGE ONLY: The user wants an EXACT copy — not a reinterpretation.\n" +
+                "- If they attached image(s): embed those exact files using placeholders __LUBA_IMG_0__, __LUBA_IMG_1__, etc. as src. Do NOT redraw, restyle, or approximate the photo.\n" +
+                "- If they described something to copy (UI, layout, text, logo idea): match it as closely as possible — same structure, colors, wording.\n" +
+                "- If they ask to put the photo in a game/app: the sprite/texture/background MUST be the real attachment via __LUBA_IMG_N__, not a drawn stand-in.\n" +
+                "- Without /copy you may design freely; WITH /copy, fidelity comes first.";
+        }
+        if (pendingForceSearch) {
+            systemPrompt += "\n\nThe user forced a web search. Prefer LIVE WEB SEARCH RESULTS when provided.";
+        }
+        if (pendingShortMode) {
+            systemPrompt += "\n\nSHORT MODE: Reply in as few lines as possible. Direct. No filler, no long intros.";
+        }
+        if (pendingDetailedMode) {
+            systemPrompt += "\n\nDETAILED MODE: Give a thorough, complete answer. Cover important angles, examples, and edge cases without being spammy.";
+        }
+        if (pendingRoastMode) {
+            systemPrompt += "\n\nROAST MODE: Respond with sharp, funny roast energy. Still based on what you actually see/know — witty, not random cruelty for no reason. OK to be harsh and use strong language.";
+        }
+        if (pendingEli5Mode) {
+            systemPrompt += "\n\nELI5 MODE: Explain like the user is 5 years old. Simple words, short sentences, friendly analogies. No jargon.";
+        }
+        if (pendingFixMode) {
+            systemPrompt += "\n\nFIX MODE: Continue the SAME previous game/app from this chat. Fix bugs and apply improvements. Do not start a different project.";
+        }
+
         // Fast path for easy chat ("hi", short questions) — less history, no tools, smaller output
         const msgText = (text || '').trim();
         // Pre-detect large code/game asks so prompt + limits match (Modes can stay Normal)
@@ -9706,7 +9970,7 @@ Every substantive answer ends with:
 
         // Pre-search: actually hit the web, then feed results into the model
         let forcedSearchBlock = '';
-        if (needsSearchTool && !imageToSend) {
+        if ((needsSearchTool || pendingForceSearch) && !imageToSend) {
             try {
                 const searchQ = buildSearchQuery(msgText);
                 setTypingStatus(searchQ ? ('Searching the web for “' + searchQ.slice(0, 60) + '”…') : 'Searching the web…');
@@ -9736,6 +10000,16 @@ Every substantive answer ends with:
         const visionItems = (mediaList || []).filter(function(m){ return m && m.dataUrl; }).slice(0, 10);
         if (forcedSearchBlock) {
             systemPrompt += "\n\nWhen LIVE WEB SEARCH RESULTS are provided with the user message, you MUST use them as the main source. Give the best clear, direct answer (numbers, dates, names). Prefer search results over training memory. If results conflict, say so briefly and pick the most credible source. Do not pretend you did not search.";
+        }
+
+        // If user attached images and wants them in a build, force exact-image placeholders
+        const mediaForBuild = (typeof selectedMediaItems !== 'undefined' && selectedMediaItems) ? selectedMediaItems : [];
+        const wantsExactImage = pendingCopyMode || (mediaForBuild.length && /\b(use|put|place|add|insert|exact|this|photo|picture|image|sprite|texture|copy)\b/i.test(msgText)
+            && (activeMode === 'html' || activeMode === 'code' || /\b(game|app|html|sprite|texture|background|character|logo)\b/i.test(msgText)));
+        if (pendingCopyMode || wantsExactImage || (mediaForBuild.length && (activeMode === 'html' || /\b(make|build)\b/i.test(msgText)))) {
+            const lines = mediaForBuild.map((m, i) => '__LUBA_IMG_' + i + '__ = user attachment ' + (i + 1) + (m.isVideo ? ' (video poster/frame if needed)' : ' (image)'));
+            systemPrompt += "\n\nUSER ATTACHMENTS TO EMBED EXACTLY (do not redraw):\n" + lines.join('\n') +
+                "\nIn any HTML you output, set img/texture src to these exact placeholder strings (e.g. src=\"__LUBA_IMG_0__\"). The client replaces them with the real files. Never substitute a drawn approximation when the user asked to use their photo.";
         }
 
         const currentParts = [{
@@ -10015,7 +10289,18 @@ Every substantive answer ends with:
                         .replace(/^#{1,6}\s*/gm, '');
 
                     const hasImages = generatedImageUrls.length > 0;
-                    const formatted = formatAiReplyHtml(reply);
+                    let formatted = formatAiReplyHtml(reply);
+                    // Embed user's attached photos into generated HTML placeholders
+                    try {
+                        if (formatted && formatted.html && selectedMediaItems && selectedMediaItems.length) {
+                            formatted = Object.assign({}, formatted, {
+                                html: injectUserImagesIntoHtml(formatted.html, selectedMediaItems)
+                            });
+                        }
+                        if (typeof reply === 'string' && selectedMediaItems && selectedMediaItems.length && /__LUBA_IMG_\d+__/.test(reply)) {
+                            reply = injectUserImagesIntoHtml(reply, selectedMediaItems);
+                        }
+                    } catch (_) {}
                     let displayReply;
                     if (formatted.hasCode) {
                         displayReply = formatted.html;
