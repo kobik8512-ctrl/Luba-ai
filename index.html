@@ -2482,6 +2482,91 @@
             color: #dbe4ff; font-size: 11px; font-weight: 700;
             padding: 8px 12px; border-radius: 10px; cursor: pointer;
         }
+        
+        .forge-vp-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 6;
+            display: flex;
+            gap: 6px;
+        }
+        .forge-vp-actions button {
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(15,18,24,.88);
+            color: #e2e8f0;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .forge-vp-actions button.ctrl {
+            background: linear-gradient(135deg, #0ea5e9, #7c3aed);
+            border-color: transparent;
+            color: #fff;
+        }
+        #forge-studio.forge-fs .forge-side { display: none !important; }
+        #forge-studio.forge-fs .forge-viewport-wrap {
+            flex: 1 !important;
+            height: 100% !important;
+            max-height: none !important;
+            min-height: 0 !important;
+        }
+        #forge-studio.forge-fs .forge-body { flex-direction: column; }
+        #forge-studio.forge-control-on .forge-side { display: none !important; }
+        #forge-studio.forge-control-on .forge-viewport-wrap {
+            flex: 1 !important;
+            height: 100% !important;
+            max-height: none !important;
+        }
+        #forge-control-panel {
+            display: none;
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            z-index: 12;
+            max-height: 42%;
+            overflow-y: auto;
+            padding: 10px 12px 16px;
+            background: linear-gradient(180deg, transparent, rgba(8,10,14,.55) 12%, rgba(10,12,18,.96));
+            border-top: 1px solid rgba(103,232,249,.2);
+            pointer-events: auto;
+        }
+        #forge-studio.forge-control-on #forge-control-panel { display: block; }
+        .forge-ctrl-title {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 8px;
+            color: #e2e8f0; font-size: 13px; font-weight: 800;
+        }
+        .forge-ctrl-title span { opacity: .7; font-weight: 600; font-size: 11px; }
+        .forge-ctrl-row {
+            display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
+        }
+        .forge-ctrl-row button {
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(26,32,48,.95);
+            color: #e2e8f0;
+            font-size: 11px; font-weight: 700;
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .forge-ctrl-row button.on {
+            background: #22d3ee; color: #042f2e; border-color: transparent;
+        }
+        .forge-ctrl-row button.danger {
+            background: rgba(239,68,68,.2); border-color: rgba(239,68,68,.4); color: #fecaca;
+        }
+        .forge-ctrl-label {
+            width: 100%;
+            font-size: 10px; font-weight: 700; letter-spacing: .04em;
+            text-transform: uppercase; color: #94a3b8; margin: 4px 0 2px;
+        }
+        .forge-ctrl-sel {
+            font-size: 12px; color: #a5f3fc; margin-bottom: 6px;
+            min-height: 16px;
+        }
+
         .forge-tool.primary {
             background: #22d3ee; color: #042f2e; border-color: transparent;
         }
@@ -11923,6 +12008,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 const sun = new THREE.DirectionalLight(0xffffff, 0.85);
                 sun.position.set(8, 16, 6);
                 scene.add(sun);
+                // Extra ambient so dark cars are still visible
+                const amb = new THREE.AmbientLight(0xffffff, 0.55);
+                scene.add(amb);
                 // subtle origin marker
                 const dot = new THREE.Mesh(
                     new THREE.SphereGeometry(0.08, 12, 12),
@@ -11930,6 +12018,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 );
                 scene.add(dot);
                 F.renderer = renderer;
+                F._hemi = hemi;
+                F._sun = sun;
+                F._ambient = amb;
+                F.scene.background = new THREE.Color(0x0a0c10);
                 F.scene = scene;
                 F.camera = camera;
                 F.target = new THREE.Vector3(0, 0.5, 0);
@@ -12106,6 +12198,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             forgeAppend('ai', 'Forge online. Empty infinite floor.\n\nTell me what to build or change in the scene — I will build it here.');
         }
         forgeInitViewport();
+        try { forgeWireControlUI(); } catch (_) {}
         try { document.getElementById('forge-input').focus(); } catch (_) {}
     }
 
@@ -12263,6 +12356,104 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         });
     }
 
+
+    function forgeResolveTargetMesh(op) {
+        const F = window.__forge;
+        if (!F || !F._meshByName) return null;
+        const n = op && (op.name || op.target || op.id || op.object);
+        if (n && F._meshByName[n]) return F._meshByName[n];
+        // fuzzy: name contains
+        if (n) {
+            const key = String(n).toLowerCase();
+            const keys = Object.keys(F._meshByName);
+            for (let i = 0; i < keys.length; i++) {
+                if (keys[i].toLowerCase().indexOf(key) >= 0 || key.indexOf(keys[i].toLowerCase()) >= 0) {
+                    return F._meshByName[keys[i]];
+                }
+            }
+            // match label
+            const objs = F._objects || [];
+            for (let i = 0; i < objs.length; i++) {
+                if (objs[i] && objs[i].label && String(objs[i].label).toLowerCase().indexOf(key) >= 0) {
+                    if (F._meshByName[objs[i].name]) return F._meshByName[objs[i].name];
+                }
+            }
+        }
+        // Prefer last user GLTF, then any last object
+        const objs = F._objects || [];
+        for (let i = objs.length - 1; i >= 0; i--) {
+            if (objs[i] && objs[i].userGltf && F._meshByName[objs[i].name]) return F._meshByName[objs[i].name];
+        }
+        if (objs.length && F._meshByName[objs[objs.length - 1].name]) return F._meshByName[objs[objs.length - 1].name];
+        const keys = Object.keys(F._meshByName);
+        return keys.length ? F._meshByName[keys[keys.length - 1]] : null;
+    }
+
+    function forgeSetSkyColor(colorHex) {
+        const F = window.__forge;
+        if (!F) return;
+        const c = (typeof colorHex === 'number') ? colorHex : (forgeParseColor(colorHex) != null ? forgeParseColor(colorHex) : 0x87ceeb);
+        if (F.renderer) F.renderer.setClearColor(c, 1);
+        if (F.scene) {
+            F.scene.background = new THREE.Color(c);
+            if (F.scene.fog) {
+                F.scene.fog.color = new THREE.Color(c);
+            }
+        }
+        F._skyColor = c;
+    }
+
+    function forgeSetAmbient(intensity, colorHex) {
+        const F = window.__forge;
+        if (!F || !F.scene) return;
+        const inten = intensity != null ? Number(intensity) : 1.2;
+        const col = colorHex != null ? (forgeParseColor(colorHex) != null ? forgeParseColor(colorHex) : 0xffffff) : 0xffffff;
+        if (!F._ambient) {
+            F._ambient = new THREE.AmbientLight(col, inten);
+            F.scene.add(F._ambient);
+        } else {
+            F._ambient.color.setHex(col);
+            F._ambient.intensity = inten;
+        }
+        if (F._hemi) {
+            F._hemi.intensity = Math.max(0.4, inten * 0.7);
+        }
+        if (F._sun) {
+            F._sun.intensity = Math.max(0.5, inten * 0.9);
+        }
+    }
+
+    function forgeTintMesh(mesh, colorHex) {
+        if (!mesh) return;
+        const col = (typeof colorHex === 'number') ? colorHex : (forgeParseColor(colorHex) != null ? forgeParseColor(colorHex) : null);
+        if (col == null) return;
+        mesh.traverse(function(ch) {
+            if (!ch.isMesh || !ch.material) return;
+            const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+            mats.forEach(function(mat) {
+                if (!mat) return;
+                try {
+                    // Clone so we don't mutate shared materials badly
+                    if (!mat.userData) mat.userData = {};
+                    if (!mat.userData._forgeTinted) {
+                        mat = mat.clone();
+                        mat.userData._forgeTinted = true;
+                        if (Array.isArray(ch.material)) {
+                            // skip complex multi for simplicity
+                        } else {
+                            ch.material = mat;
+                        }
+                    }
+                    if (mat.color) mat.color.setHex(col);
+                    if (mat.emissive && mat.metalness > 0.5) {
+                        // keep headlights-ish; slight emissive pull
+                    }
+                    mat.needsUpdate = true;
+                } catch (_) {}
+            });
+        });
+    }
+
     function forgeApplyOps(ops) {
         const F = window.__forge;
         if (!F || !F.scene || typeof THREE === 'undefined') return { ok: false, issues: ['no scene'] };
@@ -12301,26 +12492,57 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     } else issues.push('remove missing name @' + idx);
                     return;
                 }
-                if (action === 'move' || action === 'scale' || action === 'color' || action === 'resize') {
-                    const n = op.name || op.target || (F._objects.length ? F._objects[F._objects.length-1].name : null);
-                    const mesh = n && F._meshByName[n];
+                // Sky / background / lighting — full environment control
+                if (action === 'sky' || action === 'background' || action === 'bg' || action === 'environment') {
+                    const skyCol = op.color || op.sky || op.background || op.value || '#87ceeb';
+                    forgeSetSkyColor(skyCol);
+                    if (op.ambient != null || op.light != null || op.intensity != null) {
+                        forgeSetAmbient(op.ambient != null ? op.ambient : (op.intensity != null ? op.intensity : 1.3), op.lightColor || op.color);
+                    } else if (/black|dark|night/i.test(String(skyCol))) {
+                        forgeSetAmbient(0.35, '#6688aa');
+                    } else {
+                        forgeSetAmbient(1.25, '#ffffff');
+                    }
+                    return;
+                }
+                if (action === 'light' || action === 'lighting' || action === 'ambient' || action === 'brighten') {
+                    forgeSetAmbient(
+                        op.intensity != null ? op.intensity : (op.value != null ? op.value : 1.4),
+                        op.color || op.lightColor || '#ffffff'
+                    );
+                    if (op.sky || op.background) forgeSetSkyColor(op.sky || op.background);
+                    return;
+                }
+                if (action === 'move' || action === 'scale' || action === 'color' || action === 'resize' || action === 'paint' || action === 'tint' || action === 'recolor' || action === 'rotate') {
+                    const mesh = forgeResolveTargetMesh(op);
                     if (!mesh) { issues.push('target not found @' + idx); return; }
                     if (op.pos || op.position) {
                         const p = op.pos || op.position;
                         mesh.position.set(Number(p[0])||0, Number(p[1])||0, Number(p[2])||0);
                     }
-                    if (op.scale) mesh.scale.set(Number(op.scale[0])||1, Number(op.scale[1])||1, Number(op.scale[2])||1);
+                    if (op.scale) {
+                        const sc = op.scale;
+                        if (Array.isArray(sc)) mesh.scale.set(Number(sc[0])||1, Number(sc[1])||1, Number(sc[2])||1);
+                        else {
+                            const s = Number(sc) || 1;
+                            mesh.scale.set(s, s, s);
+                        }
+                    }
                     if (op.size != null) {
                         const s = Number(op.size) || 1;
-                        mesh.scale.set(s, s, s);
+                        mesh.scale.multiplyScalar(s);
                     }
-                    if (op.color != null) {
-                        mesh.traverse(function(ch) {
-                            if (ch.material && ch.material.color) {
-                                const c = forgeParseColor(op.color);
-                                ch.material.color.set(c != null ? c : op.color);
-                            }
-                        });
+                    if (op.rot || op.rotation) {
+                        const r = op.rot || op.rotation;
+                        mesh.rotation.set(
+                            (Number(r[0])||0) * Math.PI / 180,
+                            (Number(r[1])||0) * Math.PI / 180,
+                            (Number(r[2])||0) * Math.PI / 180
+                        );
+                    }
+                    if (op.color != null || action === 'color' || action === 'paint' || action === 'tint' || action === 'recolor') {
+                        const col = op.color != null ? op.color : (op.value || 'blue');
+                        forgeTintMesh(mesh, col);
                     }
                     return;
                 }
@@ -12773,7 +12995,12 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 (attachedModels.length ? ('User uploaded GLB already in viewport: ' + attachedModels.map(function(m){return m.name||'model';}).join(', ') + '. NEVER clear the scene or replace it with primitives. Only move/scale if they asked.\n') : '') +
                 '\n' +
                 'RULES:\n' +
-                '0) If the user uploaded a .glb/.gltf it is ALREADY in the live viewport. NEVER clear/reset the whole scene. NEVER replace their model with a box/sphere/car primitive. Only move/scale/rotate their existing model with forge-scene ops targeting the last gltf object. Never output a "Place this model" button.\n' +
+                '0) FULL CONTROL of the live viewport: sky/background color, lights, move/scale/rotate/recolor any object including user-uploaded GLBs.\n' +
+                '   Sky examples: {"action":"sky","color":"#87ceeb"} or {"action":"sky","color":"blue"} or {"action":"sky","color":"#1e3a5f"} for night.\n' +
+                '   Lighting: {"action":"light","intensity":1.5} or {"action":"ambient","intensity":1.2,"color":"#ffffff"}.\n' +
+                '   Recolor user model (no exact name needed): {"action":"color","color":"blue"} — applies to their uploaded car/tree.\n' +
+                '   Move/scale: {"action":"move","pos":[2,0,0]} {"action":"scale","scale":[1.5,1.5,1.5]}.\n' +
+                '   If the user uploaded a .glb it is ALREADY in the viewport. NEVER clear the whole scene. NEVER replace it with a box/sphere primitive. Never output a Place this model button.\n' +
                 '1) For building/editing the 3D scene (houses, cars, trees, cubes, move, scale, recolor, delete, etc.) respond with a short sentence AND a ```forge-scene JSON fence.\n' +
                 'Format:\n```forge-scene\n{"ops":[{"action":"add","shape":"house","color":"blue","pos":[0,0,0],"scale":[1,1,1],"name":"house1"}]}\n```\n' +
                 'Actions: add, remove, move, scale, color, clear.\n' +
@@ -12892,6 +13119,45 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     forgeSetStatus('Scene updated · your model restored');
                 }
             } catch (_) {}
+            // Local full-control fallback when AI ops miss sky/color
+            try {
+                const t = String(text || '');
+                const localOps = [];
+                if (/\bsky\b/i.test(t) || /\bbackground\b/i.test(t) || /\b(daylight|day time|brighter sky)\b/i.test(t)) {
+                    let sky = 'blue';
+                    if (/\bblack\b|\bnight\b|\bdark\b/i.test(t)) sky = '#0a0c10';
+                    else if (/\bwhite\b|\bbright\b/i.test(t)) sky = '#dbeafe';
+                    else if (/\bgray\b|\bgrey\b/i.test(t)) sky = '#64748b';
+                    else if (/\borange\b|\bsunset\b/i.test(t)) sky = '#fb923c';
+                    else if (/\bblue\b/i.test(t)) sky = '#5dade2';
+                    else if (/\bgreen\b/i.test(t)) sky = '#6ee7b7';
+                    else sky = '#87ceeb';
+                    localOps.push({ action: 'sky', color: sky });
+                }
+                if (/\b(light|lighting|brighten|too dark|cant see|can\'t see|cannot see)\b/i.test(t)) {
+                    localOps.push({ action: 'light', intensity: 1.6, color: '#ffffff' });
+                }
+                if (/\b(paint|recolor|color|colour|make .+ blue|make .+ red|make .+ green|blue color|red color)\b/i.test(t)) {
+                    let col = null;
+                    if (/\bblue\b/i.test(t)) col = 'blue';
+                    else if (/\bred\b/i.test(t)) col = 'red';
+                    else if (/\bgreen\b/i.test(t)) col = 'green';
+                    else if (/\bwhite\b/i.test(t)) col = 'white';
+                    else if (/\byellow\b/i.test(t)) col = 'yellow';
+                    else if (/\borange\b/i.test(t)) col = 'orange';
+                    else if (/\bpurple\b/i.test(t)) col = 'purple';
+                    else if (/\bpink\b/i.test(t)) col = 'pink';
+                    else if (/\bblack\b/i.test(t) && !/\bsky\b/i.test(t)) col = 'black';
+                    if (col) localOps.push({ action: 'color', color: col });
+                }
+                if (localOps.length) {
+                    const a = forgeApplyOps(localOps);
+                    if (a && a.ok) {
+                        forgeSetStatus('Scene updated');
+                        placedSomething = true;
+                    }
+                }
+            } catch (e) { console.warn('forge local env', e); }
             // Client safety net: only for empty scenes with NO user GLB (don't replace their car with a toy box)
             try {
                 const hasUserGltf = (window.__forge && window.__forge._objects || []).some(function(o){ return o && o.userGltf; }) || (attachedModels && attachedModels.length);
@@ -13038,7 +13304,343 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         document.body.style.overflow = 'hidden';
     }
 
+
+    // ===== Forge Control Mode (manual Blender-like edit) =====
+    window.__forgeCtrl = window.__forgeCtrl || { tool: 'select', selected: null, dragging: false, lx: 0, ly: 0 };
+
+    function forgeResizeViewport() {
+        try {
+            const canvas = document.getElementById('forge-canvas');
+            const F = window.__forge;
+            if (!canvas || !F || !F.renderer || !F.camera) return;
+            const parent = canvas.parentElement;
+            const w = parent.clientWidth || window.innerWidth;
+            const h = parent.clientHeight || Math.floor(window.innerHeight * 0.42);
+            F.camera.aspect = w / Math.max(h, 1);
+            F.camera.updateProjectionMatrix();
+            F.renderer.setSize(w, h, false);
+        } catch (_) {}
+    }
+
+    function forgeSetFullscreen(on) {
+        const st = document.getElementById('forge-studio');
+        const xbtn = document.getElementById('forge-btn-vp-close');
+        if (!st) return;
+        if (on) st.classList.add('forge-fs');
+        else st.classList.remove('forge-fs');
+        if (xbtn) xbtn.style.display = (on || st.classList.contains('forge-control-on')) ? 'inline-flex' : 'none';
+        setTimeout(forgeResizeViewport, 50);
+        setTimeout(forgeResizeViewport, 250);
+    }
+
+    function forgeUpdateCtrlSelLabel() {
+        const el = document.getElementById('forge-ctrl-sel');
+        if (!el) return;
+        const mesh = window.__forgeCtrl.selected;
+        if (!mesh) {
+            el.textContent = 'Nothing selected — tap an object · tool: ' + (window.__forgeCtrl.tool || 'select');
+            return;
+        }
+        el.textContent = 'Selected: ' + (mesh.name || 'object') + ' · tool: ' + (window.__forgeCtrl.tool || 'select');
+    }
+
+    function forgeSelectMesh(mesh) {
+        const F = window.__forge;
+        const prev = window.__forgeCtrl.selected;
+        if (prev && prev.userData) {
+            try {
+                prev.traverse(function(ch) {
+                    if (ch.isMesh && ch.material && ch.userData._forgeEmissiveBackup != null) {
+                        if (ch.material.emissive) ch.material.emissive.setHex(ch.userData._forgeEmissiveBackup);
+                        delete ch.userData._forgeEmissiveBackup;
+                    }
+                });
+            } catch (_) {}
+        }
+        window.__forgeCtrl.selected = mesh || null;
+        if (mesh) {
+            try {
+                mesh.traverse(function(ch) {
+                    if (ch.isMesh && ch.material && ch.material.emissive) {
+                        ch.userData = ch.userData || {};
+                        ch.userData._forgeEmissiveBackup = ch.material.emissive.getHex();
+                        ch.material.emissive.setHex(0x224466);
+                    }
+                });
+            } catch (_) {}
+        }
+        forgeUpdateCtrlSelLabel();
+    }
+
+    function forgePickObject(clientX, clientY) {
+        const F = window.__forge;
+        const canvas = document.getElementById('forge-canvas');
+        if (!F || !F.camera || !F.scene || !canvas || typeof THREE === 'undefined') return null;
+        const rect = canvas.getBoundingClientRect();
+        const mouse = new THREE.Vector2(
+            ((clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1,
+            -((clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1
+        );
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(mouse, F.camera);
+        const targets = [];
+        Object.keys(F._meshByName || {}).forEach(function(n) {
+            const m = F._meshByName[n];
+            if (m) targets.push(m);
+        });
+        // also grid-skip: only registered objects
+        const hits = ray.intersectObjects(targets, true);
+        if (!hits.length) return null;
+        let obj = hits[0].object;
+        while (obj.parent && obj.parent !== F.scene && !F._meshByName[obj.name]) {
+            // climb to registered root
+            let found = null;
+            const keys = Object.keys(F._meshByName || {});
+            for (let i = 0; i < keys.length; i++) {
+                const root = F._meshByName[keys[i]];
+                if (root === obj || (root && root.children && root.getObjectById && root.getObjectById(obj.id))) {
+                    found = root; break;
+                }
+                let p = obj;
+                while (p) {
+                    if (p === root) { found = root; break; }
+                    p = p.parent;
+                }
+                if (found) break;
+            }
+            if (found) return found;
+            obj = obj.parent;
+        }
+        // map hit to registered mesh
+        const keys = Object.keys(F._meshByName || {});
+        for (let i = 0; i < keys.length; i++) {
+            const root = F._meshByName[keys[i]];
+            let p = hits[0].object;
+            while (p) {
+                if (p === root) return root;
+                p = p.parent;
+            }
+        }
+        return null;
+    }
+
+    function forgeEnterControlMode() {
+        const st = document.getElementById('forge-studio');
+        if (!st) return;
+        st.classList.add('forge-control-on');
+        st.classList.add('forge-fs');
+        window.__forgeCtrl.active = true;
+        window.__forgeCtrl.tool = 'select';
+        try {
+            document.querySelectorAll('#forge-ctrl-tools button').forEach(function(b) {
+                b.classList.toggle('on', b.getAttribute('data-tool') === 'select');
+            });
+        } catch (_) {}
+        const xbtn = document.getElementById('forge-btn-vp-close');
+        if (xbtn) xbtn.style.display = 'inline-flex';
+        forgeUpdateCtrlSelLabel();
+        setTimeout(forgeResizeViewport, 50);
+        setTimeout(forgeResizeViewport, 300);
+        forgeSetStatus('Control mode — select · move · rotate · scale');
+    }
+
+    function forgeExitControlMode() {
+        const st = document.getElementById('forge-studio');
+        if (!st) return;
+        st.classList.remove('forge-control-on');
+        // keep fullscreen if user had it? exit both for clarity
+        st.classList.remove('forge-fs');
+        window.__forgeCtrl.active = false;
+        window.__forgeCtrl.dragging = false;
+        forgeSelectMesh(null);
+        const xbtn = document.getElementById('forge-btn-vp-close');
+        if (xbtn) xbtn.style.display = 'none';
+        setTimeout(forgeResizeViewport, 50);
+        forgeSetStatus('Control closed');
+    }
+
+    function forgeControlAdd(shape) {
+        const F = window.__forge;
+        if (!F || !F.scene) return;
+        const colorMap = { box: 0x6366f1, sphere: 0x22d3ee, cylinder: 0xa78bfa, tree: 0x16a34a, house: 0xd6b28a, car: 0xef4444, plane: 0x64748b };
+        const mesh = forgeMakeMesh(shape, colorMap[shape] || 0x6366f1, [1, 1, 1]);
+        F._placeCount = (F._placeCount || 0) + 1;
+        const name = shape + '_ctrl_' + F._placeCount;
+        mesh.name = name;
+        mesh.position.set((F._placeCount % 4) - 1.5, shape === 'plane' ? 0.06 : 0.5, Math.floor(F._placeCount / 4) * 1.2);
+        F.scene.add(mesh);
+        F._meshByName = F._meshByName || {};
+        F._objects = F._objects || [];
+        F._meshByName[name] = mesh;
+        F._objects.push({ name: name, kind: shape, label: shape, userGltf: false, x: mesh.position.x, y: mesh.position.y, z: mesh.position.z, h: 1 });
+        forgeSelectMesh(mesh);
+        forgeSetStatus('Added ' + shape);
+    }
+
+    function forgeWireControlUI() {
+        const fsBtn = document.getElementById('forge-btn-fullscreen');
+        const ctrlBtn = document.getElementById('forge-btn-control');
+        const xBtn = document.getElementById('forge-btn-vp-close');
+        if (fsBtn && !fsBtn.dataset.wired) {
+            fsBtn.dataset.wired = '1';
+            fsBtn.onclick = function(e) {
+                e.preventDefault();
+                const st = document.getElementById('forge-studio');
+                const on = !(st && st.classList.contains('forge-fs')) || st.classList.contains('forge-control-on');
+                if (st && st.classList.contains('forge-control-on')) {
+                    // already fullscreen in control — toggle plain fs off keeps control
+                    forgeSetFullscreen(true);
+                } else {
+                    forgeSetFullscreen(!(st && st.classList.contains('forge-fs')));
+                }
+            };
+        }
+        if (ctrlBtn && !ctrlBtn.dataset.wired) {
+            ctrlBtn.dataset.wired = '1';
+            ctrlBtn.onclick = function(e) {
+                e.preventDefault();
+                forgeEnterControlMode();
+            };
+        }
+        if (xBtn && !xBtn.dataset.wired) {
+            xBtn.dataset.wired = '1';
+            xBtn.onclick = function(e) {
+                e.preventDefault();
+                const st = document.getElementById('forge-studio');
+                if (st && st.classList.contains('forge-control-on')) forgeExitControlMode();
+                else forgeSetFullscreen(false);
+            };
+        }
+        const panel = document.getElementById('forge-control-panel');
+        if (panel && !panel.dataset.wired) {
+            panel.dataset.wired = '1';
+            panel.addEventListener('click', function(e) {
+                const t = e.target;
+                if (!t || !t.getAttribute) return;
+                if (t.getAttribute('data-tool')) {
+                    window.__forgeCtrl.tool = t.getAttribute('data-tool');
+                    panel.querySelectorAll('#forge-ctrl-tools button').forEach(function(b) {
+                        b.classList.toggle('on', b === t);
+                    });
+                    forgeUpdateCtrlSelLabel();
+                    return;
+                }
+                if (t.getAttribute('data-add')) {
+                    forgeControlAdd(t.getAttribute('data-add'));
+                    return;
+                }
+                if (t.getAttribute('data-paint')) {
+                    const mesh = window.__forgeCtrl.selected;
+                    if (!mesh) { forgeSetStatus('Select an object first'); return; }
+                    forgeTintMesh(mesh, t.getAttribute('data-paint'));
+                    return;
+                }
+                if (t.getAttribute('data-sky')) {
+                    forgeSetSkyColor(t.getAttribute('data-sky'));
+                    forgeSetAmbient(1.2, '#ffffff');
+                    return;
+                }
+                if (t.getAttribute('data-light')) {
+                    forgeSetAmbient(Number(t.getAttribute('data-light')) || 1.2, '#ffffff');
+                    return;
+                }
+                if (t.getAttribute('data-act')) {
+                    const act = t.getAttribute('data-act');
+                    const F = window.__forge;
+                    const mesh = window.__forgeCtrl.selected;
+                    if (act === 'exit') { forgeExitControlMode(); return; }
+                    if (act === 'del') {
+                        if (!mesh) return;
+                        try { F.scene.remove(mesh); } catch (_) {}
+                        if (mesh.name && F._meshByName) delete F._meshByName[mesh.name];
+                        F._objects = (F._objects || []).filter(function(o){ return o.name !== mesh.name; });
+                        forgeSelectMesh(null);
+                        forgeSetStatus('Deleted');
+                        return;
+                    }
+                    if (act === 'dup' && mesh) {
+                        const clone = mesh.clone(true);
+                        F._placeCount = (F._placeCount || 0) + 1;
+                        const name = (mesh.name || 'obj') + '_copy_' + F._placeCount;
+                        clone.name = name;
+                        clone.position.x += 1.5;
+                        F.scene.add(clone);
+                        F._meshByName[name] = clone;
+                        F._objects.push({ name: name, kind: 'clone', label: name, userGltf: !!(mesh.userData && mesh.userData.userGltf) });
+                        forgeSelectMesh(clone);
+                        return;
+                    }
+                    if (act === 'focus' && mesh) {
+                        try {
+                            const box = new THREE.Box3().setFromObject(mesh);
+                            const c = box.getCenter(new THREE.Vector3());
+                            const s = box.getSize(new THREE.Vector3());
+                            F.target = c.clone();
+                            if (F.spherical) {
+                                F.spherical.radius = Math.max(3, Math.max(s.x, s.y, s.z) * 2.5);
+                            }
+                            if (typeof forgeApplyCam === 'function') forgeApplyCam();
+                        } catch (_) {}
+                    }
+                }
+            });
+        }
+
+        // Pointer handlers on canvas for select + transform in control mode
+        const canvas = document.getElementById('forge-canvas');
+        if (canvas && !canvas.dataset.ctrlWired) {
+            canvas.dataset.ctrlWired = '1';
+            canvas.addEventListener('pointerdown', function(e) {
+                if (!window.__forgeCtrl.active) return;
+                const tool = window.__forgeCtrl.tool || 'select';
+                if (tool === 'select' || !window.__forgeCtrl.selected) {
+                    const hit = forgePickObject(e.clientX, e.clientY);
+                    if (hit) forgeSelectMesh(hit);
+                }
+                if (window.__forgeCtrl.selected && tool !== 'select') {
+                    window.__forgeCtrl.dragging = true;
+                    window.__forgeCtrl.lx = e.clientX;
+                    window.__forgeCtrl.ly = e.clientY;
+                    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+                }
+            });
+            canvas.addEventListener('pointermove', function(e) {
+                if (!window.__forgeCtrl.active || !window.__forgeCtrl.dragging) return;
+                const mesh = window.__forgeCtrl.selected;
+                if (!mesh) return;
+                const dx = e.clientX - window.__forgeCtrl.lx;
+                const dy = e.clientY - window.__forgeCtrl.ly;
+                window.__forgeCtrl.lx = e.clientX;
+                window.__forgeCtrl.ly = e.clientY;
+                const tool = window.__forgeCtrl.tool;
+                const F = window.__forge;
+                if (tool === 'move') {
+                    const panSpeed = 0.01 * ((F && F.spherical && F.spherical.radius) || 8);
+                    mesh.position.x += dx * panSpeed;
+                    mesh.position.z += dy * panSpeed;
+                } else if (tool === 'rotate') {
+                    mesh.rotation.y += dx * 0.01;
+                    mesh.rotation.x += dy * 0.01;
+                } else if (tool === 'scale') {
+                    const f = 1 + (-dy) * 0.01;
+                    mesh.scale.multiplyScalar(Math.max(0.05, Math.min(3, f)));
+                }
+            });
+            canvas.addEventListener('pointerup', function() {
+                window.__forgeCtrl.dragging = false;
+            });
+            canvas.addEventListener('pointercancel', function() {
+                window.__forgeCtrl.dragging = false;
+            });
+        }
+    }
+
+    // Wire control UI when forge opens
+
     window.openForgeStudio = openForgeStudio;
+    window.forgeEnterControlMode = forgeEnterControlMode;
+    window.forgeExitControlMode = forgeExitControlMode;
+
     window.closeForgeStudio = closeForgeStudio;
     window.forgeSendBuild = forgeSendBuild;
     window.forgePlayBuild = forgePlayBuild;
@@ -13117,6 +13719,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 photoIn.value = '';
             };
         }
+        try { forgeWireControlUI(); } catch (_) {}
         if (fileIn && !fileIn.dataset.wired) {
             fileIn.dataset.wired = '1';
             fileIn.onchange = async function() {
@@ -13218,10 +13821,63 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
   <div class="forge-body">
     <div class="forge-viewport-wrap">
       <div class="forge-viewport-label">1 finger orbit · 2 finger pan · pinch zoom</div>
+      <div class="forge-vp-actions">
+        <button type="button" id="forge-btn-fullscreen" title="Fullscreen">Fullscreen</button>
+        <button type="button" class="ctrl" id="forge-btn-control" title="Manual edit">Control</button>
+        <button type="button" id="forge-btn-vp-close" title="Exit fullscreen / control" style="display:none">✕</button>
+      </div>
       <canvas id="forge-canvas"></canvas>
       <div class="forge-tools">
         <button type="button" class="forge-tool" id="forge-reset-scene" onclick="window.forgeResetScene&&window.forgeResetScene()">Reset scene</button>
         <button type="button" class="forge-tool primary" id="forge-play-last" style="display:none" onclick="window.forgePlayBuild&&window.forgePlayBuild()">Play build</button>
+      </div>
+      <div id="forge-control-panel" aria-label="Manual control">
+        <div class="forge-ctrl-title">Control mode <span>edit without AI</span></div>
+        <div class="forge-ctrl-sel" id="forge-ctrl-sel">Tap an object to select · drag to transform</div>
+        <div class="forge-ctrl-label">Tool</div>
+        <div class="forge-ctrl-row" id="forge-ctrl-tools">
+          <button type="button" data-tool="select" class="on">Select</button>
+          <button type="button" data-tool="move">Move</button>
+          <button type="button" data-tool="rotate">Rotate</button>
+          <button type="button" data-tool="scale">Scale</button>
+        </div>
+        <div class="forge-ctrl-label">Add</div>
+        <div class="forge-ctrl-row">
+          <button type="button" data-add="box">Cube</button>
+          <button type="button" data-add="sphere">Sphere</button>
+          <button type="button" data-add="cylinder">Cylinder</button>
+          <button type="button" data-add="tree">Tree</button>
+          <button type="button" data-add="house">House</button>
+          <button type="button" data-add="car">Car</button>
+          <button type="button" data-add="plane">Platform</button>
+        </div>
+        <div class="forge-ctrl-label">Paint selected</div>
+        <div class="forge-ctrl-row">
+          <button type="button" data-paint="red">Red</button>
+          <button type="button" data-paint="blue">Blue</button>
+          <button type="button" data-paint="green">Green</button>
+          <button type="button" data-paint="white">White</button>
+          <button type="button" data-paint="black">Black</button>
+          <button type="button" data-paint="yellow">Yellow</button>
+          <button type="button" data-paint="orange">Orange</button>
+          <button type="button" data-paint="purple">Purple</button>
+        </div>
+        <div class="forge-ctrl-label">Sky / light</div>
+        <div class="forge-ctrl-row">
+          <button type="button" data-sky="#87ceeb">Sky blue</button>
+          <button type="button" data-sky="#0a0c10">Night</button>
+          <button type="button" data-sky="#dbeafe">Bright</button>
+          <button type="button" data-sky="#fb923c">Sunset</button>
+          <button type="button" data-light="1.6">Brighten</button>
+          <button type="button" data-light="0.4">Dim</button>
+        </div>
+        <div class="forge-ctrl-label">Selected object</div>
+        <div class="forge-ctrl-row">
+          <button type="button" data-act="dup">Duplicate</button>
+          <button type="button" data-act="focus">Focus</button>
+          <button type="button" data-act="del" class="danger">Delete</button>
+          <button type="button" data-act="exit">Exit control</button>
+        </div>
       </div>
     </div>
     <div class="forge-side">
