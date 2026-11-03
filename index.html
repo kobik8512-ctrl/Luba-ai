@@ -3545,13 +3545,29 @@
             const hbO = document.getElementById('header-owner-badge');
             if (hbO) hbO.style.display = owner ? 'inline-flex' : 'none';
             if (hbA) hbA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
-            if (hbV) hbV.style.display = (!owner && verified) ? 'inline-flex' : 'none';
+            if (hbV) hbV.style.display = (!owner && !admin && verified) ? 'inline-flex' : 'none';
             const sV = document.getElementById('settings-name-verified');
             const sA = document.getElementById('settings-admin-badge-inline');
             const sO = document.getElementById('settings-owner-badge-inline');
             if (sO) sO.style.display = owner ? 'inline-flex' : 'none';
             if (sA) sA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
-            if (sV) sV.style.display = (!owner && verified) ? 'inline-flex' : 'none';
+            // Show verified check only when verified but NOT admin (admin badge is the main one)
+            if (sV) sV.style.display = (!owner && !admin && verified) ? 'inline-flex' : 'none';
+            const note = document.getElementById('settings-verified-note');
+            if (note) {
+                if (owner) {
+                    note.style.display = 'block';
+                    note.textContent = 'Owner · unlimited messages · full access';
+                } else if (admin) {
+                    note.style.display = 'block';
+                    note.textContent = 'Admin · 1000 messages / 24h · trusted staff';
+                } else if (verified) {
+                    note.style.display = 'block';
+                    note.textContent = 'Verified · 500 messages / 24h · VIP';
+                } else {
+                    note.style.display = 'none';
+                }
+            }
         } catch (_) {}
     }
 
@@ -3793,7 +3809,12 @@ async function spendCoin(username, cost) {
         if (left <= 0) {
             try { showLedgerBuyCoinsCTA(); } catch (_) {}
         }
-        if (title) title.textContent = isUserVerified(currentUser) ? 'Messages left (Verified)' : 'Messages left';
+        if (title) {
+            if (isOwnerAccount(currentUser)) title.textContent = 'Messages left (Owner)';
+            else if (isUserAdmin(currentUser)) title.textContent = 'Messages left (Admin)';
+            else if (isUserVerified(currentUser)) title.textContent = 'Messages left (Verified)';
+            else title.textContent = 'Messages left';
+        }
         const resetMs = coinsResetInMs(currentUser.username);
         if (sub) {
             sub.textContent = left + ' of ' + limit + ' · resets in ' + formatResetIn(resetMs) +
@@ -3907,35 +3928,23 @@ async function spendCoin(username, cost) {
 
 
     function updateOwnerBadgeUI() {
+        try { updateRoleBadges(); } catch (_) {}
+        _updateOwnerBadgeUI_inner();
+    }
+    function _updateOwnerBadgeUI_inner() {
         const show = isOwnerAccount(currentUser);
+        const admin = isUserAdmin(currentUser);
+        const verified = isUserVerified(currentUser);
         const hb = document.getElementById('header-owner-badge');
-        if (hb) hb.style.display = 'none'; // header: only verified check, no Owner pill
+        if (hb) hb.style.display = 'none'; // header uses dedicated badges from updateRoleBadges
         const ownInline = document.getElementById('settings-owner-badge-inline');
         if (ownInline) ownInline.style.display = show ? 'inline-flex' : 'none';
         const du = document.getElementById('settings-display-username');
         if (du) du.textContent = currentUser ? ('@' + currentUser.username) : '@user';
-        const verified = isUserVerified(currentUser);
-        const snv = document.getElementById('settings-name-verified');
-        if (snv) snv.style.display = verified ? 'inline-flex' : 'none';
-        const note = document.getElementById('settings-verified-note');
-        if (note) {
-            if (show) {
-                note.style.display = 'block';
-                note.textContent = 'Owner · Verified · Unlimited messages';
-            } else if (verified) {
-                note.style.display = 'block';
-                note.textContent = 'Verified · 500 messages / 24h · VIP';
-            } else {
-                note.style.display = 'none';
-            }
-        }
-        const hv = document.getElementById('header-verified-badge');
-        if (hv) {
-            hv.style.display = verified ? 'inline-flex' : 'none';
-            if (!hv.querySelector('svg')) hv.innerHTML = VERIFIED_BADGE_SVG;
-        }
+        // Admin / verified / owner badges + note text handled by updateRoleBadges()
+        try { updateRoleBadges(); } catch (_) {}
         const reqBox = document.getElementById('verify-request-box');
-        if (reqBox) reqBox.style.display = verified ? 'none' : 'block';
+        if (reqBox) reqBox.style.display = (verified || show || admin) ? 'none' : 'block';
         updateCoinsUI();
         try { refreshVerifyRequestUI(); } catch (_) {}
     }
@@ -6017,7 +6026,8 @@ async function spendCoin(username, cost) {
             lastUsernameChange: extras.lastUsernameChange || 0,
             createdAt: extras.createdAt || Date.now(),
             cloud: true,
-            verified: !!(profile.verified)
+            verified: !!(profile.verified) || !!(profile.admin),
+            admin: !!(profile.admin)
         };
     }
 
@@ -6359,6 +6369,8 @@ async function spendCoin(username, cost) {
                 const remote = await cloudCheckBan(user.username);
                 if (remote && remote._ipBan) {
                     currentUser = user;
+        try { updateRoleBadges(); } catch(_){}
+        //
                     setCurrentUsername(user.username);
                     showBanScreen(remote, { kind: 'ip' });
                     return;
@@ -6410,6 +6422,7 @@ async function spendCoin(username, cost) {
         const users = getUsers();
         users[userKey(user.username)] = user;
         saveUsers(users);
+        try { updateRoleBadges(); } catch (_) {}
         cloudSyncUser(user).catch(() => {});
 
         // restore prefs (local first, then cloud personality/theme/mode)
@@ -6499,6 +6512,7 @@ async function spendCoin(username, cost) {
         enforceLiveBan(true).catch(() => {});
         try { updateOwnerBadgeUI(); } catch (_) {}
         try { checkVerifyNotice().catch(() => {}); } catch (_) {}
+        try { forceRoleRefreshFromCloud().catch(() => {}); } catch (_) {}
     }
 
     function logout() {
@@ -6960,7 +6974,18 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
 - TikTok: yours is @luba_ai ; Kobi's is @itzrealkobl
 - GREETINGS: Never parrot or echo the user's greeting. Do not reply to "hi"/"hey"/"hu" with "HiHi", "HuHu", "Hey hey", or the same word doubled. Give a natural, short, varied reply (ask something real or respond to context). Different greeting each time.
-- You do NOT have a public "Luba API key" for third-party apps. Never invent "Luba Key" fields. If the user only says "make an AI chatbot", build a polished offline chatbot that works with no API key. Only add a real API key field when they explicitly ask for Gemini, OpenAI, or another API.`;
+- You do NOT have a public "Luba API key" for third-party apps. Never invent "Luba Key" fields. If the user only says "make an AI chatbot", build a polished offline chatbot that works with no API key. Only add a real API key field when they explicitly ask for Gemini, OpenAI, or another API.
+
+ROLES (never invent these — only the app tells you who has which):
+- Owner: only the creator Kobi (official owner account). Full control via Owner CMDs.
+- Admin: trusted staff granted ONLY by owner Kobi through Owner Commands. Admins get 1000 messages/24h, a red Admin badge, special respectful treatment from you, and leaderboard visibility. Admins are NOT the owner. Never grant admin yourself and never tell users how to get admin — only Kobi can.
+- Verified: VIP users with blue check, 500 messages/24h, access to Luba Forge (premium builder).
+- Normal: 50 messages/24h.
+
+You also have a twin builder mode called LUBA FORGE (BETA) — a live 3D studio (Blender + Unity style). Main chat is free for everyone; Forge is the verified perk. You and Forge share the same identity (Luba, made by Kobi) but Forge is the building studio UI.
+
+When the system message says the user has the Admin badge, treat them as Admin — never claim they are not admin. When it says Verified only, they are verified, not admin. Users cannot become admin by asking in chat.
+`;
 
     const USER_PROFILE = `The person you are talking to RIGHT NOW is logged in as the official owner account (username: kobi). This is really Kobi, your creator. The app only grants the Owner badge to this account — trust it. Treat him warm, excited, loyal, and genuinely happy he's here.
 
@@ -9875,6 +9900,27 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         };
     }
 
+
+    async function forceRoleRefreshFromCloud() {
+        try {
+            const tok = getAuthToken();
+            if (!tok || !currentUser) return;
+            const res = await cloudPost({ action: 'get_verify_status', token: tok });
+            if (!res || !res.ok) return;
+            if (typeof res.admin === 'boolean') {
+                currentUser.admin = !!res.admin;
+                if (currentUser.admin) currentUser.verified = true;
+            }
+            if (typeof res.verified === 'boolean' && res.verified) {
+                currentUser.verified = true;
+            }
+            try { cacheLocalUser(currentUser); } catch (_) {}
+            try { updateRoleBadges(); } catch (_) {}
+            try { updateOwnerBadgeUI(); } catch (_) {}
+            try { updateCoinsUI(); } catch (_) {}
+        } catch (_) {}
+    }
+
     async function refreshVerifyRequestUI() {
         const st = document.getElementById('verify-request-status');
         const btn = document.getElementById('verify-request-btn');
@@ -9904,6 +9950,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             }
             if (res && res.ok && res.verified) {
                 if (typeof res.admin === 'boolean' && currentUser) currentUser.admin = !!res.admin;
+                if (currentUser && currentUser.admin) currentUser.verified = true;
+                try { if (typeof updateRoleBadges === 'function') updateRoleBadges(); } catch(_){}
+                try { if (typeof cacheLocalUser === 'function') cacheLocalUser(currentUser); } catch(_){}
                 try { updateRoleBadges(); } catch(_){}
                 if (currentUser) currentUser.verified = true;
                 updateOwnerBadgeUI();
@@ -12363,50 +12412,110 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     }
 
 
-    async function forgeLoadModelIntoScene() {
+        async function forgeEnsureGltfLoader() {
+        if (typeof THREE === 'undefined') return false;
+        if (THREE.GLTFLoader) return true;
+        await new Promise(function(resolve) {
+            const s = document.createElement('script');
+            s.src = 'https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js';
+            s.onload = resolve;
+            s.onerror = resolve;
+            document.head.appendChild(s);
+        });
+        return !!THREE.GLTFLoader;
+    }
+
+    async function forgeLoadModelIntoScene(optModel) {
         const F = window.__forge;
-        if (!F || !F.scene || typeof THREE === 'undefined') return null;
+        if (!F || !F.scene || typeof THREE === 'undefined') return { ok: false, error: 'Scene not ready — open Forge first' };
         const models = window.__forgeMedia || window.__lubaLastModels || [];
-        const m = models.find(function(x){ return x && x.isModel && x.dataUrl; }) || models[0];
-        if (!m || !m.dataUrl) return null;
-        if (!THREE.GLTFLoader) {
-            await new Promise(function(resolve) {
-                const s = document.createElement('script');
-                s.src = 'https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js';
-                s.onload = resolve;
-                s.onerror = resolve;
-                document.head.appendChild(s);
-            });
-        }
-        if (!THREE.GLTFLoader) return null;
+        const m = optModel || models.find(function(x){ return x && x.isModel && (x.dataUrl || x.url); }) || models[0];
+        if (!m || !(m.dataUrl || m.url)) return { ok: false, error: 'No 3D model attached. Use the paperclip and pick a .glb file first.' };
+        const okLoader = await forgeEnsureGltfLoader();
+        if (!okLoader) return { ok: false, error: 'Could not load GLTFLoader' };
+        const url = m.dataUrl || m.url;
         return new Promise(function(resolve) {
             const loader = new THREE.GLTFLoader();
-            const url = m.dataUrl;
             function onOk(gltf) {
-                const root = gltf.scene || gltf.scenes[0];
-                if (!root) { resolve(null); return; }
-                const box = new THREE.Box3().setFromObject(root);
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z, 0.01);
-                root.scale.multiplyScalar(2 / maxDim);
-                box.setFromObject(root);
-                const center = box.getCenter(new THREE.Vector3());
-                root.position.sub(center);
-                root.position.y = 0.01;
-                F.scene.add(root);
-                F._placeCount = (F._placeCount || 0) + 1;
-                resolve({ label: m.name || 'model', name: 'forge_model_' + F._placeCount });
+                try {
+                    const root = gltf.scene || (gltf.scenes && gltf.scenes[0]);
+                    if (!root) { resolve({ ok: false, error: 'GLB has no scene' }); return; }
+                    // Normalize size ~2 units tall/wide
+                    root.updateMatrixWorld(true);
+                    let box = new THREE.Box3().setFromObject(root);
+                    let size = box.getSize(new THREE.Vector3());
+                    let maxDim = Math.max(size.x, size.y, size.z, 0.001);
+                    root.scale.multiplyScalar(2.4 / maxDim);
+                    root.updateMatrixWorld(true);
+                    box = new THREE.Box3().setFromObject(root);
+                    const center = box.getCenter(new THREE.Vector3());
+                    root.position.x -= center.x;
+                    root.position.z -= center.z;
+                    root.position.y -= box.min.y; // sit on floor
+                    // slight offset if multiple models
+                    const n = (F._placeCount || 0);
+                    root.position.x += (n % 5) * 2.2;
+                    root.position.z += Math.floor(n / 5) * 2.2;
+                    F.scene.add(root);
+                    F._placeCount = n + 1;
+                    const name = 'forge_model_' + F._placeCount;
+                    root.name = name;
+                    if (!F._meshByName) F._meshByName = {};
+                    if (!F._objects) F._objects = [];
+                    F._meshByName[name] = root;
+                    F._objects.push({ name: name, kind: 'gltf', label: m.name || 'model' });
+                    // Frame camera on model
+                    try {
+                        box = new THREE.Box3().setFromObject(root);
+                        const c = box.getCenter(new THREE.Vector3());
+                        const s2 = box.getSize(new THREE.Vector3());
+                        const rad = Math.max(s2.x, s2.y, s2.z, 1) * 2.2;
+                        F.target = c.clone();
+                        if (F.spherical) {
+                            F.spherical.radius = Math.max(3, Math.min(40, rad));
+                            F.spherical.phi = 1.05;
+                            F.spherical.theta = 0.6;
+                        }
+                        if (typeof forgeApplyCam === 'function') forgeApplyCam();
+                    } catch (_) {}
+                    forgeSetStatus('Placed: ' + (m.name || 'model'));
+                    resolve({ ok: true, label: m.name || 'model', name: name });
+                } catch (e) {
+                    resolve({ ok: false, error: (e && e.message) || 'place failed' });
+                }
             }
-            function onErr() { resolve(null); }
+            function onErr(err) {
+                const msg = (err && err.message) ? err.message : 'GLB failed to load';
+                resolve({ ok: false, error: msg });
+            }
             try {
                 if (String(url).indexOf('data:') === 0) {
                     fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
-                        loader.parse(buf, '', onOk, onErr);
+                        try { loader.parse(buf, '', onOk, onErr); }
+                        catch (e) { onErr(e); }
                     }).catch(onErr);
-                } else loader.load(url, onOk, undefined, onErr);
-            } catch (_) { onErr(); }
+                } else {
+                    loader.load(url, onOk, undefined, onErr);
+                }
+            } catch (e) { onErr(e); }
         });
     }
+
+    async function forgePlaceAttachedModel(fromBtn) {
+        forgeSetStatus('Loading model…');
+        const res = await forgeLoadModelIntoScene();
+        if (res && res.ok) {
+            forgeAppend('ai', 'Placed **' + (res.label || 'model') + '** on the floor. Drag to orbit · pinch to zoom.');
+            forgeSetStatus('Scene updated · model on floor');
+        } else {
+            forgeAppend('ai', 'Could not place the model' + (res && res.error ? (': ' + res.error) : '.') + ' Re-attach the .glb and try Place again.');
+            forgeSetStatus('Place failed');
+        }
+        return res;
+    }
+    window.forgePlaceAttachedModel = forgePlaceAttachedModel;
+    window.forgeLoadModelIntoScene = forgeLoadModelIntoScene;
+
 
     function forgeShowThinking() {
         const chat = document.getElementById('forge-chat');
@@ -12486,6 +12595,18 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (!currentUser) { alert('Log in first'); return; }
         const input = document.getElementById('forge-input');
         const text = (input && input.value || '').trim();
+        // Local place: never wait on AI for attached GLB
+        if (/\b(place|put|drop|spawn|load)\b/i.test(text) && /\b(model|tree|car|glb|gltf|this|it|file)\b/i.test(text)
+            || /^place\b/i.test(text) || /place (the )?(model|tree|car)/i.test(text)) {
+            const hasModel = (window.__forgeMedia || window.__lubaLastModels || []).some(function(x){ return x && x.isModel && (x.dataUrl || x.url); });
+            if (hasModel) {
+                if (input) input.value = '';
+                forgeAppend('user', text);
+                await forgePlaceAttachedModel(false);
+                return;
+            }
+        }
+
         if (!text) return;
         if (input) input.value = '';
         forgeAppend('user', text);
@@ -12852,11 +12973,28 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                         if (typeof modelUrl === 'string' && modelUrl.indexOf('data:application/octet-stream') === 0) {
                             modelUrl = modelUrl.replace('data:application/octet-stream', 'data:model/gltf-binary');
                         }
-                        const item = { dataUrl: modelUrl, isModel: true, name: f.name || 'model.glb', size: f.size, mime: 'model/gltf-binary' };
+                        // Always prefer blob URL — more reliable than huge data: URLs for GLTFLoader
+                        try {
+                            if (String(modelUrl).indexOf('data:') === 0) {
+                                modelUrl = URL.createObjectURL(f);
+                            }
+                        } catch (_) {}
+                        if (!window.__forgeMedia) window.__forgeMedia = [];
+                        const item = { dataUrl: modelUrl, url: modelUrl, isModel: true, name: f.name || 'model.glb', size: f.size, mime: 'model/gltf-binary' };
                         window.__forgeMedia.push(item);
                         window.__lubaLastModels = [item];
-                        forgeAppend('ai', '3D model attached: ' + (f.name || 'model') + '. Say "place the car/model" to drop it on the floor, or describe a full build.');
-                        forgeSetStatus('Model attached');
+                        const placeId = 'forge-place-' + Date.now().toString(36);
+                        forgeAppend('ai',
+                            '3D model attached: <b>' + (f.name || 'model').replace(/</g,'') + '</b> (' + Math.round((f.size||0)/1024) + ' KB).<br>' +
+                            'Tap the button to drop it on the floor, or type <i>place the model</i>.<br><br>' +
+                            '<button type="button" class="forge-play" id="' + placeId + '">Place this model</button>',
+                            true
+                        );
+                        setTimeout(function(){
+                            const b = document.getElementById(placeId);
+                            if (b) b.onclick = function(ev){ ev.preventDefault(); forgePlaceAttachedModel(true); };
+                        }, 0);
+                        forgeSetStatus('Model attached — tap Place');
                     } else {
                         forgeAppend('ai', 'That file is not a .glb/.gltf model. Use the paperclip for 3D models.');
                     }
@@ -12895,6 +13033,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         } else if (id === 'forge-play-last' || (t.closest && t.closest('#forge-play-last'))) {
             e.preventDefault();
             forgePlayBuild();
+        } else if ((id && id.indexOf('forge-place-') === 0) || (t.closest && t.closest('[id^="forge-place-"]'))) {
+            e.preventDefault();
+            if (typeof forgePlaceAttachedModel === 'function') forgePlaceAttachedModel(true);
         }
     }, true);
 
