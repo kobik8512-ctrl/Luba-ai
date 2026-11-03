@@ -2521,6 +2521,42 @@
             font-weight: 800; font-size: 13px;
             padding: 10px 18px; border-radius: 999px;
         }
+        .forge-attach-row {
+            display: none;
+            padding: 6px 12px 0;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .forge-attach-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(34, 211, 238, 0.12);
+            border: 1px solid rgba(34, 211, 238, 0.35);
+            color: #e2e8f0;
+            font-size: 12px;
+            max-width: 100%;
+        }
+        .forge-attach-chip b {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 160px;
+        }
+        .forge-attach-chip button {
+            border: none;
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
         .forge-composer {
             padding: 10px 12px 14px;
             border-top: 1px solid rgba(255,255,255,.08);
@@ -12557,17 +12593,47 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         });
     }
 
-    async function forgePlaceAttachedModel(fromBtn) {
-        forgeSetStatus('Loading model…');
-        const res = await forgeLoadModelIntoScene();
-        if (res && res.ok) {
-            forgeAppend('ai', 'Placed **' + (res.label || 'model') + '** on the floor. Drag to orbit · pinch to zoom.');
-            forgeSetStatus('Scene updated · model on floor');
-        } else {
-            forgeAppend('ai', 'Could not place the model' + (res && res.error ? (': ' + res.error) : '.') + ' Re-attach the .glb and try Place again.');
-            forgeSetStatus('Place failed');
+    function forgeRenderAttachRow() {
+        const row = document.getElementById('forge-attach-row');
+        if (!row) return;
+        const media = window.__forgeMedia || [];
+        if (!media.length) {
+            row.style.display = 'none';
+            row.innerHTML = '';
+            return;
         }
-        return res;
+        row.style.display = 'flex';
+        row.innerHTML = media.map(function(m, i) {
+            const label = (m.name || (m.isModel ? 'model.glb' : 'file')).replace(/[<>]/g, '');
+            const kind = m.isModel ? '3D' : (m.isVideo ? 'Video' : 'File');
+            return '<span class="forge-attach-chip" data-idx="' + i + '"><span style="opacity:.7">' + kind + '</span><b title="' + label + '">' + label + '</b><button type="button" data-forge-remove="' + i + '" title="Remove">×</button></span>';
+        }).join('');
+    }
+
+    async function forgePlaceAttachedModel(fromBtn, silent) {
+        // Prevent double-fire (click handler + delegation, or double Build)
+        if (window.__forgePlacing) return { ok: false, error: 'busy' };
+        window.__forgePlacing = true;
+        try {
+            forgeSetStatus('Loading model…');
+            const res = await forgeLoadModelIntoScene();
+            if (res && res.ok) {
+                // Mark model as already placed so we don't drop it twice
+                try {
+                    (window.__forgeMedia || []).forEach(function(m){ if (m && m.isModel) m._placed = true; });
+                } catch (_) {}
+                if (!silent) {
+                    forgeAppend('ai', 'Placed ' + (res.label || 'model') + ' on the floor. Drag to orbit · pinch to zoom.');
+                }
+                forgeSetStatus('Scene updated · model on floor');
+            } else if (!silent) {
+                forgeAppend('ai', 'Could not place the model' + (res && res.error ? (': ' + res.error) : '.') + ' Re-attach the .glb and try again.');
+                forgeSetStatus('Place failed');
+            }
+            return res || { ok: false };
+        } finally {
+            window.__forgePlacing = false;
+        }
     }
     window.forgePlaceAttachedModel = forgePlaceAttachedModel;
     window.forgeLoadModelIntoScene = forgeLoadModelIntoScene;
@@ -12652,21 +12718,18 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (!currentUser) { alert('Log in first'); return; }
         const input = document.getElementById('forge-input');
         const text = (input && input.value || '').trim();
-        // Local place: never wait on AI for attached GLB
-        if (/\b(place|put|drop|spawn|load)\b/i.test(text) && /\b(model|tree|car|glb|gltf|this|it|file)\b/i.test(text)
-            || /^place\b/i.test(text) || /place (the )?(model|tree|car)/i.test(text)) {
-            const hasModel = (window.__forgeMedia || window.__lubaLastModels || []).some(function(x){ return x && x.isModel && (x.dataUrl || x.url); });
-            if (hasModel) {
-                if (input) input.value = '';
-                forgeAppend('user', text);
-                await forgePlaceAttachedModel(false);
-                return;
-            }
-        }
-
         if (!text) return;
         if (input) input.value = '';
         forgeAppend('user', text);
+
+        // If a GLB is attached and not yet in the scene, place it once (user describes where/what in their text)
+        try {
+            const pending = (window.__forgeMedia || []).filter(function(x){ return x && x.isModel && (x.dataUrl || x.url) && !x._placed; });
+            if (pending.length) {
+                await forgePlaceAttachedModel(false, true);
+                forgeAppend('ai', 'Using your attached model in the scene. (' + (pending[0].name || 'model') + ')');
+            }
+        } catch (_) {}
         forgeSetStatus('Building…');
         const sendBtn = document.getElementById('forge-send');
         if (sendBtn) sendBtn.disabled = true;
@@ -12682,7 +12745,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             const wantsFullGame = /\b(game|html app|website|clicker|platformer|playable|full game)\b/i.test(text);
 
             const system = 'You are Luba inside LUBA FORGE — a live 3D builder (like Blender + Unity mix).\n' +
-                'Current scene objects: ' + sceneSummary + '.\n\n' +
+                'Current scene objects: ' + sceneSummary + '.\n' +
+                ((window.__forgeMedia||[]).some(function(m){return m&&m.isModel;}) ? ('User attached GLB: ' + ((window.__forgeMedia||[]).filter(function(m){return m&&m.isModel;}).map(function(m){return m.name;}).join(', ')) + ' — already placed in the viewport when they send a message. Respond about position/scale if they asked (next to house, bigger, etc.) using forge-scene move/scale ops.\n') : '') +
+                '\n' +
                 'RULES:\n' +
                 '1) For building/editing the 3D scene (houses, cars, trees, cubes, move, scale, recolor, delete, etc.) respond with a short sentence AND a ```forge-scene JSON fence.\n' +
                 'Format:\n```forge-scene\n{"ops":[{"action":"add","shape":"house","color":"blue","pos":[0,0,0],"scale":[1,1,1],"name":"house1"}]}\n```\n' +
@@ -13009,6 +13074,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                         window.__forgeMedia.push({ dataUrl: du, isVideo: /^video\//.test(files[i].type), isModel: false, name: files[i].name });
                     } catch (_) {}
                 }
+                try { forgeRenderAttachRow(); } catch(_){}
                 forgeSetStatus('Attached ' + window.__forgeMedia.length + ' media item(s)');
                 forgeAppend('ai', 'Got your photo(s). Say what to do with them, or build a scene that uses them.');
                 photoIn.value = '';
@@ -13037,21 +13103,18 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                             }
                         } catch (_) {}
                         if (!window.__forgeMedia) window.__forgeMedia = [];
-                        const item = { dataUrl: modelUrl, url: modelUrl, isModel: true, name: f.name || 'model.glb', size: f.size, mime: 'model/gltf-binary' };
+                        const item = { dataUrl: modelUrl, url: modelUrl, isModel: true, name: f.name || 'model.glb', size: f.size, mime: 'model/gltf-binary', _placed: false };
                         window.__forgeMedia.push(item);
                         window.__lubaLastModels = [item];
-                        const placeId = 'forge-place-' + Date.now().toString(36);
-                        forgeAppend('ai',
-                            '3D model attached: <b>' + (f.name || 'model').replace(/</g,'') + '</b> (' + Math.round((f.size||0)/1024) + ' KB).<br>' +
-                            'Tap the button to drop it on the floor, or type <i>place the model</i>.<br><br>' +
-                            '<button type="button" class="forge-play" id="' + placeId + '">Place this model</button>',
-                            true
-                        );
-                        setTimeout(function(){
-                            const b = document.getElementById(placeId);
-                            if (b) b.onclick = function(ev){ ev.preventDefault(); forgePlaceAttachedModel(true); };
-                        }, 0);
-                        forgeSetStatus('Model attached — tap Place');
+                        try { forgeRenderAttachRow(); } catch (_) {}
+                        forgeSetStatus('Attached ' + (f.name || 'model') + ' — type where to put it');
+                        try {
+                            const inp = document.getElementById('forge-input');
+                            if (inp) {
+                                inp.placeholder = 'e.g. put this tree next to the house';
+                                inp.focus();
+                            }
+                        } catch (_) {}
                     } else {
                         forgeAppend('ai', 'That file is not a .glb/.gltf model. Use the paperclip for 3D models.');
                     }
@@ -13090,9 +13153,17 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         } else if (id === 'forge-play-last' || (t.closest && t.closest('#forge-play-last'))) {
             e.preventDefault();
             forgePlayBuild();
-        } else if ((id && id.indexOf('forge-place-') === 0) || (t.closest && t.closest('[id^="forge-place-"]'))) {
+        } else if (t.closest && t.closest('[data-forge-remove]')) {
             e.preventDefault();
-            if (typeof forgePlaceAttachedModel === 'function') forgePlaceAttachedModel(true);
+            e.stopPropagation();
+            const btn = t.closest('[data-forge-remove]');
+            const idx = parseInt(btn.getAttribute('data-forge-remove'), 10);
+            if (!isNaN(idx) && window.__forgeMedia) {
+                window.__forgeMedia.splice(idx, 1);
+                window.__lubaLastModels = (window.__forgeMedia || []).filter(function(m){ return m && m.isModel; });
+                try { forgeRenderAttachRow(); } catch (_) {}
+                forgeSetStatus(window.__forgeMedia.length ? 'Attachment updated' : 'Attachment cleared');
+            }
         }
     }, true);
 
