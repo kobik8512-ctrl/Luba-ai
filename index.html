@@ -6817,13 +6817,13 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 3, 2026 (Luba Forge verified access)
+        const TERMS_TEXT = `Last updated: November 3, 2026 (slash commands + Luba Forge)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer), slash commands (/truth, /copy, /add, /webadd, /search, and others), live web search for facts or public textures/assets, interactive HTML/game previews, embedding your photos or .glb/.gltf 3D models into generated apps, speech, generated images, coins/message limits, verification, and linked tools we add over time.
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — e.g. /truth, /plan, /search, /draw, /code, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
@@ -6831,7 +6831,7 @@ The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do 
 You are responsible for your username and password. Do not share your password. You must be old enough under the laws where you live, or use the app only with a parent or guardian's permission. We may suspend or remove accounts that break these Terms, abuse the service, or harm others.
 
 4. Acceptable use
-You agree not to threaten, harass, exploit, or harm people (especially minors); break into accounts or systems; spam, scam, or spread malware; upload illegal content; abuse limits or bugs; or present AI output as licensed professional advice when it is not. Slash modes like /truth and /roast are for honest or humorous chat — do not use the service to target or harass real private individuals with harmful content.
+You agree not to threaten, harass, exploit, or harm people (especially minors); break into accounts or systems; spam, scam, or spread malware; upload illegal content; abuse limits or bugs; or present AI output as licensed professional advice when it is not. Slash modes (including /truth, /roast, /draw, and others) are for honest, creative, or practical chat — do not use the service to target or harass real private individuals with harmful content. Do not try to obtain Admin or Owner access except through official owner actions.
 
 5. Messages, media, and limits
 Messages and media you send are processed so Luba can reply. Images you attach may be embedded into HTML previews you generate (for example with /copy) as data on your device. Videos and images may be stored on your device (including IndexedDB) and, when sync is available, on our servers for your account. Large files may be limited by device storage or network rules. Message limits, coins, or verification rules may apply and can change.
@@ -6859,10 +6859,12 @@ The owner may grant Admin to selected users via Owner CMDs. Admins are not owner
 We may update these Terms. Continued use after changes means you accept the updated version.
 `;
 
-    const PRIVACY_TEXT = `Last updated: November 3, 2026
+    const PRIVACY_TEXT = `Last updated: November 3, 2026 (slash commands + roles)
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
+
+Slash commands and Modes only change how the assistant replies; they do not create a separate data sale. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
 
 2. Account data
 We may store username, password hash, profile photo, preferences (including mode settings), verification status, coin/message counters, and session tokens.
@@ -7105,6 +7107,7 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - Modes users can turn on: Normal, Study, HTML (interactive apps/games in preview), Code, Creative, Lawyer, and others shown in the Modes menu.
 - LUBA FORGE (your twin): You have a companion studio called Luba Forge — a separate 3D builder workspace (empty infinite floor, live scene, Play builds). It lives under Modes as "LUBA FORGE" (BETA). You and Forge are two sides of the same product: you chat and write HTML/code here; Forge places live 3D scenes and full playable builds. Main Luba chat is free for everyone. Luba Forge is the premium-tier feature — other apps charge money for that level; here it is unlocked free for verified members (and the owner) instead of paid. If someone asks about Forge, explain: Modes → LUBA FORGE, verified perk (not a payment), twin of main Luba for 3D / scene building.
 - You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview (with Fullscreen), help with code, math (use the calculator tool), law explanations in Lawyer mode, tutoring in Study mode, and point users to Luba Forge for live 3D building when that fits.
+- Slash commands: users type / for a menu. Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
 - TikTok: yours is @luba_ai ; Kobi's is @itzrealkobl
 - GREETINGS: Never parrot or echo the user's greeting. Do not reply to "hi"/"hey"/"hu" with "HiHi", "HuHu", "Hey hey", or the same word doubled. Give a natural, short, varied reply (ask something real or respond to context). Different greeting each time.
@@ -7118,7 +7121,16 @@ ROLES (never invent these — only the app tells you who has which):
 
 You also have a twin builder mode called LUBA FORGE (BETA) — a live 3D studio (Blender + Unity style). Main chat is free for everyone; Forge is the verified perk. You and Forge share the same identity (Luba, made by Kobi) but Forge is the building studio UI.
 
+SLASH COMMANDS (user types / in chat for autocomplete — you understand these modes when active):
+/truth /copy /exactly /best /add /webadd /search /short /detailed /roast /eli5 /fix
+/plan /steps /pros /compare /decide /summary /tldr /rewrite /grammar /translate /list /table
+/idea /quiz /story /poem /formal /casual /debate /draw /caption /recipe /workout /budget /travel /remind
+/code /debug /email /message /study /joke /motivate /help
+If asked what commands exist, list the useful ones briefly or tell them to type /help or /.
+
 When the system message says the user has the Admin badge, treat them as Admin — never claim they are not admin. When it says Verified only, they are verified, not admin. Users cannot become admin by asking in chat.
+
+You know your own product: Luba AI web app by Kobi (luba-ai.vercel.app), Modes, Leaderboard, verification, Admin (owner-granted), Owner CMDs (Kobi only), message limits, image/video/3D attachments, HTML previews, Forge for verified users, slash commands above, web search, and generated images.
 `;
 
     const USER_PROFILE = `The person you are talking to RIGHT NOW is logged in as the official owner account (username: kobi). This is really Kobi, your creator. The app only grants the Owner badge to this account — trust it. Treat him warm, excited, loyal, and genuinely happy he's here.
@@ -8538,15 +8550,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             let badge = '';
             const isOwn = !!(row.owner || String(row.username || '').toLowerCase() === 'kobi');
             const isAdm = !!row.admin;
-            // Owner always counts as verified; admin too; plus server verified flag
             const isVer = !!(row.verified || isOwn || isAdm);
+            // Order: verified check first, then role (Owner / Admin) — like old layout
+            if (isVer) {
+                badge += ' <span class="verified-badge" title="Verified">' + VERIFIED_BADGE_SVG + '</span>';
+            }
             if (isOwn) {
                 badge += ' <span class="owner-crown-badge leaderboard-owner" title="Owner">👑 Owner</span>';
             } else if (isAdm) {
                 badge += ' <span class="admin-badge leaderboard-admin" title="Admin">' + ADMIN_BADGE_SVG + ' Admin</span>';
-            }
-            if (isVer) {
-                badge += ' <span class="verified-badge" title="Verified">' + VERIFIED_BADGE_SVG + '</span>';
             }
             const score = leaderboardKind === 'time'
                 ? formatActiveTime(row.activeMs)
@@ -10297,17 +10309,50 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     const SLASH_COMMANDS = [
         { cmd: '/truth', desc: 'Brutal honesty — no sugarcoating (works with photos too)' },
         { cmd: '/copy', desc: 'Use the exact photo/text — no redraw, no remix' },
-        { cmd: '/exactly', desc: 'Build ONLY what you asked — no extra features, no random add-ons' },
-        { cmd: '/best', desc: 'Maximum quality build — research, details, physics, full polish' },
-        { cmd: '/add', desc: 'Add something to the current game/app/text (trees, features…)' },
-        { cmd: '/webadd', desc: 'Search web for textures/3D assets and add them into the build' },
+        { cmd: '/exactly', desc: 'Build ONLY what you asked — no extra features' },
+        { cmd: '/best', desc: 'Maximum quality build — full polish' },
+        { cmd: '/add', desc: 'Add something to the current game/app/text' },
+        { cmd: '/webadd', desc: 'Search web for textures/3D assets and add them' },
         { cmd: '/search', desc: 'Force a live web search for your question' },
-        { cmd: '/short', desc: 'Answer short and direct — no long essays' },
-        { cmd: '/detailed', desc: 'Long, thorough answer with full detail' },
-        { cmd: '/roast', desc: 'Savage funny roast energy (still honest)' },
-        { cmd: '/eli5', desc: 'Explain like I am 5 — super simple' },
-        { cmd: '/fix', desc: 'Fix/continue the previous game or app in this chat' },
-        { cmd: '/help', desc: 'List available slash commands' }
+        { cmd: '/short', desc: 'Answer short and direct' },
+        { cmd: '/detailed', desc: 'Long thorough answer' },
+        { cmd: '/roast', desc: 'Savage funny roast (still honest)' },
+        { cmd: '/eli5', desc: 'Explain like I am 5' },
+        { cmd: '/fix', desc: 'Fix/continue the previous game or app' },
+        { cmd: '/plan', desc: 'Step-by-step plan to do the thing' },
+        { cmd: '/steps', desc: 'Numbered steps only — no fluff' },
+        { cmd: '/pros', desc: 'Pros and cons list' },
+        { cmd: '/compare', desc: 'Compare options side by side' },
+        { cmd: '/decide', desc: 'Help me choose — clear recommendation' },
+        { cmd: '/summary', desc: 'Summarize the text or topic' },
+        { cmd: '/tldr', desc: 'Ultra short TL;DR only' },
+        { cmd: '/rewrite', desc: 'Rewrite clearer / better' },
+        { cmd: '/grammar', desc: 'Fix grammar and spelling' },
+        { cmd: '/translate', desc: 'Translate (say languages after command)' },
+        { cmd: '/list', desc: 'Answer as a clean bullet list' },
+        { cmd: '/table', desc: 'Answer as a markdown table' },
+        { cmd: '/idea', desc: 'Brainstorm creative ideas' },
+        { cmd: '/quiz', desc: 'Quiz me on this topic' },
+        { cmd: '/story', desc: 'Write a short story about it' },
+        { cmd: '/poem', desc: 'Write a poem about it' },
+        { cmd: '/formal', desc: 'Formal professional tone' },
+        { cmd: '/casual', desc: 'Casual friendly tone' },
+        { cmd: '/debate', desc: 'Argue both sides fairly' },
+        { cmd: '/draw', desc: 'Force generate a picture of this' },
+        { cmd: '/caption', desc: 'Caption this photo (attach image)' },
+        { cmd: '/recipe', desc: 'Turn this into a recipe format' },
+        { cmd: '/workout', desc: 'Workout / training plan style' },
+        { cmd: '/budget', desc: 'Money breakdown / budget style' },
+        { cmd: '/travel', desc: 'Travel plan for the place/topic' },
+        { cmd: '/remind', desc: 'Save this as a memory about me' },
+        { cmd: '/code', desc: 'Explain or write code clearly' },
+        { cmd: '/debug', desc: 'Find bugs and fix this code/error' },
+        { cmd: '/email', desc: 'Write a ready-to-send email' },
+        { cmd: '/message', desc: 'Write a text/DM you can send' },
+        { cmd: '/study', desc: 'Study notes / teach this topic' },
+        { cmd: '/joke', desc: 'Tell a joke about this' },
+        { cmd: '/motivate', desc: 'Short motivational push' },
+        { cmd: '/help', desc: 'List all slash commands' }
     ];
     let slashActiveIndex = 0;
     let slashFiltered = [];
@@ -10323,6 +10368,39 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     let pendingRoastMode = false;
     let pendingEli5Mode = false;
     let pendingFixMode = false;
+    let pendingPlanMode = false;
+    let pendingStepsMode = false;
+    let pendingProsMode = false;
+    let pendingCompareMode = false;
+    let pendingDecideMode = false;
+    let pendingSummaryMode = false;
+    let pendingTldrMode = false;
+    let pendingRewriteMode = false;
+    let pendingGrammarMode = false;
+    let pendingTranslateMode = false;
+    let pendingListMode = false;
+    let pendingTableMode = false;
+    let pendingIdeaMode = false;
+    let pendingQuizMode = false;
+    let pendingStoryMode = false;
+    let pendingPoemMode = false;
+    let pendingFormalMode = false;
+    let pendingCasualMode = false;
+    let pendingDebateMode = false;
+    let pendingDrawMode = false;
+    let pendingCaptionMode = false;
+    let pendingRecipeMode = false;
+    let pendingWorkoutMode = false;
+    let pendingBudgetMode = false;
+    let pendingTravelMode = false;
+    let pendingRemindMode = false;
+    let pendingCodeMode = false;
+    let pendingDebugMode = false;
+    let pendingEmailMode = false;
+    let pendingMessageMode = false;
+    let pendingStudySlashMode = false;
+    let pendingJokeMode = false;
+    let pendingMotivateMode = false;
 
     function parseSlashCommand(raw) {
         const text = String(raw || '');
@@ -11163,6 +11241,39 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         pendingRoastMode = false;
         pendingEli5Mode = false;
         pendingFixMode = false;
+        pendingPlanMode = false;
+        pendingStepsMode = false;
+        pendingProsMode = false;
+        pendingCompareMode = false;
+        pendingDecideMode = false;
+        pendingSummaryMode = false;
+        pendingTldrMode = false;
+        pendingRewriteMode = false;
+        pendingGrammarMode = false;
+        pendingTranslateMode = false;
+        pendingListMode = false;
+        pendingTableMode = false;
+        pendingIdeaMode = false;
+        pendingQuizMode = false;
+        pendingStoryMode = false;
+        pendingPoemMode = false;
+        pendingFormalMode = false;
+        pendingCasualMode = false;
+        pendingDebateMode = false;
+        pendingDrawMode = false;
+        pendingCaptionMode = false;
+        pendingRecipeMode = false;
+        pendingWorkoutMode = false;
+        pendingBudgetMode = false;
+        pendingTravelMode = false;
+        pendingRemindMode = false;
+        pendingCodeMode = false;
+        pendingDebugMode = false;
+        pendingEmailMode = false;
+        pendingMessageMode = false;
+        pendingStudySlashMode = false;
+        pendingJokeMode = false;
+        pendingMotivateMode = false;
         if (!isRetry && text) {
             const sp = parseSlashCommand(text);
             if (sp.cmd === '/help') {
@@ -11213,6 +11324,105 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             } else if (sp.cmd === '/fix') {
                 pendingFixMode = true;
                 text = sp.rest || 'Fix bugs and improve the previous game/app in this chat. Continue the same project.';
+            } else if (sp.cmd === '/plan') {
+                pendingPlanMode = true;
+                text = sp.rest || 'Make a clear step-by-step plan.';
+            } else if (sp.cmd === '/steps') {
+                pendingStepsMode = true;
+                text = sp.rest || 'Give numbered steps only.';
+            } else if (sp.cmd === '/pros') {
+                pendingProsMode = true;
+                text = sp.rest || 'List pros and cons.';
+            } else if (sp.cmd === '/compare') {
+                pendingCompareMode = true;
+                text = sp.rest || 'Compare the options clearly.';
+            } else if (sp.cmd === '/decide') {
+                pendingDecideMode = true;
+                text = sp.rest || 'Help me decide with a clear recommendation.';
+            } else if (sp.cmd === '/summary' || sp.cmd === '/summarize') {
+                pendingSummaryMode = true;
+                text = sp.rest || 'Summarize this.';
+            } else if (sp.cmd === '/tldr') {
+                pendingTldrMode = true;
+                text = sp.rest || 'Give a TL;DR only.';
+            } else if (sp.cmd === '/rewrite') {
+                pendingRewriteMode = true;
+                text = sp.rest || 'Rewrite this clearer and better.';
+            } else if (sp.cmd === '/grammar') {
+                pendingGrammarMode = true;
+                text = sp.rest || 'Fix grammar and spelling.';
+            } else if (sp.cmd === '/translate') {
+                pendingTranslateMode = true;
+                text = sp.rest || 'Translate this.';
+            } else if (sp.cmd === '/list') {
+                pendingListMode = true;
+                text = sp.rest || 'Answer as a bullet list.';
+            } else if (sp.cmd === '/table') {
+                pendingTableMode = true;
+                text = sp.rest || 'Answer as a table.';
+            } else if (sp.cmd === '/idea' || sp.cmd === '/ideas') {
+                pendingIdeaMode = true;
+                text = sp.rest || 'Brainstorm ideas.';
+            } else if (sp.cmd === '/quiz') {
+                pendingQuizMode = true;
+                text = sp.rest || 'Quiz me on this topic.';
+            } else if (sp.cmd === '/story') {
+                pendingStoryMode = true;
+                text = sp.rest || 'Write a short story.';
+            } else if (sp.cmd === '/poem') {
+                pendingPoemMode = true;
+                text = sp.rest || 'Write a poem.';
+            } else if (sp.cmd === '/formal') {
+                pendingFormalMode = true;
+                text = sp.rest || text.replace(/^\/formal\s*/i, '').trim();
+            } else if (sp.cmd === '/casual') {
+                pendingCasualMode = true;
+                text = sp.rest || text.replace(/^\/casual\s*/i, '').trim();
+            } else if (sp.cmd === '/debate') {
+                pendingDebateMode = true;
+                text = sp.rest || 'Debate both sides.';
+            } else if (sp.cmd === '/draw' || sp.cmd === '/image') {
+                pendingDrawMode = true;
+                text = sp.rest || 'Generate an image of this.';
+            } else if (sp.cmd === '/caption') {
+                pendingCaptionMode = true;
+                text = sp.rest || 'Write a good caption for this photo.';
+            } else if (sp.cmd === '/recipe') {
+                pendingRecipeMode = true;
+                text = sp.rest || 'Write this as a recipe.';
+            } else if (sp.cmd === '/workout') {
+                pendingWorkoutMode = true;
+                text = sp.rest || 'Make a workout plan.';
+            } else if (sp.cmd === '/budget') {
+                pendingBudgetMode = true;
+                text = sp.rest || 'Make a budget breakdown.';
+            } else if (sp.cmd === '/travel') {
+                pendingTravelMode = true;
+                text = sp.rest || 'Make a travel plan.';
+            } else if (sp.cmd === '/remind' || sp.cmd === '/remember') {
+                pendingRemindMode = true;
+                text = sp.rest || 'Remember this about me.';
+            } else if (sp.cmd === '/code') {
+                pendingCodeMode = true;
+                text = sp.rest || 'Help with this code.';
+            } else if (sp.cmd === '/debug') {
+                pendingDebugMode = true;
+                text = sp.rest || 'Debug this code or error.';
+            } else if (sp.cmd === '/email') {
+                pendingEmailMode = true;
+                text = sp.rest || 'Write an email.';
+            } else if (sp.cmd === '/message' || sp.cmd === '/dm' || sp.cmd === '/text') {
+                pendingMessageMode = true;
+                text = sp.rest || 'Write a message I can send.';
+            } else if (sp.cmd === '/study') {
+                pendingStudySlashMode = true;
+                text = sp.rest || 'Teach me this topic with study notes.';
+            } else if (sp.cmd === '/joke') {
+                pendingJokeMode = true;
+                text = sp.rest || 'Tell a joke.';
+            } else if (sp.cmd === '/motivate' || sp.cmd === '/motivation') {
+                pendingMotivateMode = true;
+                text = sp.rest || 'Give me a short motivational push.';
             }
         }
         closeSlashMenu();
@@ -11463,6 +11673,39 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (pendingFixMode) {
             systemPrompt += "\n\nFIX MODE: Continue the SAME previous game/app from this chat. Fix bugs and apply improvements. Do not start a different project.";
         }
+        if (pendingPlanMode) systemPrompt += "\n\nPLAN MODE: Reply as a clear step-by-step plan with ordered steps. Practical and doable.";
+        if (pendingStepsMode) systemPrompt += "\n\nSTEPS MODE: Numbered steps only. Minimal intro. No long essays.";
+        if (pendingProsMode) systemPrompt += "\n\nPROS/CONS MODE: Give balanced Pros and Cons sections, then a short bottom line.";
+        if (pendingCompareMode) systemPrompt += "\n\nCOMPARE MODE: Compare options side by side (criteria, strengths, weaknesses). End with who each option is best for.";
+        if (pendingDecideMode) systemPrompt += "\n\nDECIDE MODE: Help the user choose. Give a clear recommendation and why, plus when the alternative is better.";
+        if (pendingSummaryMode) systemPrompt += "\n\nSUMMARY MODE: Summarize clearly. Capture main points only.";
+        if (pendingTldrMode) systemPrompt += "\n\nTL;DR MODE: Maximum 2 short sentences. No extra sections.";
+        if (pendingRewriteMode) systemPrompt += "\n\nREWRITE MODE: Rewrite the user's text clearer, tighter, and more natural. Keep meaning. Show the improved version first.";
+        if (pendingGrammarMode) systemPrompt += "\n\nGRAMMAR MODE: Fix grammar and spelling. Show corrected text first, then briefly note main fixes.";
+        if (pendingTranslateMode) systemPrompt += "\n\nTRANSLATE MODE: Translate as requested. If languages not specified, ask once or default to clear English <-> their language from context. Provide the translation first.";
+        if (pendingListMode) systemPrompt += "\n\nLIST MODE: Answer mainly as clean bullet points.";
+        if (pendingTableMode) systemPrompt += "\n\nTABLE MODE: Answer as a markdown table when possible.";
+        if (pendingIdeaMode) systemPrompt += "\n\nIDEA MODE: Brainstorm multiple creative, useful ideas. Vary them. Short labels + one line each.";
+        if (pendingQuizMode) systemPrompt += "\n\nQUIZ MODE: Quiz the user. Ask one question at a time (or a short set), wait for answers in spirit, give feedback, explain briefly.";
+        if (pendingStoryMode) systemPrompt += "\n\nSTORY MODE: Write an engaging short story about the topic.";
+        if (pendingPoemMode) systemPrompt += "\n\nPOEM MODE: Write a poem about the topic. Match mood to the request.";
+        if (pendingFormalMode) systemPrompt += "\n\nFORMAL MODE: Professional, polished, formal tone. No slang.";
+        if (pendingCasualMode) systemPrompt += "\n\nCASUAL MODE: Casual friendly tone, like texting a smart friend.";
+        if (pendingDebateMode) systemPrompt += "\n\nDEBATE MODE: Argue both sides fairly with strongest points for each, then a balanced conclusion.";
+        if (pendingDrawMode) systemPrompt += "\n\nDRAW MODE: You MUST call generate_image with a detailed photorealistic prompt for what they asked. Short caption after.";
+        if (pendingCaptionMode) systemPrompt += "\n\nCAPTION MODE: Look at the attached photo and write 3 caption options (casual, witty, clean).";
+        if (pendingRecipeMode) systemPrompt += "\n\nRECIPE MODE: Format as a recipe: ingredients, steps, time, servings tips.";
+        if (pendingWorkoutMode) systemPrompt += "\n\nWORKOUT MODE: Practical training plan (warmup, main sets, rest, notes). Safety first.";
+        if (pendingBudgetMode) systemPrompt += "\n\nBUDGET MODE: Money breakdown with categories and rough numbers. Be realistic.";
+        if (pendingTravelMode) systemPrompt += "\n\nTRAVEL MODE: Travel plan with days/places/tips. Practical and flexible.";
+        if (pendingRemindMode) systemPrompt += "\n\nREMIND MODE: Save the fact with the save_memory tool if appropriate, and confirm what you will remember.";
+        if (pendingCodeMode) systemPrompt += "\n\nCODE MODE: Focus on clear, working code. Explain briefly. Prefer complete snippets over pseudo-code.";
+        if (pendingDebugMode) systemPrompt += "\n\nDEBUG MODE: Find the bug/error, explain the cause in plain language, then give a fixed version.";
+        if (pendingEmailMode) systemPrompt += "\n\nEMAIL MODE: Write a complete email (subject + body) the user can copy-send. Match the tone they asked for.";
+        if (pendingMessageMode) systemPrompt += "\n\nMESSAGE MODE: Write a short text/DM the user can send as-is. Natural, not corporate unless asked.";
+        if (pendingStudySlashMode) systemPrompt += "\n\nSTUDY MODE (slash): Teach the topic with clear notes, key points, and a quick check question at the end.";
+        if (pendingJokeMode) systemPrompt += "\n\nJOKE MODE: Tell a funny joke related to the topic. Keep it light; avoid punching down at private people.";
+        if (pendingMotivateMode) systemPrompt += "\n\nMOTIVATE MODE: Short, real motivational push — specific to their situation if given. No empty clichés wall.";
         if (pendingAddMode) {
             systemPrompt += "\n\nADD MODE (/add) IS ON: Continue the SAME previous project in this chat (game, HTML app, or text). ADD what the user asked for (trees, enemies, UI, features, paragraphs, etc.). Do not rebuild a different project from scratch. Keep existing systems working and integrate the new pieces cleanly. If they said \"more features\", invent several fun, working additions that fit the same project.\n" +
                 "If they ask for trees/props in 3D: build them procedurally (trunk + foliage meshes, multiple instances with random scale/position) so they always appear — do not rely on external models that can fail. Keep the script error-free.";
