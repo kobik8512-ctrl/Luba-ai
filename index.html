@@ -3545,14 +3545,14 @@
             const hbO = document.getElementById('header-owner-badge');
             if (hbO) hbO.style.display = owner ? 'inline-flex' : 'none';
             if (hbA) hbA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
-            if (hbV) hbV.style.display = (!owner && !admin && verified) ? 'inline-flex' : 'none';
+            if (hbV) hbV.style.display = (!owner && verified) ? 'inline-flex' : 'none';
             const sV = document.getElementById('settings-name-verified');
             const sA = document.getElementById('settings-admin-badge-inline');
             const sO = document.getElementById('settings-owner-badge-inline');
             if (sO) sO.style.display = owner ? 'inline-flex' : 'none';
             if (sA) sA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
             // Show verified check only when verified but NOT admin (admin badge is the main one)
-            if (sV) sV.style.display = (!owner && !admin && verified) ? 'inline-flex' : 'none';
+            if (sV) sV.style.display = (!owner && verified) ? 'inline-flex' : 'none';
             const note = document.getElementById('settings-verified-note');
             if (note) {
                 if (owner) {
@@ -12026,11 +12026,20 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
         if (typeof THREE === 'undefined') {
             const s = document.createElement('script');
-            s.src = 'https://unpkg.com/three@0.149.0/build/three.min.js';
-            s.onload = boot;
+            s.src = 'https://unpkg.com/three@0.128.0/build/three.min.js';
+            s.onload = function() {
+                // Preload GLTFLoader so Place works immediately
+                forgeLoadScript('https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js').then(function(){
+                    if (!THREE.GLTFLoader) {
+                        return forgeLoadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js');
+                    }
+                }).finally(function(){ boot(); });
+            };
             s.onerror = function() { forgeSetStatus('Could not load 3D engine'); };
             document.head.appendChild(s);
-        } else boot();
+        } else {
+            forgeEnsureGltfLoader().finally(function(){ boot(); });
+        }
         window.addEventListener('resize', function() {
             if (!window.__forge.open || !window.__forge.renderer) return;
             const parent = canvas.parentElement;
@@ -12412,17 +12421,62 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     }
 
 
-        async function forgeEnsureGltfLoader() {
-        if (typeof THREE === 'undefined') return false;
-        if (THREE.GLTFLoader) return true;
-        await new Promise(function(resolve) {
+            function forgeLoadScript(src) {
+        return new Promise(function(resolve) {
+            try {
+                const existing = document.querySelector('script[src="' + src + '"]');
+                if (existing) {
+                    if (existing.getAttribute('data-loaded') === '1') { resolve(true); return; }
+                    existing.addEventListener('load', function(){ resolve(true); });
+                    existing.addEventListener('error', function(){ resolve(false); });
+                    return;
+                }
+            } catch (_) {}
             const s = document.createElement('script');
-            s.src = 'https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js';
-            s.onload = resolve;
-            s.onerror = resolve;
+            s.src = src;
+            s.async = true;
+            s.onload = function(){ try { s.setAttribute('data-loaded','1'); } catch(_){} resolve(true); };
+            s.onerror = function(){ resolve(false); };
             document.head.appendChild(s);
         });
-        return !!THREE.GLTFLoader;
+    }
+
+    async function forgeEnsureGltfLoader() {
+        if (typeof THREE !== 'undefined' && THREE.GLTFLoader) return true;
+
+        // r150+ removed global examples/js — use r128 GLTFLoader which attaches THREE.GLTFLoader
+        // Must match a THREE build that still works with our viewport (r128–r149 Mesh APIs are fine)
+        const loaderUrls = [
+            'https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js',
+            'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js',
+            'https://unpkg.com/three@0.133.1/examples/js/loaders/GLTFLoader.js',
+            'https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js'
+        ];
+
+        for (let i = 0; i < loaderUrls.length; i++) {
+            if (typeof THREE !== 'undefined' && THREE.GLTFLoader) return true;
+            await forgeLoadScript(loaderUrls[i]);
+            if (typeof THREE !== 'undefined' && THREE.GLTFLoader) return true;
+            // small wait for slow mobile
+            await new Promise(function(r){ setTimeout(r, 60); });
+            if (typeof THREE !== 'undefined' && THREE.GLTFLoader) return true;
+        }
+
+        // Module fallback: import GLTFLoader and bind to global THREE (same scene graph only if three instance matches —
+        // so we also try constructing with global THREE by patching)
+        try {
+            const mod = await import('https://unpkg.com/three@0.128.0/examples/jsm/loaders/GLTFLoader.js');
+            if (mod && mod.GLTFLoader) {
+                THREE.GLTFLoader = mod.GLTFLoader;
+                return true;
+            }
+        } catch (e) {
+            console.warn('forge gltf module', e);
+        }
+
+        // Last resort: inline mini-loader via fetch of UMD text is too heavy — fail clearly
+        return !!(typeof THREE !== 'undefined' && THREE.GLTFLoader);
     }
 
     async function forgeLoadModelIntoScene(optModel) {
@@ -12431,16 +12485,20 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const models = window.__forgeMedia || window.__lubaLastModels || [];
         const m = optModel || models.find(function(x){ return x && x.isModel && (x.dataUrl || x.url); }) || models[0];
         if (!m || !(m.dataUrl || m.url)) return { ok: false, error: 'No 3D model attached. Use the paperclip and pick a .glb file first.' };
+
         const okLoader = await forgeEnsureGltfLoader();
-        if (!okLoader) return { ok: false, error: 'Could not load GLTFLoader' };
+        if (!okLoader) return { ok: false, error: 'Could not load GLTFLoader (CDN blocked?). Try again on Wi‑Fi or another browser.' };
+
         const url = m.dataUrl || m.url;
         return new Promise(function(resolve) {
-            const loader = new THREE.GLTFLoader();
+            let loader;
+            try { loader = new THREE.GLTFLoader(); }
+            catch (e) { resolve({ ok: false, error: 'GLTFLoader init failed' }); return; }
+
             function onOk(gltf) {
                 try {
                     const root = gltf.scene || (gltf.scenes && gltf.scenes[0]);
                     if (!root) { resolve({ ok: false, error: 'GLB has no scene' }); return; }
-                    // Normalize size ~2 units tall/wide
                     root.updateMatrixWorld(true);
                     let box = new THREE.Box3().setFromObject(root);
                     let size = box.getSize(new THREE.Vector3());
@@ -12451,8 +12509,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     const center = box.getCenter(new THREE.Vector3());
                     root.position.x -= center.x;
                     root.position.z -= center.z;
-                    root.position.y -= box.min.y; // sit on floor
-                    // slight offset if multiple models
+                    root.position.y -= box.min.y;
                     const n = (F._placeCount || 0);
                     root.position.x += (n % 5) * 2.2;
                     root.position.z += Math.floor(n / 5) * 2.2;
@@ -12464,7 +12521,6 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     if (!F._objects) F._objects = [];
                     F._meshByName[name] = root;
                     F._objects.push({ name: name, kind: 'gltf', label: m.name || 'model' });
-                    // Frame camera on model
                     try {
                         box = new THREE.Box3().setFromObject(root);
                         const c = box.getCenter(new THREE.Vector3());
@@ -12515,6 +12571,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     }
     window.forgePlaceAttachedModel = forgePlaceAttachedModel;
     window.forgeLoadModelIntoScene = forgeLoadModelIntoScene;
+
 
 
     function forgeShowThinking() {
