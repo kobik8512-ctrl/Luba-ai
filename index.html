@@ -2036,6 +2036,7 @@
             height: 12px;
             flex-shrink: 0;
         }
+        #header-owner-badge { display: none !important; }
         .header-owner-badge {
             margin-right: 2px;
             font-size: 9px;
@@ -2451,8 +2452,8 @@
             .forge-body { flex-direction: row; }
         }
         .forge-viewport-wrap {
-            flex: 1.2; min-height: 42vh; position: relative;
-            background: #07090d;
+            flex: 1.2; min-height: 42vh; height: 42vh; position: relative;
+            background: #0b1220;
             border-bottom: 1px solid rgba(255,255,255,.06);
         }
         @media (min-width: 900px) {
@@ -2509,16 +2510,17 @@
         #forge-studio.forge-fs .forge-side { display: none !important; }
         #forge-studio.forge-fs .forge-viewport-wrap {
             flex: 1 !important;
-            height: 100% !important;
+            height: auto !important;
             max-height: none !important;
-            min-height: 0 !important;
+            min-height: 60vh !important;
         }
         #forge-studio.forge-fs .forge-body { flex-direction: column; }
         #forge-studio.forge-control-on .forge-side { display: none !important; }
         #forge-studio.forge-control-on .forge-viewport-wrap {
             flex: 1 !important;
-            height: 100% !important;
+            height: auto !important;
             max-height: none !important;
+            min-height: 50vh !important;
         }
         #forge-control-panel {
             display: none;
@@ -3092,7 +3094,7 @@
         <span class="verified-badge header-verified-badge" id="header-verified-badge" style="display:none;" title="Verified"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1D9BF0"/><path d="M7 12.2l3.2 3.2L17 8.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     </div>
     <div class="header-actions">
-        <span class="owner-crown-badge header-owner-badge" id="header-owner-badge" style="display:none;" title="Official owner account">
+        <span class="owner-crown-badge header-owner-badge" id="header-owner-badge" style="display:none !important;" title="Official owner account">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 19h18v2H3v-2zm2.5-6.5L3 7l4.5 2L12 4l4.5 5L21 7l-2.5 5.5V17H5.5v-4.5z"/></svg>
             Owner
         </span>
@@ -3660,20 +3662,23 @@
         try {
             const owner = isOwnerAccount(currentUser);
             const admin = isUserAdmin(currentUser);
-            const verified = isUserVerified(currentUser);
+            // Actual verified flag on account (admins are always treated verified for perks)
+            const hasVerifiedFlag = !!(currentUser && (currentUser.verified || currentUser.admin)) || owner;
             const hbV = document.getElementById('header-verified-badge');
             const hbA = document.getElementById('header-admin-badge');
             const hbO = document.getElementById('header-owner-badge');
-            if (hbO) hbO.style.display = owner ? 'inline-flex' : 'none';
+            // NEVER show Owner next to Luba AI name in the top bar
+            if (hbO) hbO.style.display = 'none';
+            // Header: verified check for verified/admin (not owner clutter), admin pill for admins
             if (hbA) hbA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
-            if (hbV) hbV.style.display = (!owner && verified) ? 'inline-flex' : 'none';
+            if (hbV) hbV.style.display = (!owner && hasVerifiedFlag) ? 'inline-flex' : 'none';
             const sV = document.getElementById('settings-name-verified');
             const sA = document.getElementById('settings-admin-badge-inline');
             const sO = document.getElementById('settings-owner-badge-inline');
+            // Settings account row: Owner badge only for owner; Admin + Verified can both show
             if (sO) sO.style.display = owner ? 'inline-flex' : 'none';
             if (sA) sA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
-            // Show verified check only when verified but NOT admin (admin badge is the main one)
-            if (sV) sV.style.display = (!owner && verified) ? 'inline-flex' : 'none';
+            if (sV) sV.style.display = (!owner && hasVerifiedFlag) ? 'inline-flex' : 'none';
             const note = document.getElementById('settings-verified-note');
             if (note) {
                 if (owner) {
@@ -3681,8 +3686,8 @@
                     note.textContent = 'Owner · unlimited messages · full access';
                 } else if (admin) {
                     note.style.display = 'block';
-                    note.textContent = 'Admin · 1000 messages / 24h · trusted staff';
-                } else if (verified) {
+                    note.textContent = 'Admin · Verified · 1000 messages / 24h · trusted staff';
+                } else if (hasVerifiedFlag) {
                     note.style.display = 'block';
                     note.textContent = 'Verified · 500 messages / 24h · VIP';
                 } else {
@@ -11993,14 +11998,14 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
                 renderer.setSize(w, h, false);
-                renderer.setClearColor(0x0a0c10, 1);
+                renderer.setClearColor(0x0d1526, 1);
                 const scene = new THREE.Scene();
                 scene.fog = new THREE.Fog(0x0a0c10, 12, 55);
                 const camera = new THREE.PerspectiveCamera(55, w / Math.max(h, 1), 0.05, 200);
                 camera.position.set(6, 4, 8);
                 camera.lookAt(0, 0, 0);
                 // Infinite-style grid floor (like Blender/Unity empty scene)
-                const grid = new THREE.GridHelper(80, 80, 0x22d3ee, 0x1e293b);
+                const grid = new THREE.GridHelper(80, 80, 0x38bdf8, 0x334155);
                 grid.position.y = 0;
                 scene.add(grid);
                 const hemi = new THREE.HemisphereLight(0xb1e1ff, 0x1a1a22, 0.9);
@@ -13314,11 +13319,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             const F = window.__forge;
             if (!canvas || !F || !F.renderer || !F.camera) return;
             const parent = canvas.parentElement;
-            const w = parent.clientWidth || window.innerWidth;
-            const h = parent.clientHeight || Math.floor(window.innerHeight * 0.42);
+            let w = (parent && parent.clientWidth) || window.innerWidth || 360;
+            let h = (parent && parent.clientHeight) || 0;
+            if (h < 80) h = Math.floor(window.innerHeight * 0.42);
+            if (h < 80) h = 280;
+            if (w < 40) w = window.innerWidth || 360;
             F.camera.aspect = w / Math.max(h, 1);
             F.camera.updateProjectionMatrix();
             F.renderer.setSize(w, h, false);
+            if (F.renderer && F.scene && F.camera) F.renderer.render(F.scene, F.camera);
         } catch (_) {}
     }
 
@@ -13448,14 +13457,39 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const st = document.getElementById('forge-studio');
         if (!st) return;
         st.classList.remove('forge-control-on');
-        // keep fullscreen if user had it? exit both for clarity
         st.classList.remove('forge-fs');
         window.__forgeCtrl.active = false;
         window.__forgeCtrl.dragging = false;
         forgeSelectMesh(null);
         const xbtn = document.getElementById('forge-btn-vp-close');
         if (xbtn) xbtn.style.display = 'none';
-        setTimeout(forgeResizeViewport, 50);
+        setTimeout(function(){
+            try { forgeResizeViewport(); } catch(_){}
+            // If canvas died (0 size / black), rebuild viewport but keep objects
+            try {
+                const F = window.__forge;
+                const canvas = document.getElementById('forge-canvas');
+                const parent = canvas && canvas.parentElement;
+                const h = parent ? parent.clientHeight : 0;
+                if (!F || !F.renderer || h < 40) {
+                    const kept = (F && F._objects) ? F._objects.slice() : [];
+                    const keptMeshes = F && F._meshByName ? Object.assign({}, F._meshByName) : {};
+                    forgeInitViewport();
+                    // re-add meshes
+                    try {
+                        const F2 = window.__forge;
+                        if (F2 && F2.scene) {
+                            Object.keys(keptMeshes).forEach(function(n){
+                                try { F2.scene.add(keptMeshes[n]); } catch(_){}
+                            });
+                            F2._meshByName = keptMeshes;
+                            F2._objects = kept;
+                        }
+                    } catch(_){}
+                }
+            } catch(_){}
+        }, 60);
+        setTimeout(forgeResizeViewport, 200);
         forgeSetStatus('Control closed');
     }
 
