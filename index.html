@@ -12275,10 +12275,21 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             try {
                 const action = String(op.action || op.op || 'add').toLowerCase();
                 if (action === 'clear' || action === 'reset') {
-                    Object.keys(F._meshByName).forEach(function(n) {
-                        try { F.scene.remove(F._meshByName[n]); } catch(_){}
+                    // Keep user-uploaded GLB models — AI must not wipe their car/tree
+                    const keep = {};
+                    const keepObjs = [];
+                    Object.keys(F._meshByName || {}).forEach(function(n) {
+                        const mesh = F._meshByName[n];
+                        const meta = (F._objects || []).find(function(o){ return o && o.name === n; });
+                        if (mesh && (mesh.userData && mesh.userData.userGltf || meta && meta.userGltf)) {
+                            keep[n] = mesh;
+                            if (meta) keepObjs.push(meta);
+                        } else {
+                            try { F.scene.remove(mesh); } catch(_){}
+                        }
                     });
-                    F._meshByName = {}; F._objects = []; F._placeCount = 0;
+                    F._meshByName = keep;
+                    F._objects = keepObjs;
                     return;
                 }
                 if (action === 'remove' || action === 'delete') {
@@ -12555,8 +12566,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     root.name = name;
                     if (!F._meshByName) F._meshByName = {};
                     if (!F._objects) F._objects = [];
+                    try { root.userData = root.userData || {}; root.userData.userGltf = true; root.userData.sourceName = m.name || 'model'; } catch(_){}
                     F._meshByName[name] = root;
-                    F._objects.push({ name: name, kind: 'gltf', label: m.name || 'model' });
+                    F._objects.push({ name: name, kind: 'gltf', label: m.name || 'model', userGltf: true });
                     try {
                         box = new THREE.Box3().setFromObject(root);
                         const c = box.getCenter(new THREE.Vector3());
@@ -12722,14 +12734,26 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (input) input.value = '';
         forgeAppend('user', text);
 
-        // If a GLB is attached and not yet in the scene, place it once (user describes where/what in their text)
+        // Snapshot attached models, then clear composer chips (same as main Luba after send)
+        let attachedModels = [];
         try {
-            const pending = (window.__forgeMedia || []).filter(function(x){ return x && x.isModel && (x.dataUrl || x.url) && !x._placed; });
+            attachedModels = (window.__forgeMedia || []).filter(function(x){ return x && x.isModel && (x.dataUrl || x.url); });
+            // Keep data for placement, but remove chips from the input row
+            window.__forgeMedia = [];
+            window.__lubaLastModels = attachedModels.slice();
+            try { forgeRenderAttachRow(); } catch (_) {}
+        } catch (_) {}
+
+        // Place attached GLB now so user sees it while Luba thinks — protected from AI clear
+        try {
+            const pending = attachedModels.filter(function(x){ return x && !x._placed; });
             if (pending.length) {
+                window.__forgeMedia = pending.slice();
                 await forgePlaceAttachedModel(false, true);
-                forgeAppend('ai', 'Using your attached model in the scene. (' + (pending[0].name || 'model') + ')');
+                window.__forgeMedia = [];
             }
         } catch (_) {}
+
         forgeSetStatus('Building…');
         const sendBtn = document.getElementById('forge-send');
         if (sendBtn) sendBtn.disabled = true;
@@ -12746,9 +12770,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
             const system = 'You are Luba inside LUBA FORGE — a live 3D builder (like Blender + Unity mix).\n' +
                 'Current scene objects: ' + sceneSummary + '.\n' +
-                ((window.__forgeMedia||[]).some(function(m){return m&&m.isModel;}) ? ('User attached GLB: ' + ((window.__forgeMedia||[]).filter(function(m){return m&&m.isModel;}).map(function(m){return m.name;}).join(', ')) + ' — already placed in the viewport when they send a message. Respond about position/scale if they asked (next to house, bigger, etc.) using forge-scene move/scale ops.\n') : '') +
+                (attachedModels.length ? ('User uploaded GLB already in viewport: ' + attachedModels.map(function(m){return m.name||'model';}).join(', ') + '. NEVER clear the scene or replace it with primitives. Only move/scale if they asked.\n') : '') +
                 '\n' +
                 'RULES:\n' +
+                '0) If the user uploaded a .glb/.gltf it is ALREADY in the live viewport. NEVER clear/reset the whole scene. NEVER replace their model with a box/sphere/car primitive. Only move/scale/rotate their existing model with forge-scene ops targeting the last gltf object. Never output a "Place this model" button.\n' +
                 '1) For building/editing the 3D scene (houses, cars, trees, cubes, move, scale, recolor, delete, etc.) respond with a short sentence AND a ```forge-scene JSON fence.\n' +
                 'Format:\n```forge-scene\n{"ops":[{"action":"add","shape":"house","color":"blue","pos":[0,0,0],"scale":[1,1,1],"name":"house1"}]}\n```\n' +
                 'Actions: add, remove, move, scale, color, clear.\n' +
@@ -12764,8 +12789,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
             let msg = text;
             try {
-                if ((window.__forgeMedia && window.__forgeMedia.length) || (window.__lubaLastModels && window.__lubaLastModels.length)) {
-                    msg += '\n\n[User attached media/model available]';
+                if (attachedModels.length) {
+                    msg += '\n\n[User GLB already placed in live viewport: ' + attachedModels.map(function(m){return m.name||'model';}).join(', ') + '. Do not clear or replace it.]';
                 }
             } catch (_) {}
 
@@ -12850,23 +12875,35 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             if (ops && ops.length) {
                 const applied = forgeApplyOps(ops);
                 placedSomething = !!(applied && applied.ok);
-                const brief = reply.replace(/```[\s\S]*?```/g, '').trim().slice(0, 400);
+                // Strip fake "Place this model" buttons / junk from AI text
+                let brief = reply.replace(/```[\s\S]*?```/g, '').replace(/<button[\s\S]*?<\/button>/gi, '').trim().slice(0, 400);
+                brief = brief.replace(/Place this model/gi, '').trim();
                 forgeAppend('ai', (brief || 'Updated the scene.') + (applied.ok ? '' : ' (some ops had issues: ' + (applied.issues || []).join('; ') + ')'));
                 forgeSetStatus(applied.ok ? 'Scene updated' : 'Scene updated with warnings');
             }
-            // Client safety net: if user asked for car/house/tree and nothing landed, place it locally
+            // If AI wiped or never kept the user GLB, put it back
             try {
+                const F2 = window.__forge;
+                const stillHas = F2 && F2._objects && F2._objects.some(function(o){ return o && o.userGltf; });
+                if (!stillHas && attachedModels && attachedModels.length) {
+                    window.__forgeMedia = attachedModels.map(function(m){ return Object.assign({}, m, { _placed: false }); });
+                    await forgePlaceAttachedModel(false, true);
+                    window.__forgeMedia = [];
+                    forgeSetStatus('Scene updated · your model restored');
+                }
+            } catch (_) {}
+            // Client safety net: only for empty scenes with NO user GLB (don't replace their car with a toy box)
+            try {
+                const hasUserGltf = (window.__forge && window.__forge._objects || []).some(function(o){ return o && o.userGltf; }) || (attachedModels && attachedModels.length);
                 const intent = forgeGuessIntent(text);
                 const objCount = (window.__forge && window.__forge._objects && window.__forge._objects.length) || 0;
-                if (intent && (!ops || !ops.length || !placedSomething || objCount === 0)) {
+                if (!hasUserGltf && intent && (!ops || !ops.length || !placedSomething || objCount === 0)) {
                     const localOps = forgeLocalOpsForIntent(intent, text);
                     if (localOps && localOps.length) {
                         const applied2 = forgeApplyOps(localOps);
                         if (applied2 && applied2.ok) {
                             if (!(ops && ops.length)) {
                                 forgeAppend('ai', 'Placed a ' + intent + ' in the scene.');
-                            } else {
-                                forgeAppend('ai', '(Also ensured a ' + intent + ' is on the floor.)');
                             }
                             forgeSetStatus('Scene updated');
                             placedSomething = true;
