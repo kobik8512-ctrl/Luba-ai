@@ -319,8 +319,14 @@
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 300;
+            z-index: 99999;
             padding: 20px;
+        }
+        .lightbox-overlay .lb-loading {
+            position: absolute;
+            color: rgba(255,255,255,.7);
+            font-size: 14px;
+            pointer-events: none;
         }
 
         .lightbox-overlay.active {
@@ -7167,8 +7173,14 @@ When someone says hi / hey / hello:
 Use emojis when they fit (not every message, but don't be emoji-dead either).
 Keep answers clear and natural. Short dry one-liners are fine sometimes, but overall you should feel alive, kind, and interested.
 
-When analyzing images, be specific and honest. For math use LaTeX $...$ / $$...$$.
-You also have a generate_image tool for drawing requests — use it when they ask for a picture.`;
+When analyzing images, be specific and honest — actually look at what is in the photo (objects, people, place, colors, text). Never pretend you cannot see an attached image.
+If the user sends a photo and asks to change it (add a dog, remove something, change background, etc.):
+1) Briefly acknowledge what you see in their photo.
+2) Call generate_image with a FULL photorealistic prompt that recreates their scene PLUS the change.
+3) Do not refuse or only describe without generating.
+
+For math use LaTeX $...$ / $$...$$.
+You also have a generate_image tool — use it for any draw/generate/edit-photo request. Prefer realistic photo style unless they ask for art.`;
 
     const STUDY_MODE_INSTRUCTIONS = `STUDY MODE IS CURRENTLY ON. The user turned on a tutoring mode, and it changes how you answer any homework-style or "figure this out" question (math, science, coding, language, history, anything learnable) until they turn it off:
 - Do not just hand over a short final answer with no explanation.
@@ -8524,12 +8536,16 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             const rankClass = row.rank === 1 ? ' gold' : row.rank === 2 ? ' silver' : row.rank === 3 ? ' bronze' : '';
             const av = row.avatarDataUrl || defaultLbAvatar(row.username);
             let badge = '';
-            if (row.owner || String(row.username || '').toLowerCase() === 'kobi') {
+            const isOwn = !!(row.owner || String(row.username || '').toLowerCase() === 'kobi');
+            const isAdm = !!row.admin;
+            // Owner always counts as verified; admin too; plus server verified flag
+            const isVer = !!(row.verified || isOwn || isAdm);
+            if (isOwn) {
                 badge += ' <span class="owner-crown-badge leaderboard-owner" title="Owner">👑 Owner</span>';
-            } else if (row.admin) {
+            } else if (isAdm) {
                 badge += ' <span class="admin-badge leaderboard-admin" title="Admin">' + ADMIN_BADGE_SVG + ' Admin</span>';
             }
-            if (row.verified && !(row.owner || String(row.username || '').toLowerCase() === 'kobi')) {
+            if (isVer) {
                 badge += ' <span class="verified-badge" title="Verified">' + VERIFIED_BADGE_SVG + '</span>';
             }
             const score = leaderboardKind === 'time'
@@ -8787,17 +8803,41 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
     function openLightbox(src) {
         if (!src) return;
+        try {
+            var loadEl = lightboxOverlay.querySelector('.lb-loading');
+            if (!loadEl) {
+                loadEl = document.createElement('div');
+                loadEl.className = 'lb-loading';
+                loadEl.textContent = 'Loading…';
+                lightboxOverlay.appendChild(loadEl);
+            }
+            loadEl.style.display = 'block';
+            lightboxImg.onload = function() { try { loadEl.style.display = 'none'; } catch(_){} };
+            lightboxImg.onerror = function() {
+                try { loadEl.textContent = 'Could not open this image'; } catch(_){}
+            };
+        } catch (_) {}
+        lightboxImg.removeAttribute('src');
         lightboxImg.src = src;
         lightboxOverlay.classList.add('active');
     }
     async function openLightboxFromEl(img) {
         if (!img) return;
-        var src = img.getAttribute('src') || '';
-        if ((src.indexOf('data:') === 0 && src.length > 40) || src.indexOf('blob:') === 0) {
+        var src = img.currentSrc || img.getAttribute('src') || '';
+        // Live data/blob — open immediately
+        if ((src.indexOf('data:') === 0 && src.length > 40) || src.indexOf('blob:') === 0 || src.indexOf('http') === 0) {
             openLightbox(src);
             return;
         }
         var id = img.getAttribute('data-media-id');
+        if (!id) {
+            try {
+                var wrap = img.closest('[data-media-id], .user-media-wrap, .msg');
+                if (wrap) {
+                    id = wrap.getAttribute('data-media-id') || (wrap.querySelector('[data-media-id]') && wrap.querySelector('[data-media-id]').getAttribute('data-media-id'));
+                }
+            } catch (_) {}
+        }
         if (id) {
             try {
                 var data = await idbGetMedia(id);
@@ -8809,11 +8849,18 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 }
             } catch (_) {}
         }
-        if (src) openLightbox(src);
+        if (src && src !== 'null' && src !== 'undefined') openLightbox(src);
+        else {
+            try { alert('Image is still loading or was not saved. Send it again.'); } catch (_) {}
+        }
     }
     function closeLightbox() {
         lightboxOverlay.classList.remove('active');
         lightboxImg.src = '';
+        try {
+            var loadEl = lightboxOverlay.querySelector('.lb-loading');
+            if (loadEl) loadEl.style.display = 'none';
+        } catch (_) {}
     }
     lightboxClose.onclick = closeLightbox;
     lightboxOverlay.onclick = (e) => { if (e.target === lightboxOverlay) closeLightbox(); };
@@ -9292,6 +9339,41 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }).catch(function(){ return null; });
     }
 
+    
+    function normalizeImageToJpegDataUrl(file) {
+        return new Promise(function(resolve) {
+            try {
+                var url = URL.createObjectURL(file);
+                var im = new Image();
+                im.onload = function() {
+                    try {
+                        var maxSide = 1600;
+                        var w = im.naturalWidth || im.width || 1;
+                        var h = im.naturalHeight || im.height || 1;
+                        var scale = Math.min(1, maxSide / Math.max(w, h));
+                        var cw = Math.max(1, Math.round(w * scale));
+                        var ch = Math.max(1, Math.round(h * scale));
+                        var c = document.createElement('canvas');
+                        c.width = cw; c.height = ch;
+                        var ctx = c.getContext('2d');
+                        ctx.drawImage(im, 0, 0, cw, ch);
+                        var out = c.toDataURL('image/jpeg', 0.88);
+                        try { URL.revokeObjectURL(url); } catch (_) {}
+                        resolve(out);
+                    } catch (e) {
+                        try { URL.revokeObjectURL(url); } catch (_) {}
+                        resolve(null);
+                    }
+                };
+                im.onerror = function() {
+                    try { URL.revokeObjectURL(url); } catch (_) {}
+                    resolve(null);
+                };
+                im.src = url;
+            } catch (_) { resolve(null); }
+        });
+    }
+
     async function handleImageInputChange(e) {
         const inputEl = e && e.target ? e.target : imageInputEl;
         const files = inputEl && inputEl.files ? Array.prototype.slice.call(inputEl.files) : [];
@@ -9357,12 +9439,20 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     try { rememberLastModelsFromSelected(); } catch (_) {}
                 } else {
                     var dataUrl = await readFileAsDataUrl(file);
-                    selectedMediaItems.push({
+                    if (isImage && !isVideo) {
+                    try {
+                        var norm = await normalizeImageToJpegDataUrl(file);
+                        if (norm && norm.length > 40) {
+                            dataUrl = norm;
+                        }
+                    } catch (_) {}
+                }
+                selectedMediaItems.push({
                         dataUrl: dataUrl,
                         isVideo: !!isVideo,
                         isModel: false,
                         name: file.name || 'file',
-                        mime: file.type || ''
+                        mime: isImage && !isVideo ? 'image/jpeg' : (file.type || '')
                     });
                 }
                 added++;
@@ -10547,13 +10637,13 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             },
             {
                 name: "generate_image",
-                description: "Generates an image from a text description and shows it to the user. Use this whenever the user asks to draw, generate, create, make, or see a picture/image/photo/artwork of something.",
+                description: "Generates a photorealistic image from a detailed text description and shows it to the user. ALWAYS use this when the user asks to draw, generate, create, make, edit, add something into, or see a picture/image/photo. If the user sent a photo and asks to change it (e.g. 'add a dog here', 'put a car in the background'), carefully describe the ORIGINAL photo scene from what you see, then describe the edited result in full detail in the prompt so the new image matches.",
                 parameters: {
                     type: "OBJECT",
                     properties: {
                         prompt: {
                             type: "STRING",
-                            description: "A clear, detailed English description of the image to generate, e.g. 'a golden retriever puppy running on a beach at sunset, photorealistic'."
+                            description: "Detailed English scene description. Prefer photorealistic camera-style wording (lens, lighting, environment). For photo-edits: describe the full resulting image including everything visible in their photo PLUS the requested change, e.g. 'the same living room from the user photo, brown sofa, window light, now with a golden retriever sitting on the floor, photorealistic'."
                         }
                     },
                     required: ["prompt"]
@@ -10631,8 +10721,17 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     }
 
     function buildImageUrl(prompt) {
+        let p = String(prompt || 'a photo').trim();
+        // Nudge generator toward realistic photos unless user asked for art/cartoon
+        if (!/cartoon|anime|illustration|drawing|sketch|pixel|3d render|oil paint|watercolor/i.test(p)) {
+            if (!/photorealistic|realistic|photograph|dslr|35mm/i.test(p)) {
+                p += ', photorealistic, natural lighting, sharp focus, realistic photo';
+            }
+        }
         const seed = Math.floor(Math.random() * 1000000);
-        return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
+        // flux = stronger realism on pollinations
+        return 'https://image.pollinations.ai/prompt/' + encodeURIComponent(p) +
+            '?width=1024&height=1024&nologo=true&model=flux&enhance=true&seed=' + seed;
     }
 
     function buildGeneratedImageHTML(url) {
