@@ -2452,9 +2452,10 @@
             .forge-body { flex-direction: row; }
         }
         .forge-viewport-wrap {
-            flex: 1.2; min-height: 42vh; height: 42vh; position: relative;
-            background: #0b1220;
+            flex: 1.2 1 42vh; min-height: 280px; height: 42vh; position: relative;
+            background: #101a2e;
             border-bottom: 1px solid rgba(255,255,255,.06);
+            overflow: hidden;
         }
         @media (min-width: 900px) {
             .forge-viewport-wrap {
@@ -2464,8 +2465,9 @@
             }
         }
         #forge-canvas {
-            width: 100%; height: 100%; display: block;
+            width: 100%; height: 100%; min-height: 280px; display: block;
             touch-action: none;
+            background: #101a2e;
         }
         .forge-viewport-label {
             position: absolute; left: 12px; top: 12px;
@@ -3662,28 +3664,28 @@
         try {
             const owner = isOwnerAccount(currentUser);
             const admin = isUserAdmin(currentUser);
-            // Actual verified flag on account (admins are always treated verified for perks)
-            const hasVerifiedFlag = !!(currentUser && (currentUser.verified || currentUser.admin)) || owner;
+            // Owner + admin + verified flag all count as verified for the blue check
+            const hasVerifiedFlag = owner || admin || !!(currentUser && currentUser.verified);
             const hbV = document.getElementById('header-verified-badge');
             const hbA = document.getElementById('header-admin-badge');
             const hbO = document.getElementById('header-owner-badge');
-            // NEVER show Owner next to Luba AI name in the top bar
+            // NEVER show Owner pill next to "Luba AI" title
             if (hbO) hbO.style.display = 'none';
-            // Header: verified check for verified/admin (not owner clutter), admin pill for admins
+            // Header next to Luba AI: blue verified check when verified; red admin when admin (not owner)
+            if (hbV) hbV.style.display = hasVerifiedFlag ? 'inline-flex' : 'none';
             if (hbA) hbA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
-            if (hbV) hbV.style.display = (!owner && hasVerifiedFlag) ? 'inline-flex' : 'none';
             const sV = document.getElementById('settings-name-verified');
             const sA = document.getElementById('settings-admin-badge-inline');
             const sO = document.getElementById('settings-owner-badge-inline');
-            // Settings account row: Owner badge only for owner; Admin + Verified can both show
+            // Settings: Verified check for anyone verified (including owner); Owner/Admin pills as roles
+            if (sV) sV.style.display = hasVerifiedFlag ? 'inline-flex' : 'none';
             if (sO) sO.style.display = owner ? 'inline-flex' : 'none';
             if (sA) sA.style.display = (!owner && admin) ? 'inline-flex' : 'none';
-            if (sV) sV.style.display = (!owner && hasVerifiedFlag) ? 'inline-flex' : 'none';
             const note = document.getElementById('settings-verified-note');
             if (note) {
                 if (owner) {
                     note.style.display = 'block';
-                    note.textContent = 'Owner · unlimited messages · full access';
+                    note.textContent = 'Owner · Verified · unlimited messages · full access';
                 } else if (admin) {
                     note.style.display = 'block';
                     note.textContent = 'Admin · Verified · 1000 messages / 24h · trusted staff';
@@ -11993,19 +11995,33 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     try { F.renderer.dispose(); } catch (_) {}
                 }
                 const parent = canvas.parentElement;
-                const w = parent.clientWidth || window.innerWidth;
-                const h = parent.clientHeight || Math.floor(window.innerHeight * 0.42);
-                const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+                let w = (parent && parent.clientWidth) || window.innerWidth || 360;
+                let h = (parent && parent.clientHeight) || 0;
+                if (h < 120) h = Math.floor((window.innerHeight || 640) * 0.42);
+                if (h < 120) h = 280;
+                if (w < 80) w = window.innerWidth || 360;
+                // Explicit canvas buffer size (WebView often reports 0 for CSS height)
+                try { canvas.width = w; canvas.height = h; canvas.style.width = '100%'; canvas.style.height = h + 'px'; } catch(_){}
+                if (parent) { try { parent.style.minHeight = h + 'px'; } catch(_){} }
+                let renderer;
+                try {
+                    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false, powerPreference: 'default' });
+                } catch (glErr) {
+                    forgeSetStatus('WebGL failed on this device');
+                    console.warn(glErr);
+                    return;
+                }
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
                 renderer.setSize(w, h, false);
-                renderer.setClearColor(0x0d1526, 1);
+                renderer.setClearColor(0x101a2e, 1);
                 const scene = new THREE.Scene();
                 scene.fog = new THREE.Fog(0x0a0c10, 12, 55);
                 const camera = new THREE.PerspectiveCamera(55, w / Math.max(h, 1), 0.05, 200);
                 camera.position.set(6, 4, 8);
                 camera.lookAt(0, 0, 0);
                 // Infinite-style grid floor (like Blender/Unity empty scene)
-                const grid = new THREE.GridHelper(80, 80, 0x38bdf8, 0x334155);
+                const grid = new THREE.GridHelper(60, 60, 0x67e8f9, 0x475569);
+                grid.position.y = 0.01;
                 grid.position.y = 0;
                 scene.add(grid);
                 const hemi = new THREE.HemisphereLight(0xb1e1ff, 0x1a1a22, 0.9);
@@ -12151,7 +12167,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     if (F.renderer && F.scene && F.camera) F.renderer.render(F.scene, F.camera);
                 }
                 loop();
+                try { renderer.render(scene, camera); } catch(_){}
                 forgeSetStatus('Empty scene · infinite floor · ready');
+                setTimeout(function(){ try { forgeResizeViewport(); } catch(_){} }, 100);
+                setTimeout(function(){ try { forgeResizeViewport(); } catch(_){} }, 400);
             } catch (e) {
                 console.warn('forge viewport', e);
                 forgeSetStatus('Viewport failed — still can chat builds');
@@ -12202,7 +12221,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             chat.dataset.welcomed = '1';
             forgeAppend('ai', 'Forge online. Empty infinite floor.\n\nTell me what to build or change in the scene — I will build it here.');
         }
-        forgeInitViewport();
+        try { forgeInitViewport(); } catch (e) { console.warn(e); forgeSetStatus('3D engine error'); }
+        setTimeout(function(){ try { forgeInitViewport(); forgeResizeViewport(); } catch(_){} }, 200);
         try { forgeWireControlUI(); } catch (_) {}
         try { document.getElementById('forge-input').focus(); } catch (_) {}
     }
