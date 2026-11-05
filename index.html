@@ -6613,8 +6613,6 @@ async function spendCoin(username, cost) {
                 const remote = await cloudCheckBan(user.username);
                 if (remote && remote._ipBan) {
                     currentUser = user;
-        try { updateRoleBadges(); } catch(_){}
-        //
                     setCurrentUsername(user.username);
                     showBanScreen(remote, { kind: 'ip' });
                     return;
@@ -6910,8 +6908,11 @@ async function spendCoin(username, cost) {
         try {
             const ok = await tryAutoLogin();
             if (ok) return;
-        } catch (_) {}
-        renderDeviceAccounts();
+        } catch (e) {
+            console.warn('auto-login failed', e);
+            try { document.body.classList.remove('logged-in'); } catch (_) {}
+        }
+        try { renderDeviceAccounts(); } catch (_) {}
         // One retry for flaky webviews
         setTimeout(async () => {
             if (document.body.classList.contains('logged-in')) return;
@@ -6919,7 +6920,8 @@ async function spendCoin(username, cost) {
                 const ok = await tryAutoLogin();
                 if (!ok) renderDeviceAccounts();
             } catch (_) {
-                renderDeviceAccounts();
+                try { document.body.classList.remove('logged-in'); } catch (_) {}
+                try { renderDeviceAccounts(); } catch (_) {}
             }
         }, 80);
     })();
@@ -7717,15 +7719,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         c = c.replace(/^```(?:html|HTML)?\s*/i, '').replace(/```\s*$/i, '').trim();
         if (!c) return '';
         if (!/<!DOCTYPE/i.test(c) && !/<html/i.test(c)) {
-            c = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + c + '<div id="luba-file-viewer" aria-hidden="true">
-  <div class="fv-bar">
-    <div class="fv-title" id="luba-fv-title">File</div>
-    <button type="button" class="fv-close" id="luba-fv-close" title="Close">×</button>
-  </div>
-  <pre id="luba-fv-pre" style="display:none"></pre>
-  <iframe id="luba-fv-frame" style="display:none" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; autoplay; fullscreen"></iframe>
-</div>
-</body></html>';
+            c = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + c + '</body></html>';
         }
         if (!/<body/i.test(c)) {
             c = c.replace(/<\/head>/i, '</head><body>') + '</body>';
@@ -8129,15 +8123,14 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             } else {
                 // File card: Download · Copy · Open (in app)
                 html += buildFileCard(code, lang);
-                // Keep a short collapsible preview under it for context
                 const codeId = storeCodeBlock(code);
-                html += `<div class="code-block-wrap">
-                    <div class="code-preview-bar">
-                        <span>${escapeHtmlText(lang || 'code')} preview</span>
-                        <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy</button>
-                    </div>
-                    <pre class="code-block"><code>${escapeHtmlText(code.length > 4000 ? (code.slice(0, 4000) + '\n\n/* … truncated in preview — use Download / Open for full file */') : code)}</code></pre>
-                </div>`;
+                const previewCode = code.length > 4000
+                    ? (code.slice(0, 4000) + "\n\n/* truncated — use Download or Open for full file */")
+                    : code;
+                html += '<div class="code-block-wrap">' +
+                    '<div class="code-preview-bar"><span>' + escapeHtmlText(lang || 'code') + ' preview</span>' +
+                    '<button type="button" class="small-btn" data-code-id="' + codeId + '" onclick="copyLubaCode(this)">Copy</button></div>' +
+                    '<pre class="code-block"><code>' + escapeHtmlText(previewCode) + '</code></pre></div>';
             }
             hasCode = true;
             last = f.end;
@@ -14708,6 +14701,16 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
       </div>
     </div>
   </div>
+</div>
+
+
+<div id="luba-file-viewer" aria-hidden="true">
+  <div class="fv-bar">
+    <div class="fv-title" id="luba-fv-title">File</div>
+    <button type="button" class="fv-close" id="luba-fv-close" title="Close">×</button>
+  </div>
+  <pre id="luba-fv-pre" style="display:none"></pre>
+  <iframe id="luba-fv-frame" style="display:none" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; autoplay; fullscreen"></iframe>
 </div>
 
 </body>
