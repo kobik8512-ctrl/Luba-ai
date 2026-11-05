@@ -1562,6 +1562,116 @@
             display: block;
             background: #111;
         }
+        
+        /* Luba sendable file cards */
+        .luba-file-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 0;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            max-width: 100%;
+        }
+        body.light .luba-file-card {
+            background: rgba(0,0,0,0.04);
+            border-color: rgba(0,0,0,0.1);
+        }
+        .luba-file-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #334155, #1e293b);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        .luba-file-meta { flex: 1; min-width: 0; }
+        .luba-file-name {
+            font-weight: 800;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .luba-file-sub {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 2px;
+        }
+        .luba-file-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .luba-file-actions button {
+            border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.06);
+            color: inherit;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .luba-file-actions button.primary {
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            border-color: transparent;
+            color: #fff;
+        }
+        .luba-file-actions button:active { transform: scale(0.97); }
+        #luba-file-viewer {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            background: rgba(0,0,0,0.92);
+            flex-direction: column;
+        }
+        #luba-file-viewer.open { display: flex; }
+        #luba-file-viewer .fv-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            gap: 10px;
+        }
+        #luba-file-viewer .fv-title {
+            font-weight: 800;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        #luba-file-viewer .fv-close {
+            border: none;
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        #luba-file-viewer pre {
+            flex: 1;
+            margin: 0;
+            padding: 14px;
+            overflow: auto;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        #luba-file-viewer iframe {
+            flex: 1;
+            border: none;
+            width: 100%;
+            background: #0f1115;
+        }
+
         .code-block-wrap {
             margin-top: 10px;
             border: 1px solid var(--border);
@@ -7106,7 +7216,7 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - Daily message limits (coins): normal users get 50 messages per 24 hours; verified users get 500. Owner has unlimited. When out of messages, users can buy more via Ledger Life (https://ledger-life-ashen.vercel.app) using in-app money — not real money.
 - Modes users can turn on: Normal, Study, HTML (interactive apps/games in preview), Code, Creative, Lawyer, and others shown in the Modes menu.
 - LUBA FORGE (your twin): You have a companion studio called Luba Forge — a separate 3D builder workspace (empty infinite floor, live scene, Play builds). It lives under Modes as "LUBA FORGE" (BETA). You and Forge are two sides of the same product: you chat and write HTML/code here; Forge places live 3D scenes and full playable builds. Main Luba chat is free for everyone. Luba Forge is the premium-tier feature — other apps charge money for that level; here it is unlocked free for verified members (and the owner) instead of paid. If someone asks about Forge, explain: Modes → LUBA FORGE, verified perk (not a payment), twin of main Luba for 3D / scene building.
-- You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview (with Fullscreen), help with code, math (use the calculator tool), law explanations in Lawyer mode, tutoring in Study mode, and point users to Luba Forge for live 3D building when that fits.
+- You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview, send back downloadable files (user gets Download / Copy / Open in app when you return code), help with code, math (use the calculator tool), law explanations in Lawyer mode, tutoring in Study mode, and point users to Luba Forge for live 3D building when that fits.
 - Slash commands: users type / for a menu. Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
 - TikTok: yours is @luba_ai ; Kobi's is @itzrealkobl
@@ -7607,7 +7717,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         c = c.replace(/^```(?:html|HTML)?\s*/i, '').replace(/```\s*$/i, '').trim();
         if (!c) return '';
         if (!/<!DOCTYPE/i.test(c) && !/<html/i.test(c)) {
-            c = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + c + '</body></html>';
+            c = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + c + '<div id="luba-file-viewer" aria-hidden="true">
+  <div class="fv-bar">
+    <div class="fv-title" id="luba-fv-title">File</div>
+    <button type="button" class="fv-close" id="luba-fv-close" title="Close">×</button>
+  </div>
+  <pre id="luba-fv-pre" style="display:none"></pre>
+  <iframe id="luba-fv-frame" style="display:none" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; autoplay; fullscreen"></iframe>
+</div>
+</body></html>';
         }
         if (!/<body/i.test(c)) {
             c = c.replace(/<\/head>/i, '</head><body>') + '</body>';
@@ -7703,6 +7821,147 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
     };
 
+
+    function guessFileName(lang, code) {
+        try {
+            const m = String(code || '').match(/<!--\s*BUILD_TITLE:\s*([^\n>]+?)\s*-->/i);
+            if (m) {
+                const base = m[1].trim().replace(/[^\w\s\-\.]+/g, '').replace(/\s+/g, '-').slice(0, 40);
+                if (base) return base + '.html';
+            }
+        } catch (_) {}
+        const l = String(lang || '').toLowerCase();
+        const map = {
+            html: 'index.html', htm: 'index.html', javascript: 'script.js', js: 'script.js',
+            typescript: 'script.ts', ts: 'script.ts', css: 'styles.css',
+            python: 'script.py', py: 'script.py', lua: 'script.lua',
+            json: 'data.json', txt: 'notes.txt', markdown: 'readme.md', md: 'readme.md',
+            c: 'main.c', cpp: 'main.cpp', java: 'Main.java', go: 'main.go', rs: 'main.rs'
+        };
+        if (map[l]) return map[l];
+        if (looksLikeHtmlDocument(code, l)) return 'game.html';
+        return (l || 'file') + '.txt';
+    }
+
+    function fileIconFor(lang, name) {
+        const n = String(name || '').toLowerCase();
+        const l = String(lang || '').toLowerCase();
+        if (n.endsWith('.html') || l === 'html' || l === 'htm') return '🌐';
+        if (n.endsWith('.js') || l === 'js' || l === 'javascript') return '📜';
+        if (n.endsWith('.py') || l === 'python' || l === 'py') return '🐍';
+        if (n.endsWith('.lua') || l === 'lua') return '🌙';
+        if (n.endsWith('.css') || l === 'css') return '🎨';
+        if (n.endsWith('.json') || l === 'json') return '📦';
+        return '📄';
+    }
+
+    function formatBytes(n) {
+        n = Number(n) || 0;
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function buildFileCard(code, lang, explicitName) {
+        const codeId = storeCodeBlock(code);
+        const name = explicitName || guessFileName(lang, code);
+        const icon = fileIconFor(lang, name);
+        const sub = (lang || 'file').toUpperCase() + ' · ' + formatBytes(String(code || '').length);
+        const isHtml = looksLikeHtmlDocument(code, lang) || /\.html?$/i.test(name) || lang === 'html' || lang === 'htm';
+        return (
+            '<div class="luba-file-card" data-code-id="' + codeId + '" data-file-name="' + escapeHtmlText(name) + '" data-is-html="' + (isHtml ? '1' : '0') + '">' +
+              '<div class="luba-file-icon">' + icon + '</div>' +
+              '<div class="luba-file-meta">' +
+                '<div class="luba-file-name">' + escapeHtmlText(name) + '</div>' +
+                '<div class="luba-file-sub">' + escapeHtmlText(sub) + '</div>' +
+              '</div>' +
+              '<div class="luba-file-actions">' +
+                '<button type="button" data-code-id="' + codeId + '" onclick="copyLubaCode(this)">Copy</button>' +
+                '<button type="button" data-code-id="' + codeId + '" data-file-name="' + escapeHtmlText(name) + '" onclick="downloadLubaFile(this)">Download</button>' +
+                '<button type="button" class="primary" data-code-id="' + codeId + '" data-file-name="' + escapeHtmlText(name) + '" data-is-html="' + (isHtml ? '1' : '0') + '" onclick="openLubaFile(this)">Open</button>' +
+              '</div>' +
+            '</div>'
+        );
+    }
+
+    window.downloadLubaFile = function (btn) {
+        try {
+            const id = btn.getAttribute('data-code-id');
+            const name = btn.getAttribute('data-file-name') || 'luba-file.txt';
+            const code = (window.__lubaCodeStore && window.__lubaCodeStore[id]) || '';
+            if (!code) { alert('File not found'); return; }
+            const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () {
+                try { URL.revokeObjectURL(url); } catch (_) {}
+                try { a.remove(); } catch (_) {}
+            }, 800);
+            const old = btn.textContent;
+            btn.textContent = 'Saved';
+            setTimeout(function () { btn.textContent = old; }, 1200);
+        } catch (e) {
+            console.warn(e);
+            alert('Download failed on this device');
+        }
+    };
+
+    window.openLubaFile = function (btn) {
+        try {
+            const id = btn.getAttribute('data-code-id');
+            const name = btn.getAttribute('data-file-name') || 'File';
+            const isHtml = btn.getAttribute('data-is-html') === '1';
+            const code = (window.__lubaCodeStore && window.__lubaCodeStore[id]) || '';
+            if (!code) { alert('File not found'); return; }
+            const viewer = document.getElementById('luba-file-viewer');
+            const title = document.getElementById('luba-fv-title');
+            const pre = document.getElementById('luba-fv-pre');
+            const frame = document.getElementById('luba-fv-frame');
+            if (!viewer) return;
+            if (title) title.textContent = name;
+            if (isHtml) {
+                if (pre) pre.style.display = 'none';
+                if (frame) {
+                    frame.style.display = 'block';
+                    try {
+                        frame.srcdoc = code;
+                    } catch (_) {
+                        frame.src = 'about:blank';
+                    }
+                }
+            } else {
+                if (frame) { frame.style.display = 'none'; frame.srcdoc = ''; }
+                if (pre) {
+                    pre.style.display = 'block';
+                    pre.textContent = code;
+                }
+            }
+            viewer.classList.add('open');
+            viewer.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+        } catch (e) {
+            console.warn(e);
+        }
+    };
+
+    window.closeLubaFileViewer = function () {
+        const viewer = document.getElementById('luba-file-viewer');
+        const frame = document.getElementById('luba-fv-frame');
+        const pre = document.getElementById('luba-fv-pre');
+        if (viewer) {
+            viewer.classList.remove('open');
+            viewer.setAttribute('aria-hidden', 'true');
+        }
+        if (frame) { try { frame.srcdoc = ''; } catch (_) {} frame.style.display = 'none'; }
+        if (pre) { pre.textContent = ''; pre.style.display = 'none'; }
+        document.body.style.overflow = '';
+    };
+
+
     function buildPreviewBlock(code) {
         // Prevent pitch-black empty previews: ensure body has a visible background
         try {
@@ -7735,13 +7994,16 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const lightSource = code.length > 150000
             ? escapeHtmlText('// Large preview (3D model embedded). Use Copy code / stored preview id: ' + codeId)
             : escapeHtmlText(code);
-        return `<div class="code-preview-wrap">
+        const fileName = guessFileName('html', code);
+        const fileCard = buildFileCard(code, 'html', fileName);
+        return fileCard + `<div class="code-preview-wrap">
                     <div class="code-preview-bar">
                         <span>Interactive preview</span>
                         <div class="code-preview-actions">
                             <button type="button" class="small-btn" onclick="toggleCodeSource(this)">Show code</button>
-                            <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy code</button>
-                            <button type="button" class="small-btn" onclick="openPreviewFullscreen(this)">Fullscreen</button>
+                            <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy</button>
+                            <button type="button" class="small-btn" data-code-id="${codeId}" data-file-name="${escapeHtmlText(fileName)}" onclick="downloadLubaFile(this)">Download</button>
+                            <button type="button" class="small-btn" onclick="openPreviewFullscreen(this)">Open</button>
                         </div>
                     </div>
                     <iframe class="code-preview-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; accelerometer *; gyroscope *; magnetometer *; autoplay; fullscreen; clipboard-read; clipboard-write" allowusermedia data-code-id="${codeId}" ${srcAttr} src="about:blank"></iframe>
@@ -7865,13 +8127,16 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             } else if (looksLikeHtmlDocument(code, lang)) {
                 html += buildPreviewBlock(code);
             } else {
+                // File card: Download · Copy · Open (in app)
+                html += buildFileCard(code, lang);
+                // Keep a short collapsible preview under it for context
                 const codeId = storeCodeBlock(code);
                 html += `<div class="code-block-wrap">
                     <div class="code-preview-bar">
-                        <span>${escapeHtmlText(lang || 'code')}</span>
-                        <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy code</button>
+                        <span>${escapeHtmlText(lang || 'code')} preview</span>
+                        <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy</button>
                     </div>
-                    <pre class="code-block"><code>${escapeHtmlText(code)}</code></pre>
+                    <pre class="code-block"><code>${escapeHtmlText(code.length > 4000 ? (code.slice(0, 4000) + '\n\n/* … truncated in preview — use Download / Open for full file */') : code)}</code></pre>
                 </div>`;
             }
             hasCode = true;
@@ -8024,6 +8289,21 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (fsFrame) fsFrame.srcdoc = '';
         document.body.style.overflow = '';
     };
+
+
+    (function wireFileViewer() {
+        const closeBtn = document.getElementById('luba-fv-close');
+        if (closeBtn && !closeBtn.dataset.wired) {
+            closeBtn.dataset.wired = '1';
+            closeBtn.onclick = function () { window.closeLubaFileViewer && window.closeLubaFileViewer(); };
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                const v = document.getElementById('luba-file-viewer');
+                if (v && v.classList.contains('open')) window.closeLubaFileViewer && window.closeLubaFileViewer();
+            }
+        });
+    })();
 
     window.copyLubaCode = function (btn) {
         const id = btn.getAttribute('data-code-id');
