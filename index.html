@@ -7877,10 +7877,12 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const isHtml = looksLikeHtmlDocument(code, lang) || /\.html?$/i.test(name) || lang === 'html' || lang === 'htm';
         return (
             '<div class="luba-file-card" data-code-id="' + codeId + '" data-file-name="' + escapeHtmlText(name) + '" data-is-html="' + (isHtml ? '1' : '0') + '">' +
-              '<div class="luba-file-icon">' + icon + '</div>' +
-              '<div class="luba-file-meta">' +
-                '<div class="luba-file-name">' + escapeHtmlText(name) + '</div>' +
-                '<div class="luba-file-sub">' + escapeHtmlText(sub) + '</div>' +
+              '<div class="luba-file-card-top">' +
+                '<div class="luba-file-icon">' + icon + '</div>' +
+                '<div class="luba-file-meta">' +
+                  '<div class="luba-file-name">' + escapeHtmlText(name) + '</div>' +
+                  '<div class="luba-file-sub">' + escapeHtmlText(sub) + '</div>' +
+                '</div>' +
               '</div>' +
               '<div class="luba-file-actions">' +
                 '<button type="button" data-code-id="' + codeId + '" onclick="copyLubaCode(this)">Copy</button>' +
