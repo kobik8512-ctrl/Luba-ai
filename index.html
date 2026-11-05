@@ -7869,7 +7869,6 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 html += `<div class="code-block-wrap">
                     <div class="code-preview-bar">
                         <span>${escapeHtmlText(lang || 'code')}</span>
-                        <span class="preview-load-hint" style="font-size:10px;opacity:.65;max-width:42%;line-height:1.25;font-weight:500;">If it stays loading, tell Luba it doesn\'t load</span>
                         <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy code</button>
                     </div>
                     <pre class="code-block"><code>${escapeHtmlText(code)}</code></pre>
@@ -8056,7 +8055,87 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
     };
 
-    function appendMessage(sender, text, time = null, isHtml = false) {
+
+    // Typewriter reveal (like Heaven/Hell) — feels alive, not instant dump
+    window.__lubaTypeGen = 0;
+    function lubaTypewriterText(el, fullText) {
+        const gen = ++window.__lubaTypeGen;
+        const full = String(fullText || '');
+        el.innerText = '';
+        // ~60% slower than a fast stream: readable but not sluggish
+        let delay = 18;
+        if (full.length > 1200) delay = 6;
+        else if (full.length > 500) delay = 10;
+        else if (full.length > 200) delay = 14;
+        let i = 0;
+        function tick() {
+            if (gen !== window.__lubaTypeGen) return; // newer message cancelled this
+            if (i >= full.length) {
+                el.innerText = full;
+                try { renderMathIn(el); } catch (_) {}
+                try { chatContainer.scrollTop = chatContainer.scrollHeight; } catch (_) {}
+                return;
+            }
+            // Type 1–3 chars per tick for smoother long messages
+            const step = full.length > 600 ? 3 : (full.length > 250 ? 2 : 1);
+            i = Math.min(full.length, i + step);
+            el.innerText = full.slice(0, i);
+            try {
+                const nearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 120;
+                if (nearBottom) chatContainer.scrollTop = chatContainer.scrollHeight;
+            } catch (_) {}
+            setTimeout(tick, delay);
+        }
+        tick();
+    }
+    function lubaTypewriterHtml(root) {
+        const gen = ++window.__lubaTypeGen;
+        const nodes = root.querySelectorAll('.ai-text');
+        if (!nodes.length) return; // pure code/preview — no text to animate
+        nodes.forEach(function(node) {
+            const full = node.textContent || '';
+            if (!full) return;
+            node.textContent = '';
+            node.setAttribute('data-tw-full', full);
+        });
+        let ni = 0;
+        function nextNode() {
+            if (gen !== window.__lubaTypeGen) return;
+            if (ni >= nodes.length) {
+                try { renderMathIn(root); } catch (_) {}
+                return;
+            }
+            const node = nodes[ni++];
+            const full = node.getAttribute('data-tw-full') || '';
+            node.removeAttribute('data-tw-full');
+            let i = 0;
+            let delay = full.length > 400 ? 8 : 16;
+            function tick() {
+                if (gen !== window.__lubaTypeGen) return;
+                if (i >= full.length) {
+                    node.textContent = full;
+                    try {
+                        const nearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 120;
+                        if (nearBottom) chatContainer.scrollTop = chatContainer.scrollHeight;
+                    } catch (_) {}
+                    nextNode();
+                    return;
+                }
+                const step = full.length > 500 ? 3 : 2;
+                i = Math.min(full.length, i + step);
+                node.textContent = full.slice(0, i);
+                try {
+                    const nearBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 120;
+                    if (nearBottom) chatContainer.scrollTop = chatContainer.scrollHeight;
+                } catch (_) {}
+                setTimeout(tick, delay);
+            }
+            tick();
+        }
+        nextNode();
+    }
+
+    function appendMessage(sender, text, time = null, isHtml = false, instant = false) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${sender}`;
         try {
@@ -8112,11 +8191,22 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 // Formatted preview HTML from formatAiReplyHtml / images — OK
                 content.innerHTML = raw;
             }
+            // Typewriter only the text parts; code/previews stay visible
+            if (sender === 'ai' && !instant) {
+                try { lubaTypewriterHtml(content); } catch (_) {}
+            }
         } else {
-            content.innerText = text;
+            if (sender === 'ai' && !instant && text) {
+                content.innerText = '';
+                try { lubaTypewriterText(content, String(text)); } catch (_) { content.innerText = text; }
+            } else {
+                content.innerText = text;
+            }
         }
 
-        renderMathIn(content);
+        if (!(sender === 'ai' && !instant && !isHtml)) {
+            renderMathIn(content);
+        }
 
         if (sender === 'ai') {
             const COPY_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
@@ -8375,21 +8465,21 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             const isUser = msg.role === 'user';
             if (isUser) {
                 const text = (msg.isHtml && msg.displayHtml) ? msg.displayHtml : msg.content;
-                appendMessage('user', text, msg.time, !!msg.isHtml);
+                appendMessage('user', text, msg.time, !!msg.isHtml, true);
                 return;
             }
             // Rebuild AI HTML from plain content so full pages never break the app on refresh
             const content = String(msg.content || '');
             const dh = msg.displayHtml ? String(msg.displayHtml) : '';
             if (dh.indexOf('generated-image-wrap') !== -1 || dh.indexOf('error-retry-wrap') !== -1) {
-                appendMessage('ai', dh, msg.time, true);
+                appendMessage('ai', dh, msg.time, true, true);
                 return;
             }
             const formatted = formatAiReplyHtml(content);
             if (formatted.hasCode) {
-                appendMessage('ai', formatted.html, msg.time, true);
+                appendMessage('ai', formatted.html, msg.time, true, true);
             } else {
-                appendMessage('ai', content, msg.time, false);
+                appendMessage('ai', content, msg.time, false, true);
             }
         });
         try { chatContainer.scrollTop = chatContainer.scrollHeight; } catch (_) {}
@@ -10926,7 +11016,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     }
 
     function stopGeneration() {
-        forceStopGeneration = true;
+        forceStopGeneration = true; try { window.__lubaTypeGen++; } catch(_){};
         try { if (abortController) abortController.abort(); } catch (_) {}
         // Kill thinking UI + button immediately (don't wait for fetch to die)
         try { removeTyping(); } catch (_) {}
