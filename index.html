@@ -1566,6 +1566,7 @@
         /* Luba sendable file cards */
         .luba-file-card {
             display: flex;
+            flex-direction: row;
             align-items: center;
             gap: 12px;
             margin: 10px 0;
@@ -1574,6 +1575,8 @@
             background: rgba(255,255,255,0.04);
             border: 1px solid rgba(255,255,255,0.1);
             max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
         }
         body.light .luba-file-card {
             background: rgba(0,0,0,0.04);
@@ -1587,25 +1590,35 @@
             font-size: 22px;
             flex-shrink: 0;
         }
-        .luba-file-meta { flex: 1; min-width: 0; }
+        .luba-file-meta {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+        }
         .luba-file-name {
             font-weight: 800;
             font-size: 14px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            writing-mode: horizontal-tb;
         }
         .luba-file-sub {
             font-size: 11px;
             opacity: 0.6;
             margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .luba-file-actions {
             display: flex;
             gap: 6px;
-            flex-shrink: 0;
-            flex-wrap: wrap;
+            flex: 0 0 auto;
+            flex-wrap: nowrap;
             justify-content: flex-end;
+            align-items: center;
         }
         .luba-file-actions button {
             border: 1px solid rgba(255,255,255,0.14);
@@ -7816,7 +7829,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     };
 
 
-    function guessFileName(lang, code) {
+    function guessCodeFileName(lang, code) {
         try {
             const m = String(code || '').match(/<!--\s*BUILD_TITLE:\s*([^\n>]+?)\s*-->/i);
             if (m) {
@@ -7833,7 +7846,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             c: 'main.c', cpp: 'main.cpp', java: 'Main.java', go: 'main.go', rs: 'main.rs'
         };
         if (map[l]) return map[l];
-        if (looksLikeHtmlDocument(code, l)) return 'game.html';
+        if (typeof looksLikeHtmlDocument === 'function' && looksLikeHtmlDocument(code, l)) return 'game.html';
         return (l || 'file') + '.txt';
     }
 
@@ -7858,7 +7871,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
     function buildFileCard(code, lang, explicitName) {
         const codeId = storeCodeBlock(code);
-        const name = explicitName || guessFileName(lang, code);
+        const name = explicitName || guessCodeFileName(lang, code);
         const icon = fileIconFor(lang, name);
         const sub = (lang || 'file').toUpperCase() + ' · ' + formatBytes(String(code || '').length);
         const isHtml = looksLikeHtmlDocument(code, lang) || /\.html?$/i.test(name) || lang === 'html' || lang === 'htm';
@@ -7935,6 +7948,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 }
             }
             viewer.classList.add('open');
+            viewer.style.display = 'flex';
             viewer.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
         } catch (e) {
@@ -7942,17 +7956,37 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
     };
 
-    window.closeLubaFileViewer = function () {
-        const viewer = document.getElementById('luba-file-viewer');
-        const frame = document.getElementById('luba-fv-frame');
-        const pre = document.getElementById('luba-fv-pre');
-        if (viewer) {
-            viewer.classList.remove('open');
-            viewer.setAttribute('aria-hidden', 'true');
+    document.addEventListener('click', function (e) {
+        const t = e.target;
+        if (!t) return;
+        if (t.id === 'luba-fv-close' || (t.closest && t.closest('#luba-fv-close'))) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.closeLubaFileViewer && window.closeLubaFileViewer();
         }
-        if (frame) { try { frame.srcdoc = ''; } catch (_) {} frame.style.display = 'none'; }
-        if (pre) { pre.textContent = ''; pre.style.display = 'none'; }
-        document.body.style.overflow = '';
+    }, true);
+
+    window.closeLubaFileViewer = function () {
+        try {
+            const viewer = document.getElementById('luba-file-viewer');
+            const frame = document.getElementById('luba-fv-frame');
+            const pre = document.getElementById('luba-fv-pre');
+            if (viewer) {
+                viewer.classList.remove('open');
+                viewer.style.display = 'none';
+                viewer.setAttribute('aria-hidden', 'true');
+            }
+            if (frame) {
+                try { frame.srcdoc = ''; } catch (_) {}
+                try { frame.src = 'about:blank'; } catch (_) {}
+                frame.style.display = 'none';
+            }
+            if (pre) {
+                pre.textContent = '';
+                pre.style.display = 'none';
+            }
+            document.body.style.overflow = '';
+        } catch (e) { console.warn(e); }
     };
 
 
@@ -7988,21 +8022,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const lightSource = code.length > 150000
             ? escapeHtmlText('// Large preview (3D model embedded). Use Copy code / stored preview id: ' + codeId)
             : escapeHtmlText(code);
-        const fileName = guessFileName('html', code);
-        const fileCard = buildFileCard(code, 'html', fileName);
-        return fileCard + `<div class="code-preview-wrap">
-                    <div class="code-preview-bar">
-                        <span>Interactive preview</span>
-                        <div class="code-preview-actions">
-                            <button type="button" class="small-btn" onclick="toggleCodeSource(this)">Show code</button>
-                            <button type="button" class="small-btn" data-code-id="${codeId}" onclick="copyLubaCode(this)">Copy</button>
-                            <button type="button" class="small-btn" data-code-id="${codeId}" data-file-name="${escapeHtmlText(fileName)}" onclick="downloadLubaFile(this)">Download</button>
-                            <button type="button" class="small-btn" onclick="openPreviewFullscreen(this)">Open</button>
-                        </div>
-                    </div>
-                    <iframe class="code-preview-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; accelerometer *; gyroscope *; magnetometer *; autoplay; fullscreen; clipboard-read; clipboard-write" allowusermedia data-code-id="${codeId}" ${srcAttr} src="about:blank"></iframe>
-                    <pre class="code-preview-source" style="display:none"><code>${lightSource}</code></pre>
-                </div>`;
+        const fileName = guessCodeFileName('html', code);
+        return buildFileCard(code, 'html', fileName);
+
     }
 
     function extractFences(raw) {
@@ -8121,16 +8143,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             } else if (looksLikeHtmlDocument(code, lang)) {
                 html += buildPreviewBlock(code);
             } else {
-                // File card: Download · Copy · Open (in app)
                 html += buildFileCard(code, lang);
-                const codeId = storeCodeBlock(code);
-                const previewCode = code.length > 4000
-                    ? (code.slice(0, 4000) + "\n\n/* truncated — use Download or Open for full file */")
-                    : code;
-                html += '<div class="code-block-wrap">' +
-                    '<div class="code-preview-bar"><span>' + escapeHtmlText(lang || 'code') + ' preview</span>' +
-                    '<button type="button" class="small-btn" data-code-id="' + codeId + '" onclick="copyLubaCode(this)">Copy</button></div>' +
-                    '<pre class="code-block"><code>' + escapeHtmlText(previewCode) + '</code></pre></div>';
             }
             hasCode = true;
             last = f.end;
@@ -14707,7 +14720,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 <div id="luba-file-viewer" aria-hidden="true">
   <div class="fv-bar">
     <div class="fv-title" id="luba-fv-title">File</div>
-    <button type="button" class="fv-close" id="luba-fv-close" title="Close">×</button>
+    <button type="button" class="fv-close" id="luba-fv-close" title="Close" onclick="window.closeLubaFileViewer&&window.closeLubaFileViewer()">×</button>
   </div>
   <pre id="luba-fv-pre" style="display:none"></pre>
   <iframe id="luba-fv-frame" style="display:none" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" allow="camera *; microphone *; geolocation *; autoplay; fullscreen"></iframe>
