@@ -10960,8 +10960,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const menu = document.getElementById('slash-menu');
         if (!menu || !userInput) return;
         const val = userInput.value;
-        // Only when starts with / and no space yet after full cmd OR still typing cmd
-        const m = val.match(/^(\/[a-zA-Z]*)$/);
+        // Support stacking: "/copy /exa" shows menu for the last token
+        const m = val.match(/(?:^|\s)(\/[a-zA-Z]*)$/);
         if (!m) {
             menu.classList.remove('open');
             menu.innerHTML = '';
@@ -10993,7 +10993,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
     function applySlashCommand(cmd) {
         if (!userInput) return;
-        userInput.value = cmd + ' ';
+        const val = userInput.value;
+        // Replace only the last /partial token so "/copy /exa" → "/copy /exactly "
+        if (/(?:^|\s)\/[a-zA-Z]*$/.test(val)) {
+            userInput.value = val.replace(/\/[a-zA-Z]*$/, cmd + ' ');
+        } else if (val.trim()) {
+            userInput.value = val.replace(/\s*$/, ' ') + cmd + ' ';
+        } else {
+            userInput.value = cmd + ' ';
+        }
         userInput.focus();
         const menu = document.getElementById('slash-menu');
         if (menu) { menu.classList.remove('open'); menu.innerHTML = ''; }
@@ -12255,6 +12263,20 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (studyModeBtn) studyModeBtn.disabled = true;
         showTyping(text || '');
 
+
+        // HTML/code chats: "fix" language should stick to the same file even without /fix
+        try {
+            if (!pendingFixMode && (activeMode === 'html' || activeMode === 'code') &&
+                /\b(fix|bug|broken|doesn'?t work|not work|still broken|forgot)\b/i.test(String(text || ''))) {
+                pendingFixMode = true;
+            }
+            // Keep last images available for inject on pure text fix messages
+            if ((!window.__lubaPendingMedia || !window.__lubaPendingMedia.length) &&
+                window.__lubaLastImages && window.__lubaLastImages.length) {
+                window.__lubaPendingMedia = window.__lubaLastImages.slice();
+            }
+        } catch (_) {}
+
         let systemPrompt = buildSystemPrompt();
 
         if (pendingTopicSearch) {
@@ -12299,6 +12321,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
         if (pendingEli5Mode) {
             systemPrompt += "\n\nELI5 MODE: Explain like the user is 5 years old. Simple words, short sentences, friendly analogies. No jargon.";
+        }
+        if (pendingFixMode || ((activeMode === 'html' || activeMode === 'code') && /\b(fix|bug|broken|doesn'?t work|not work|still|forgot|missing|login button)\b/i.test(String(text || '')))) {
+            systemPrompt += "\n\nSTICK TO PROJECT: Continue the SAME HTML/file from this chat. Apply the reported bug fix only. Keep every __LUBA_IMG_N__ placeholder so the photo still works after inject. Do NOT change topic or rebuild a different app unless the user clearly asks for a new project. Return the complete updated HTML.";
         }
         if (pendingFixMode) {
             systemPrompt += "\n\nFIX MODE: Continue the SAME previous game/app from this chat. Fix bugs and apply improvements. Do not start a different project.";
