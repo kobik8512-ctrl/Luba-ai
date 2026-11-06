@@ -6967,13 +6967,13 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 6, 2026 (/topic contextual web search)
+        const TERMS_TEXT = `Last updated: November 7, 2026 (stackable slash commands)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — e.g. /truth, /plan, /search, /topic for topic-aware web search, /draw, /code, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, attaching code/HTML files (shown as file chips in chat; large files may be trimmed when sent to the AI), named saved chats that auto-update while you keep chatting in them, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — stackable with spaces, e.g. /copy /exactly; also /truth, /plan, /search, /topic, /draw, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, attaching code/HTML files (shown as file chips in chat; large files may be trimmed when sent to the AI), named saved chats that auto-update while you keep chatting in them, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
@@ -7009,7 +7009,7 @@ The owner may grant Admin to selected users via Owner CMDs. Admins are not owner
 We may update these Terms. Continued use after changes means you accept the updated version.
 `;
 
-    const PRIVACY_TEXT = `Last updated: November 6, 2026 (/topic search)
+    const PRIVACY_TEXT = `Last updated: November 7, 2026 (stackable slash)
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
@@ -7257,7 +7257,7 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - Modes users can turn on: Normal, Study, HTML (interactive apps/games in preview), Code, Creative, Lawyer, and others shown in the Modes menu.
 - LUBA FORGE (your twin): You have a companion studio called Luba Forge — a separate 3D builder workspace (empty infinite floor, live scene, Play builds). It lives under Modes as "LUBA FORGE" (BETA). You and Forge are two sides of the same product: you chat and write HTML/code here; Forge places live 3D scenes and full playable builds. Main Luba chat is free for everyone. Luba Forge is the premium-tier feature — other apps charge money for that level; here it is unlocked free for verified members (and the owner) instead of paid. If someone asks about Forge, explain: Modes → LUBA FORGE, verified perk (not a payment), twin of main Luba for 3D / scene building.
 - You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview, send back downloadable files (user gets Download / Copy / Open in app when you return code), help with code, math (use the calculator tool), law explanations in Lawyer mode, tutoring in Study mode, and point users to Luba Forge for live 3D building when that fits.
-- Slash commands: users type / for a menu. /search = live web search on the question alone. /topic = live web search that includes the ongoing chat topic (so “how many people?” after a jail talk searches prison stats, not world population). Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
+- Slash commands: users type / for a menu. /search = live web search on the question alone. /topic = live web search that includes the ongoing chat topic. Slash commands are stackable with spaces (example: /copy /exactly show this photo). Do not use + between commands. /copy means the real attachment pixels only — never rebuild a brand page. /exactly means no extras; if both /exactly and /add appear, /exactly wins (so “how many people?” after a jail talk searches prison stats, not world population). Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
 
 HTML/GAME QUALITY (critical — users noticed regressions):
@@ -10771,8 +10771,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     // ============================================================
     const SLASH_COMMANDS = [
         { cmd: '/truth', desc: 'Brutal honesty — no sugarcoating (works with photos too)' },
-        { cmd: '/copy', desc: 'Use the exact photo/text — no redraw, no remix' },
-        { cmd: '/exactly', desc: 'Build ONLY what you asked — no extra features' },
+        { cmd: '/copy', desc: 'Exact photo/text only — no redraw, no fake UI around it' },
+        { cmd: '/exactly', desc: 'ONLY what you asked — stackable: /copy /exactly' },
         { cmd: '/best', desc: 'Maximum quality build — full polish' },
         { cmd: '/add', desc: 'Add something to the current game/app/text' },
         { cmd: '/webadd', desc: 'Search web for textures/3D assets and add them' },
@@ -10868,10 +10868,86 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     let pendingMotivateMode = false;
 
     function parseSlashCommand(raw) {
-        const text = String(raw || '');
-        const m = text.match(/^(\/[a-zA-Z]+)(?:\s+([\s\S]*))?$/);
-        if (!m) return { cmd: null, rest: text, raw: text };
-        return { cmd: m[1].toLowerCase(), rest: (m[2] != null ? m[2] : '').trim(), raw: text };
+        // Multi-command: "/copy /exactly put this on screen" → all flags apply
+        // "+" is NOT a combiner (user rule) — treat "/copy+/exactly" as invalid join and split
+        let text = String(raw || '').trim();
+        text = text.replace(/\/([a-zA-Z]+)\s*\+\s*/g, '/$1 ');
+        const cmds = [];
+        while (true) {
+            const m = text.match(/^\/([a-zA-Z]+)\s*/);
+            if (!m) break;
+            cmds.push('/' + m[1].toLowerCase());
+            text = text.slice(m[0].length);
+        }
+        const rest = text.trim();
+        return {
+            cmd: cmds.length ? cmds[0] : null,
+            cmds: cmds,
+            rest: rest,
+            raw: String(raw || '')
+        };
+    }
+
+    function applySlashFlags(sp) {
+        const list = (sp && sp.cmds && sp.cmds.length) ? sp.cmds : ((sp && sp.cmd) ? [sp.cmd] : []);
+        let rest = (sp && sp.rest != null) ? sp.rest : '';
+        list.forEach(function(cmd) {
+            if (cmd === '/help') return;
+            if (cmd === '/truth') pendingTruthMode = true;
+            else if (cmd === '/copy') pendingCopyMode = true;
+            else if (cmd === '/exactly' || cmd === '/exact') pendingExactMode = true;
+            else if (cmd === '/best') pendingBestMode = true;
+            else if (cmd === '/add') pendingAddMode = true;
+            else if (cmd === '/webadd') { pendingWebAddMode = true; pendingForceSearch = true; }
+            else if (cmd === '/search') pendingForceSearch = true;
+            else if (cmd === '/topic') { pendingTopicSearch = true; pendingForceSearch = true; }
+            else if (cmd === '/short') pendingShortMode = true;
+            else if (cmd === '/detailed') pendingDetailedMode = true;
+            else if (cmd === '/roast') pendingRoastMode = true;
+            else if (cmd === '/eli5') pendingEli5Mode = true;
+            else if (cmd === '/fix') pendingFixMode = true;
+            else if (cmd === '/plan') pendingPlanMode = true;
+            else if (cmd === '/steps') pendingStepsMode = true;
+            else if (cmd === '/pros') pendingProsMode = true;
+            else if (cmd === '/compare') pendingCompareMode = true;
+            else if (cmd === '/decide') pendingDecideMode = true;
+            else if (cmd === '/summary') pendingSummaryMode = true;
+            else if (cmd === '/tldr') pendingTldrMode = true;
+            else if (cmd === '/rewrite') pendingRewriteMode = true;
+            else if (cmd === '/grammar') pendingGrammarMode = true;
+            else if (cmd === '/translate') pendingTranslateMode = true;
+            else if (cmd === '/list') pendingListMode = true;
+            else if (cmd === '/table') pendingTableMode = true;
+            else if (cmd === '/idea') pendingIdeaMode = true;
+            else if (cmd === '/quiz') pendingQuizMode = true;
+            else if (cmd === '/story') pendingStoryMode = true;
+            else if (cmd === '/poem') pendingPoemMode = true;
+            else if (cmd === '/formal') pendingFormalMode = true;
+            else if (cmd === '/casual') pendingCasualMode = true;
+            else if (cmd === '/debate') pendingDebateMode = true;
+            else if (cmd === '/draw') pendingDrawMode = true;
+            else if (cmd === '/caption') pendingCaptionMode = true;
+            else if (cmd === '/recipe') pendingRecipeMode = true;
+            else if (cmd === '/workout') pendingWorkoutMode = true;
+            else if (cmd === '/budget') pendingBudgetMode = true;
+            else if (cmd === '/travel') pendingTravelMode = true;
+        });
+        // /exactly wins over /add (opposite ideas — exact = no extras)
+        if (pendingExactMode && pendingAddMode) {
+            pendingAddMode = false;
+        }
+        // Default rest text if empty after commands only
+        if (!rest) {
+            if (pendingCopyMode && pendingExactMode) rest = 'Show ONLY my exact attached photo on screen. No extra UI chrome, logos, or redesign.';
+            else if (pendingCopyMode) rest = 'Use my exact attached photo — do not redraw or rebuild a fake version.';
+            else if (pendingExactMode) rest = 'Build only what I asked — nothing extra.';
+            else if (pendingForceSearch && pendingTopicSearch) rest = 'Continue the same topic — find current numbers and facts.';
+            else if (pendingForceSearch) rest = 'Search the web for the latest relevant info.';
+            else if (pendingBestMode) rest = 'Build this at maximum quality.';
+            else if (pendingAddMode) rest = 'Add more polished features to the previous project in this chat.';
+            else if (pendingTruthMode) rest = 'Be honest about what you see / what I asked.';
+        }
+        return rest;
     }
 
     function renderSlashMenu() {
@@ -12167,11 +12243,12 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             systemPrompt += "\n\nTRUTH MODE (/truth) IS ON FOR THIS MESSAGE ONLY: Be brutally honest. No flattery, no fake compliments, no softening to protect feelings. If they ask how they look or if something is good/bad, answer the real truth in plain language (you can swear if it fits the tone). If something is actually good, say so honestly — truth means accurate, not automatically mean. For photos: describe what you actually see. Do not refuse ordinary appearance questions in this mode.";
         }
         if (pendingCopyMode) {
-            systemPrompt += "\n\nCOPY MODE (/copy) IS ON FOR THIS MESSAGE ONLY: The user wants an EXACT copy — not a reinterpretation.\n" +
-                "- If they attached image(s): embed those exact files using placeholders __LUBA_IMG_0__, __LUBA_IMG_1__, etc. as src. Do NOT redraw, restyle, or approximate the photo.\n" +
-                "- If they described something to copy (UI, layout, text, logo idea): match it as closely as possible — same structure, colors, wording.\n" +
-                "- If they ask to put the photo in a game/app: the sprite/texture/background MUST be the real attachment via __LUBA_IMG_N__, not a drawn stand-in.\n" +
-                "- Without /copy you may design freely; WITH /copy, fidelity comes first.";
+            systemPrompt += "\n\nCOPY MODE (/copy) IS ON FOR THIS MESSAGE ONLY: EXACT visual fidelity — zero redesign.\n" +
+                "- Attached image(s): use ONLY __LUBA_IMG_0__ (and _1, _2…) as the real src. Never redraw, never rebuild a fake Roblox/Google/brand screen, never invent buttons above the photo.\n" +
+                "- If the user says put this on screen / show this photo: output a minimal HTML page whose main content is <img src=\"__LUBA_IMG_0__\"> full viewport. No extra hero, no logos you invent, no 'Continue in App' chrome unless that chrome is LITERALLY in the attached pixels.\n" +
+                "- You may add only tiny controls the user asked for (zoom/reset). Everything else is forbidden in /copy.\n" +
+                "- Described UI (no attachment): match structure/colors/wording as closely as possible — still no random extras.\n" +
+                "- WITH /exactly also on: even stricter — only the photo (or only the asked elements).";
         }
         if (pendingExactMode) {
             systemPrompt += "\n\nEXACT MODE (/exactly) IS ON FOR THIS MESSAGE ONLY: Build or write ONLY what the user explicitly asked for. " +
