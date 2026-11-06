@@ -430,12 +430,16 @@
         }
 
         .msg-tools {
-            position: absolute;
-            top: 6px;
-            right: 6px;
+            position: static;
             display: flex;
-            gap: 4px;
+            gap: 6px;
             z-index: 2;
+            margin-top: 8px;
+            justify-content: flex-end;
+            opacity: 0.85;
+        }
+        .message.ai .message-body {
+            padding-right: 12px; /* text can use full width — tools are below */
         }
         .copy-btn, .speak-btn {
             background: rgba(255,255,255,0.08);
@@ -1635,17 +1639,20 @@
         .luba-file-actions button {
             flex: 1 1 0;
             min-width: 0;
+            max-width: 100%;
             box-sizing: border-box;
             border: 1px solid rgba(255,255,255,0.14);
             background: rgba(255,255,255,0.08);
             color: inherit;
             border-radius: 12px;
-            padding: 11px 6px;
-            font-size: 13px;
+            padding: 10px 4px;
+            font-size: 12px;
             font-weight: 700;
             cursor: pointer;
             text-align: center;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .luba-file-actions button.primary {
             background: linear-gradient(135deg, #0ea5e9, #6366f1);
@@ -3775,6 +3782,7 @@
     }
 
     let pendingCodeFile = null; // { name, content, size }
+    let activeSavedChatId = null; // open named save auto-updates
     let _pasteAttachBuffer = null;
     let isListening = false;
     let activeMode = 'normal'; // normal | study | html | code | creative | lawyer | builder
@@ -7251,6 +7259,7 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview, send back downloadable files (user gets Download / Copy / Open in app when you return code), help with code, math (use the calculator tool), law explanations in Lawyer mode, tutoring in Study mode, and point users to Luba Forge for live 3D building when that fits.
 - Slash commands: users type / for a menu. Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
+- When you deliver a game, app, or fixed file: always include a short spoken reply in the same message (intro / what changed / how to use) before the code fence. Never reply with only a file and zero text.
 - TikTok: yours is @luba_ai ; Kobi's is @itzrealkobl
 - GREETINGS: Never parrot or echo the user's greeting. Do not reply to "hi"/"hey"/"hu" with "HiHi", "HuHu", "Hey hey", or the same word doubled. Give a natural, short, varied reply (ask something real or respond to context). Different greeting each time.
 - You do NOT have a public "Luba API key" for third-party apps. Never invent "Luba Key" fields. If the user only says "make an AI chatbot", build a polished offline chatbot that works with no API key. Only add a real API key field when they explicitly ask for Gemini, OpenAI, or another API.
@@ -8803,6 +8812,22 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             chatHistory = chatHistory.slice(-40);
         }
         saveUserChatHistory(currentUser.username, chatHistory);
+        // Auto-update active named saved chat (so reload keeps later messages)
+        try {
+            if (typeof activeSavedChatId === 'string' && activeSavedChatId) {
+                const list = getSavedChats();
+                let changed = false;
+                for (let i = 0; i < list.length; i++) {
+                    if (list[i] && list[i].id === activeSavedChatId) {
+                        list[i].messages = chatHistory.slice();
+                        list[i].savedAt = getTime();
+                        changed = true;
+                        break;
+                    }
+                }
+                if (changed) setSavedChats(list);
+            }
+        } catch (e) { try { console.warn('saved-chat auto-update', e); } catch (_) {} }
         // Sync to server so the same account sees chats on every phone
         const token = getAuthToken();
         if (token) {
@@ -9342,8 +9367,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 const messages = {
                     normal: 'Normal mode — regular helpful answers.',
                     study: 'Study mode ON — I will teach step by step, not only give the answer.',
-                    html: 'HTML mode ON — complete single-file HTML you can run and preview. I will NOT force 3D/GLTF unless you ask or attach a .glb. (Big projects may take longer; Retry if busy.)',
-                    code: 'Code mode ON — complete working programs, not half-finished snippets.',
+                    html: 'HTML mode ON — complete single-file HTML you can run and preview. ALWAYS write a short friendly message BEFORE the code/file (what you built, how to play, what you fixed). Never send only a silent code block. I will NOT force 3D/GLTF unless you ask or attach a .glb. (Big projects may take longer; Retry if busy.)',
+                    code: 'Code mode ON — complete working programs, not half-finished snippets. Always say a short intro in chat before the code/file — never only a silent file card.',
                     creative: 'Creative mode ON — stories, ideas, and more imaginative writing.',
                     lawyer: 'Lawyer mode ON — I explain laws, legal vs illegal, and end with a clear bottom line. Not real legal advice.',
                     builder: 'Builder Demo ON — 3D scenes, your models, in-browser builds. Early demo — send a .glb or describe a scene.'
@@ -9468,6 +9493,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const entry = saved.find(c => c.id === id);
         if (!entry) return;
         chatHistory = (entry.messages || []).slice();
+        activeSavedChatId = id;
         saveChat();
         renderSavedMessages();
         savedChatsOverlay.style.display = 'none';
@@ -9503,16 +9529,18 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
         const name = saveChatNameInput.value.trim() || `Chat — ${new Date().toLocaleString()}`;
         const saved = getSavedChats();
+        const newId = 'chat_' + Date.now();
         saved.unshift({
-            id: 'chat_' + Date.now(),
+            id: newId,
             name,
             messages: chatHistory.slice(),
             savedAt: getTime()
         });
+        activeSavedChatId = newId;
         setSavedChats(saved);
         saveChatNameInput.value = '';
         renderSavedChatsList();
-        alert('Chat saved. It will also appear on your other phones when logged in.');
+        alert('Chat saved. Keep chatting — new messages auto-update this save.');
     };
 
     // ============================================================
