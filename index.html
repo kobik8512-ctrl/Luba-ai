@@ -7600,10 +7600,29 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
     // Store code so "Copy code" copies only the script, not the whole message
     window.__lubaCodeStore = window.__lubaCodeStore || {};
-    function storeCodeBlock(code) {
+    window.__lubaCodeMedia = window.__lubaCodeMedia || {};
+    function snapshotMediaForCode(mediaItems) {
+        try {
+            const src = mediaItems || window.__lubaPendingMedia || (typeof selectedMediaItems !== 'undefined' ? selectedMediaItems : []) || window.__lubaLastModels || [];
+            return (src || []).filter(function(m){ return m && m.dataUrl; }).map(function(m){
+                return { dataUrl: m.dataUrl, isModel: !!m.isModel, isVideo: !!m.isVideo, name: m.name || '' };
+            });
+        } catch (_) { return []; }
+    }
+    function storeCodeBlock(code, mediaItems) {
         const id = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
-        window.__lubaCodeStore[id] = code;
-        try { persistCodeBlock(id, code); } catch (_) {}
+        let finalCode = String(code || '');
+        try {
+            const snap = snapshotMediaForCode(mediaItems);
+            if (snap.length) {
+                window.__lubaCodeMedia[id] = snap;
+                if (typeof injectUserImagesIntoHtml === 'function') {
+                    finalCode = injectUserImagesIntoHtml(finalCode, snap);
+                }
+            }
+        } catch (_) {}
+        window.__lubaCodeStore[id] = finalCode;
+        try { persistCodeBlock(id, finalCode); } catch (_) {}
         return id;
     }
     function persistCodeBlock(id, code) {
@@ -7972,7 +7991,18 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 if (frame) {
                     frame.style.display = 'block';
                     try {
-                        frame.srcdoc = code;
+                        let html = code;
+                        try {
+                            const media = (window.__lubaCodeMedia && window.__lubaCodeMedia[id])
+                                || window.__lubaPendingMedia
+                                || (typeof selectedMediaItems !== 'undefined' ? selectedMediaItems : [])
+                                || window.__lubaLastModels
+                                || [];
+                            if (media && media.length && typeof injectUserImagesIntoHtml === 'function') {
+                                html = injectUserImagesIntoHtml(html, media);
+                            }
+                        } catch (_) {}
+                        frame.srcdoc = html;
                     } catch (_) {
                         frame.src = 'about:blank';
                     }
@@ -10977,14 +11007,22 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         });
         if (!urls.length) return out;
 
-        // Common AI mistakes: src="character.png", src="Character", src="", src="./player.png"
+        // Common AI mistakes: src="character.png", src="Character", src="", src="./player.png", alt-only attached photo
         if (urls[0]) {
-            out = out.replace(/\bsrc\s*=\s*["'](?:character|player|hero|sprite|user|photo|image|avatar)(?:\.(?:png|jpg|jpeg|gif|webp))?["']/gi,
+            out = out.replace(/\bsrc\s*=\s*["'](?:character|player|hero|sprite|user|photo|image|avatar|attached|picture|pic|img|upload|file)(?:[_-]?\d+)?(?:\.(?:png|jpg|jpeg|gif|webp|svg))?["']/gi,
                 'src="' + urls[0] + '"');
             out = out.replace(/\bsrc\s*=\s*["']\s*["']/gi, 'src="' + urls[0] + '"');
-            // CSS url(character.png)
+            out = out.replace(/\bsrc\s*=\s*["']\.\/?[^"']*\.(?:png|jpg|jpeg|gif|webp|svg)["']/gi, 'src="' + urls[0] + '"');
+            out = out.replace(/\bsrc\s*=\s*["']https?:\/\/via\.placeholder[^"']*["']/gi, 'src="' + urls[0] + '"');
+            out = out.replace(/\bsrc\s*=\s*["']https?:\/\/placehold\.co[^"']*["']/gi, 'src="' + urls[0] + '"');
+            // CSS url(...)
             out = out.replace(/url\(\s*['"]?(?:character|player|hero|sprite|user|photo|image|avatar)(?:\.(?:png|jpg|jpeg|gif|webp))?['"]?\s*\)/gi,
                 'url(' + urls[0] + ')');
+            // Background-image placeholders
+            out = out.replace(/background(?:-image)?\s*:\s*url\(\s*['"]?[^)'"]+['"]?\s*\)/i, function(m) {
+                if (/data:image/i.test(m)) return m;
+                return 'background-image:url(' + urls[0] + ')';
+            });
         }
 
         // Inject a global array so game JS can use LUBA_IMGS[0] if the model referenced it
@@ -11008,6 +11046,17 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 }
                 return '<img src="' + urls[0] + '"' + attrs + '>';
             });
+        }
+
+
+        // Last resort: still no embedded photo → inject first image into body so /copy never shows empty
+        if (urls[0] && !/data:image\//i.test(out)) {
+            const photoTag = '<div style="display:flex;justify-content:center;padding:12px"><img src="' + urls[0] + '" alt="Attached photo" style="max-width:100%;max-height:70vh;border-radius:12px;object-fit:contain"/></div>';
+            if (/<body[^>]*>/i.test(out)) {
+                out = out.replace(/<body([^>]*)>/i, '<body$1>' + photoTag);
+            } else {
+                out = photoTag + out;
+            }
         }
 
         // 3D models (.glb/.gltf) as data URLs
