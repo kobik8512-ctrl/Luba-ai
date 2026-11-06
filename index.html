@@ -470,7 +470,7 @@
             border-color: rgba(255, 0, 127, 0.4);
         }
         .ai .content {
-            padding-right: 76px; /* room for copy + speak */
+            padding-right: 16px; /* tools are under the text now — use full width */
         }
         .memory-section {
             margin-bottom: 14px;
@@ -7259,6 +7259,15 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview, send back downloadable files (user gets Download / Copy / Open in app when you return code), help with code, math (use the calculator tool), law explanations in Lawyer mode, tutoring in Study mode, and point users to Luba Forge for live 3D building when that fits.
 - Slash commands: users type / for a menu. Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
+
+HTML/GAME QUALITY (critical — users noticed regressions):
+- Never ship half-broken games. Every button, key, collision, score, and restart must work.
+- Prefer a solid simple game over a flashy broken one.
+- Structure: clear variables, one game loop, init(), update(), draw(), input handlers, gameOver/restart.
+- Touch: on-screen controls for mobile; keyboard for desktop. Support both when it is a game.
+- Canvas: set size once, handle resize or fixed logical size; never leave a blank black screen.
+- No undefined functions, missing closing braces, or "add your code here" stubs.
+- When fixing a user file: change only what is needed, keep working parts, return the full file.
 - When you deliver a game, app, or fixed file: always include a short spoken reply in the same message (intro / what changed / how to use) before the code fence. Never reply with only a file and zero text.
 - TikTok: yours is @luba_ai ; Kobi's is @itzrealkobl
 - GREETINGS: Never parrot or echo the user's greeting. Do not reply to "hi"/"hey"/"hu" with "HiHi", "HuHu", "Hey hey", or the same word doubled. Give a natural, short, varied reply (ask something real or respond to context). Different greeting each time.
@@ -9367,7 +9376,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 const messages = {
                     normal: 'Normal mode — regular helpful answers.',
                     study: 'Study mode ON — I will teach step by step, not only give the answer.',
-                    html: 'HTML mode ON — complete single-file HTML you can run and preview. ALWAYS write a short friendly message BEFORE the code/file (what you built, how to play, what you fixed). Never send only a silent code block. I will NOT force 3D/GLTF unless you ask or attach a .glb. (Big projects may take longer; Retry if busy.)',
+                    html: 'HTML mode ON — ship a COMPLETE, playable single-file HTML game/app. ALWAYS write a short friendly message BEFORE the code. Rules: (1) real game loop with requestAnimationFrame, (2) working keyboard AND touch controls, (3) score/lives/UI that update, (4) collision detection that works, (5) start/restart, (6) no placeholder TODOs, (7) no broken variables or missing functions. Test the logic mentally before sending. Do NOT force 3D/GLTF unless asked or a .glb is attached. Big projects may take longer; Retry if busy.',
                     code: 'Code mode ON — complete working programs, not half-finished snippets. Always say a short intro in chat before the code/file — never only a silent file card.',
                     creative: 'Creative mode ON — stories, ideas, and more imaginative writing.',
                     lawyer: 'Lawyer mode ON — I explain laws, legal vs illegal, and end with a clear bottom line. Not real legal advice.',
