@@ -6959,13 +6959,13 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 3, 2026 (slash commands + Luba Forge)
+        const TERMS_TEXT = `Last updated: November 6, 2026 (saved chats auto-update + file chips)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — e.g. /truth, /plan, /search, /draw, /code, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — e.g. /truth, /plan, /search, /draw, /code, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, attaching code/HTML files (shown as file chips in chat; large files may be trimmed when sent to the AI), named saved chats that auto-update while you keep chatting in them, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
@@ -7001,12 +7001,12 @@ The owner may grant Admin to selected users via Owner CMDs. Admins are not owner
 We may update these Terms. Continued use after changes means you accept the updated version.
 `;
 
-    const PRIVACY_TEXT = `Last updated: November 3, 2026 (slash commands + roles)
+    const PRIVACY_TEXT = `Last updated: November 6, 2026 (saved chats + attachments)
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
 
-Slash commands and Modes only change how the assistant replies; they do not create a separate data sale. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
+Slash commands and Modes only change how the assistant replies; they do not create a separate data sale. Named saved chats and the current chat thread may be stored on your device and, when you are logged in, synced to our servers so you can continue on another phone. Attached code/HTML files may be stored with that chat history; large files may be stored in full on-device while only a trimmed slice is sent to the AI model. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
 
 2. Account data
 We may store username, password hash, profile photo, preferences (including mode settings), verification status, coin/message counters, and session tokens.
@@ -10674,6 +10674,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             // Stop cloud from instantly re-applying the old thread
             window.__lubaChatClearedAt = Date.now();
             try { localStorage.setItem('luba_chat_cleared_' + userKey(currentUser.username), String(window.__lubaChatClearedAt)); } catch (_) {}
+            activeSavedChatId = null; // new blank chat is not tied to a saved file
             chatHistory = [];
             try {
                 localStorage.removeItem('luba_chat_' + userKey(currentUser.username));
@@ -11356,10 +11357,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     }
 
     function setPendingCodeFile(name, content) {
-        const max = 900000; // ~900KB text
+        // 10MB local attach cap (paste rarely works past a few MB anyway)
+        const max = 10 * 1024 * 1024;
         if (content.length > max) {
-            alert('File too large (max ~900KB text). Split it or shorten it.');
+            alert('File too large (max 10MB). Split it or shorten it.');
             return false;
+        }
+        if (content.length > 120000) {
+            // Full file kept on device; only a smart-trimmed slice is sent to the AI
+            try { console.info('Large file attached (' + content.length + ' chars); AI request will smart-trim'); } catch (_) {}
         }
         pendingCodeFile = {
             name: (name || 'file.html').slice(0, 80),
@@ -11405,15 +11411,49 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         return 'attachment.txt';
     }
 
+        // Keep last full attached file in memory (not always fully sent to API)
+    window.__lubaLastFullFile = null;
+
+    function smartTruncateForAI(content, maxLen) {
+        maxLen = maxLen || 150000;
+        let c = String(content || '');
+        if (c.length <= maxLen) return { text: c, truncated: false, original: c.length };
+        // Strip huge base64 payloads first (images/fonts embedded in HTML)
+        c = c.replace(/data:(?:image|audio|video|font|application)\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\r\n]+/g, '[BASE64_DATA_REMOVED]');
+        if (c.length <= maxLen) return { text: c, truncated: true, original: content.length };
+        const head = Math.floor(maxLen * 0.58);
+        const tail = Math.floor(maxLen * 0.32);
+        const missing = c.length - head - tail;
+        const text = c.slice(0, head) +
+            '\n\n/* === MIDDLE TRUNCATED (' + missing + ' chars) — file was too large for one request === */\n' +
+            '/* Apply the user request using the structure below + above. Return a COMPLETE working file. */\n\n' +
+            c.slice(-tail);
+        return { text: text, truncated: true, original: content.length };
+    }
+
     function buildFileMessageBlock(file, userNote) {
         const note = (userNote || '').trim();
+        try {
+            window.__lubaLastFullFile = {
+                name: file.name,
+                content: file.content,
+                size: file.size,
+                at: Date.now()
+            };
+        } catch (_) {}
+        // Cap what we ship to the model so Cloudflare / Gemini don't drop the request
+        const packed = smartTruncateForAI(file.content, 150000);
+        const sizeNote = packed.truncated
+            ? (' (sent ' + formatBytes(packed.text.length) + ' of ' + formatBytes(packed.original) + ' — middle trimmed for limits)')
+            : '';
         return (note ? note + '\n\n' : '') +
-            '=== ATTACHED FILE: ' + file.name + ' (' + formatBytes(file.size) + ') ===\n' +
-            'Read this entire file carefully. When fixing or editing, return the complete updated file when asked.\n' +
+            '=== ATTACHED FILE: ' + file.name + ' (' + formatBytes(file.size) + ')' + sizeNote + ' ===\n' +
+            'Edit/fix per the user note. Return the complete updated file in one code fence when you change code.\n' +
             '----- BEGIN FILE -----\n' +
-            file.content +
+            packed.text +
             '\n----- END FILE -----\n';
     }
+
 
 
     // ---- Attach long code/HTML as file (Claude-style full read) ----
@@ -11493,7 +11533,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                             return;
                         }
                         if (f.size > 900000) {
-                            alert('Code/text file max ~900KB. For 3D models use .glb/.gltf (up to 100MB).');
+                            alert('Code/text file max 10MB. For 3D models use .glb/.gltf (up to 100MB).');
                             return;
                         }
                         const reader = new FileReader();
@@ -12194,8 +12234,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
         // More history when iterating so the previous HTML stays in context
         const historyLimit = isSimpleChat ? 4
-            : (isIterateMsg ? 20
-            : (text && text.length > 12000 ? 8 : 14));
+            : (isIterateMsg ? 12
+            : (text && text.length > 80000 ? 3
+            : (text && text.length > 12000 ? 6 : 14)));
         const recent = chatHistory.slice(-historyLimit);
 
         const contents = recent.map(m => ({
@@ -12308,7 +12349,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             const MAX_CONTINUES = isSimpleChat && !longCodeMode ? 1 : (longCodeMode ? 14 : 8);
             const generatedImageUrls = [];
             // HTML / big projects need longer; simple stays fast
-            const ATTEMPT_TIMEOUT_MS = isSimpleChat && !longCodeMode ? 60000 : (longCodeMode ? 240000 : 150000);
+            const hugeAttach = !!(text && text.length > 50000);
+            const ATTEMPT_TIMEOUT_MS = isSimpleChat && !longCodeMode ? 60000
+                : (hugeAttach ? 300000 : (longCodeMode ? 240000 : 150000));
 
             while (guard < 24) {
                 if (forceStopGeneration) {
@@ -12688,7 +12731,14 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 chatHistory.push({ role: "assistant", content: timeoutMsg, time: getTime() });
                 saveChat();
             } else {
-                showErrorWithRetry("Network error: " + (err && err.message ? err.message : "unknown"));
+                var em = (err && err.message) ? String(err.message) : 'unknown';
+                var hint = '';
+                if (/abort|timeout|TimeoutError|The user aborted/i.test(em) || (err && err.name === 'AbortError')) {
+                    hint = ' Request timed out. Big files can take a while — try a shorter edit request, or split the file.';
+                } else if (/Failed to fetch|NetworkError|Load failed/i.test(em)) {
+                    hint = ' Check your internet. Very large files sometimes fail — try again or send a smaller part.';
+                }
+                showErrorWithRetry("Network error: " + em + hint);
             }
         } finally {
             isGenerating = false;
