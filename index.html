@@ -8058,6 +8058,12 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
 
     function buildPreviewBlock(code) {
+        try {
+            var media = window.__lubaLastImages || window.__lubaPendingMedia || (typeof selectedMediaItems !== 'undefined' ? selectedMediaItems : []) || [];
+            if (media && media.length && typeof injectUserImagesIntoHtml === 'function') {
+                code = injectUserImagesIntoHtml(code, media);
+            }
+        } catch (_) {}
         // Prevent pitch-black empty previews: ensure body has a visible background
         try {
             if (code && !/background(-color)?\s*:/i.test(code.slice(0, 2500))) {
@@ -11125,17 +11131,29 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
 
 
-        // Last resort: still no embedded photo → inject first image into body so /copy never shows empty
+                // Fix any <img> that is still not a real data URL (broken icon problem)
+        if (urls[0]) {
+            out = out.replace(/<img\b([^>]*)>/gi, function(full, attrs) {
+                const m = attrs.match(/\bsrc\s*=\s*(["'])([\s\S]*?)\1/i);
+                const src = m ? m[2] : '';
+                if (src && /^data:image\//i.test(src)) return full;
+                if (m) {
+                    return '<img' + attrs.replace(/\bsrc\s*=\s*(["'])[\s\S]*?\1/i, 'src="' + urls[0] + '"') + '>';
+                }
+                return '<img src="' + urls[0] + '"' + attrs + '>';
+            });
+        }
+        // Last resort: no usable image in document → inject photo
         if (urls[0] && !/data:image\//i.test(out)) {
-            const photoTag = '<div style="display:flex;justify-content:center;padding:12px"><img src="' + urls[0] + '" alt="Attached photo" style="max-width:100%;max-height:70vh;border-radius:12px;object-fit:contain"/></div>';
+            const photoTag = '<div style="display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#000"><img src="' + urls[0] + '" alt="Attached photo" style="max-width:100%;max-height:100vh;object-fit:contain"/></div>';
             if (/<body[^>]*>/i.test(out)) {
-                out = out.replace(/<body([^>]*)>/i, '<body$1>' + photoTag);
+                out = out.replace(/<body([^>]*)>/i, '<body$1 style="margin:0;background:#000">' + photoTag);
             } else {
-                out = photoTag + out;
+                out = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#000">' + photoTag + '</body></html>';
             }
         }
 
-        // 3D models (.glb/.gltf) as data URLs
+// 3D models (.glb/.gltf) as data URLs
         const models = (mediaItems || []).filter(function(m){ return m && m.isModel && m.dataUrl; });
         if (models.length) {
             models.forEach(function(m, i) {
@@ -12248,7 +12266,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 "- If the user says put this on screen / show this photo: output a minimal HTML page whose main content is <img src=\"__LUBA_IMG_0__\"> full viewport. No extra hero, no logos you invent, no 'Continue in App' chrome unless that chrome is LITERALLY in the attached pixels.\n" +
                 "- You may add only tiny controls the user asked for (zoom/reset). Everything else is forbidden in /copy.\n" +
                 "- Described UI (no attachment): match structure/colors/wording as closely as possible — still no random extras.\n" +
-                "- WITH /exactly also on: even stricter — only the photo (or only the asked elements).";
+                "- WITH /exactly also on: even stricter — only the photo (or only the asked elements).\n- FIX FOLLOW-UP (no new photo attached): keep src=\"__LUBA_IMG_0__\" exactly — do NOT remove the image, do NOT replace with empty src, do NOT paste a broken icon. The app re-injects the last photo.";
         }
         if (pendingExactMode) {
             systemPrompt += "\n\nEXACT MODE (/exactly) IS ON FOR THIS MESSAGE ONLY: Build or write ONLY what the user explicitly asked for. " +
