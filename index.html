@@ -6967,13 +6967,13 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 6, 2026 (saved chats auto-update + file chips)
+        const TERMS_TEXT = `Last updated: November 6, 2026 (/topic contextual web search)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi. By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
 
 2. The service
-Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — e.g. /truth, /plan, /search, /draw, /code, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, attaching code/HTML files (shown as file chips in chat; large files may be trimmed when sent to the AI), named saved chats that auto-update while you keep chatting in them, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
+Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save chat history on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — e.g. /truth, /plan, /search, /topic for topic-aware web search, /draw, /code, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, attaching code/HTML files (shown as file chips in chat; large files may be trimmed when sent to the AI), named saved chats that auto-update while you keep chatting in them, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
@@ -7009,12 +7009,12 @@ The owner may grant Admin to selected users via Owner CMDs. Admins are not owner
 We may update these Terms. Continued use after changes means you accept the updated version.
 `;
 
-    const PRIVACY_TEXT = `Last updated: November 6, 2026 (saved chats + attachments)
+    const PRIVACY_TEXT = `Last updated: November 6, 2026 (/topic search)
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
 
-Slash commands and Modes only change how the assistant replies; they do not create a separate data sale. Named saved chats and the current chat thread may be stored on your device and, when you are logged in, synced to our servers so you can continue on another phone. Attached code/HTML files may be stored with that chat history; large files may be stored in full on-device while only a trimmed slice is sent to the AI model. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
+Slash commands and Modes only change how the assistant replies; they do not create a separate data sale. /search looks up your question; /topic may use recent chat context to build a better search query before fetching live results. Named saved chats and the current chat thread may be stored on your device and, when you are logged in, synced to our servers so you can continue on another phone. Attached code/HTML files may be stored with that chat history; large files may be stored in full on-device while only a trimmed slice is sent to the AI model. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
 
 2. Account data
 We may store username, password hash, profile photo, preferences (including mode settings), verification status, coin/message counters, and session tokens.
@@ -7257,7 +7257,7 @@ WHAT YOU ARE (know this fully — answer confidently when asked about yourself, 
 - Modes users can turn on: Normal, Study, HTML (interactive apps/games in preview), Code, Creative, Lawyer, and others shown in the Modes menu.
 - LUBA FORGE (your twin): You have a companion studio called Luba Forge — a separate 3D builder workspace (empty infinite floor, live scene, Play builds). It lives under Modes as "LUBA FORGE" (BETA). You and Forge are two sides of the same product: you chat and write HTML/code here; Forge places live 3D scenes and full playable builds. Main Luba chat is free for everyone. Luba Forge is the premium-tier feature — other apps charge money for that level; here it is unlocked free for verified members (and the owner) instead of paid. If someone asks about Forge, explain: Modes → LUBA FORGE, verified perk (not a payment), twin of main Luba for 3D / scene building.
 - You can: chat, analyze images/photos users send, generate images when asked, write full HTML/CSS/JS apps that run in an interactive preview, send back downloadable files (user gets Download / Copy / Open in app when you return code), help with code, math (use the calculator tool), law explanations in Lawyer mode, tutoring in Study mode, and point users to Luba Forge for live 3D building when that fits.
-- Slash commands: users type / for a menu. Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
+- Slash commands: users type / for a menu. /search = live web search on the question alone. /topic = live web search that includes the ongoing chat topic (so “how many people?” after a jail talk searches prison stats, not world population). Examples: /truth /plan /search /draw /code /debug /email /study /help and many more (planning, writing, study, creative, coding). /help lists them all.
 - HTML previews support camera, microphone, location, and other browser APIs when the user's device allows them.
 
 HTML/GAME QUALITY (critical — users noticed regressions):
@@ -10746,7 +10746,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         { cmd: '/best', desc: 'Maximum quality build — full polish' },
         { cmd: '/add', desc: 'Add something to the current game/app/text' },
         { cmd: '/webadd', desc: 'Search web for textures/3D assets and add them' },
-        { cmd: '/search', desc: 'Force a live web search for your question' },
+        { cmd: '/search', desc: 'Force a live web search for your question only' },
+        { cmd: '/topic', desc: 'Web search using the whole chat topic + your question' },
         { cmd: '/short', desc: 'Answer short and direct' },
         { cmd: '/detailed', desc: 'Long thorough answer' },
         { cmd: '/roast', desc: 'Savage funny roast (still honest)' },
@@ -10791,6 +10792,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     let slashFiltered = [];
     let pendingTruthMode = false;
     let pendingForceSearch = false;
+    let pendingTopicSearch = false;
     let pendingCopyMode = false;
     let pendingExactMode = false;
     let pendingBestMode = false;
@@ -11705,6 +11707,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         // Slash commands (not the same as Modes — those stay in the Modes menu)
         pendingTruthMode = false;
         pendingForceSearch = false;
+        pendingTopicSearch = false;
         pendingCopyMode = false;
         pendingAddMode = false;
         pendingWebAddMode = false;
@@ -11781,6 +11784,11 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 pendingForceSearch = true;
                 text = sp.rest || text.replace(/^\/search\s*/i, '').trim();
                 if (!text) text = 'Search the web for the latest relevant info.';
+            } else if (sp.cmd === '/topic') {
+                pendingTopicSearch = true;
+                pendingForceSearch = true;
+                text = sp.rest || text.replace(/^\/topic\s*/i, '').trim();
+                if (!text) text = 'Continue the same topic — find current numbers and facts.';
             } else if (sp.cmd === '/short') {
                 pendingShortMode = true;
                 text = sp.rest || text.replace(/^\/short\s*/i, '').trim();
@@ -12103,6 +12111,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
         let systemPrompt = buildSystemPrompt();
 
+        if (pendingTopicSearch) {
+            systemPrompt += "\n\nTOPIC SEARCH MODE (/topic): The user wants web facts about the ONGOING conversation topic, not a random isolated reading of their last short message. Combine prior chat context (for example jail or prison) with their follow-up (for example how many people). Prefer statistics and sources that match that topic. If the short message is ambiguous, resolve it using earlier turns — do NOT jump to unrelated global population or other off-topic meanings.";
+        }
         if (pendingTruthMode) {
             systemPrompt += "\n\nTRUTH MODE (/truth) IS ON FOR THIS MESSAGE ONLY: Be brutally honest. No flattery, no fake compliments, no softening to protect feelings. If they ask how they look or if something is good/bad, answer the real truth in plain language (you can swear if it fits the tone). If something is actually good, say so honestly — truth means accurate, not automatically mean. For photos: describe what you actually see. Do not refuse ordinary appearance questions in this mode.";
         }
@@ -12242,11 +12253,38 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             return q.slice(0, 200);
         }
 
+
+        function buildTopicSearchQuery(raw, history) {
+            const userQ = buildSearchQuery(raw);
+            const stop = new Set(('the a an and or to of in on is are was were what how many about this that with for you me my we it be as at from they he she do does did can will just like so if when your have has had not but said say search please tell more some any who whom which their them than then also only into over such other after most our out up him her been being because would could should while each those these very through under again wait haha bad okay ok yes no'.split(/\s+/)));
+            const recent = (history || []).slice(-12);
+            const freq = Object.create(null);
+            recent.forEach(function(m) {
+                let c = String(m && m.content || '');
+                c = c.replace(/```[\s\S]*?```/g, ' ');
+                c = c.replace(/=== ATTACHED FILE[\s\S]*$/g, ' ');
+                c = c.replace(/https?:\/\/\S+/g, ' ');
+                const words = c.toLowerCase().match(/[a-z\u00c0-\u024f][a-z\u00c0-\u024f0-9-]{2,}/gi) || [];
+                words.forEach(function(w) {
+                    const lw = w.toLowerCase();
+                    if (stop.has(lw) || lw.length < 3) return;
+                    freq[lw] = (freq[lw] || 0) + 1;
+                });
+            });
+            const keywords = Object.keys(freq).sort(function(a, b) { return freq[b] - freq[a]; }).slice(0, 10);
+            let q = (userQ + ' ' + keywords.join(' ')).replace(/\s+/g, ' ').trim();
+            if (q.length < 8 && keywords.length) q = keywords.slice(0, 6).join(' ');
+            return q.slice(0, 220);
+        }
+
         // Pre-search: actually hit the web, then feed results into the model
         let forcedSearchBlock = '';
         if ((needsSearchTool || pendingForceSearch || pendingWebAddMode) && !imageToSend) {
             try {
                 let searchQ = buildSearchQuery(msgText);
+                if (pendingTopicSearch) {
+                    searchQ = buildTopicSearchQuery(msgText, chatHistory);
+                }
                 if (pendingWebAddMode) {
                     // Keep search light — we mainly use known-good CDN paths in the prompt
                     searchQ = (searchQ || msgText || 'trees').slice(0, 80) + ' three.js texture example';
