@@ -1,0 +1,5 @@
+# Luba AI
+> Luba AI is a web-based AI assistant application developed by Kobi.
+
+## Overview
+Luba AI is an interactive AI chat assistant application. It features real-time web search tool integration, Cloudflare Workers backend infrastructure, KV storage, and dynamic 2D canvas HTML scripting support.
