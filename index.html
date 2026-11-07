@@ -3460,8 +3460,13 @@
 
             <button type="button" class="owner-btn" id="open-owner-btn">Owner CMDs</button>
 
+            <button type="button" id="settings-story-main-btn" style="width:100%;margin:12px 0 4px;padding:12px 14px;border-radius:12px;border:1px solid #334155;background:linear-gradient(135deg,#1e293b,#0f172a);color:#e2e8f0;font-weight:600;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+                📖 Luba's story — how it started
+            </button>
             <div class="settings-tagline">Made on Earth by humans</div>
             <div class="auth-legal" style="margin-top:12px;">
+                <button type="button" class="legal-link" id="settings-story-btn">Luba's story</button>
+                ·
                 <button type="button" class="legal-link" id="settings-terms-btn">Terms of Service</button>
                 ·
                 <button type="button" class="legal-link" id="settings-privacy-btn">Privacy Policy</button>
@@ -7193,18 +7198,51 @@ Made on Earth by humans.
     if (openPrivacyBtn) openPrivacyBtn.onclick = () => openLegal('privacy');
     const settingsTermsBtn = document.getElementById('settings-terms-btn');
     const settingsPrivacyBtn = document.getElementById('settings-privacy-btn');
-    const settingsStoryBtn = document.getElementById('settings-story-btn');
     if (settingsTermsBtn) settingsTermsBtn.onclick = () => openLegal('terms');
     if (settingsPrivacyBtn) settingsPrivacyBtn.onclick = () => openLegal('privacy');
-    if (settingsStoryBtn) settingsStoryBtn.onclick = () => {
+    function openLubaStory() {
+        const STORY_TEXT =
+            "LUBA'S STORY — How it started\n\n" +
+            "Written by Kobi · Luba's creator\n\n" +
+            "It was a normal day. I was on my main account grinding MM2 on Roblox. When night came I put the phone down and went to sleep thinking I would play more in the morning.\n\n" +
+            "Morning came. I opened Roblox — BOOM. Permanent ban. Not a short ban. The whole phone was locked so I could not even make a new account. Reason: Other.\n\n" +
+            "I was shaking and crying. All the progress and money on that account was gone. I sent an appeal for a false ban.\n\n" +
+            "To forget it I started a dump project. In my own words:\n\n" +
+            "\"hmm imma js create ai to forget it then forget ai too and live my life\"\n\n" +
+            "Emoji buttons. Tiny scripts. Tons of bugs. Then login, photos, files, modes, commands, leaderboards, personality — it kept growing.\n\n" +
+            "Luba is clever now. I still have not forgotten the ban, and I still have not gotten a real appeal answer.\n\n" +
+            "Cool story, right? See you next time. Bye.\n\n— Kobi\n\n" +
+            "(Full page with ban photo + early Luba photo: open luba-story.html next to this app if hosted.)";
+
+        // Try dedicated page first
         try {
-            // Prefer sibling file on the same host; fall back to in-app note
             const url = new URL('luba-story.html', window.location.href).href;
-            window.open(url, '_blank', 'noopener,noreferrer');
-        } catch (_) {
-            window.location.href = 'luba-story.html';
-        }
-    };
+            const w = window.open(url, '_blank', 'noopener,noreferrer');
+            if (w) return;
+        } catch (_) {}
+
+        // In-app fallback (works even if only one HTML file is uploaded)
+        try {
+            if (typeof openLegal === 'function') {
+                const overlay = document.getElementById('legal-overlay');
+                const titleEl = document.getElementById('legal-title');
+                const bodyEl = document.getElementById('legal-body');
+                if (titleEl) titleEl.textContent = "Luba's story";
+                if (bodyEl) bodyEl.textContent = STORY_TEXT;
+                if (overlay) {
+                    overlay.classList.add('is-open');
+                    overlay.style.display = 'flex';
+                    overlay.style.zIndex = '10050';
+                }
+                return;
+            }
+        } catch (_) {}
+        alert(STORY_TEXT);
+    }
+    const settingsStoryBtn = document.getElementById('settings-story-btn');
+    const settingsStoryMainBtn = document.getElementById('settings-story-main-btn');
+    if (settingsStoryBtn) settingsStoryBtn.onclick = openLubaStory;
+    if (settingsStoryMainBtn) settingsStoryMainBtn.onclick = openLubaStory;
     if (closeLegalBtn) closeLegalBtn.onclick = () => closeLegal(false);
     if (closeLegalBtn2) closeLegalBtn2.onclick = () => {
         if (closeLegalBtn2.disabled) return;
@@ -7399,6 +7437,7 @@ You also have a generate_image tool — use it for any draw/generate/edit-photo 
     const HTML_MODE_INSTRUCTIONS = `HTML MODE IS CURRENTLY ON. The user wants a WORKING interactive app / game in the chat preview. Ship your ABSOLUTE MAX quality — this mode is for complete, polished, feature-rich results that look and feel like real production apps, not sketches or demos.
 
 OUTPUT FORMAT (exact):
+0) NEVER paste CSS/JS/HTML outside the fence. If the user sees raw box-shadow or #counter-title in the chat bubble, you failed. Chat text = short intro only; entire app = inside ONE ```html fence.
 1) One short intro line only, then ONE markdown fence labeled html with a COMPLETE single-file document.
 2) Document MUST start with <!DOCTYPE html> and include <html>, <head>, <body>.
 3) ALL CSS and JS in that same file. Complete CDN tags only (never empty src). Three.js: https://unpkg.com/three@0.160.0/build/three.min.js BEFORE your script.
@@ -8198,52 +8237,103 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         return fences;
     }
 
+    function looksLikeCodeLeak(text) {
+        const t = String(text || '').trim();
+        if (!t || t.length < 24) return false;
+        // CSS-ish or HTML-ish fragments that models spill outside fences
+        if (/[{};]\s*[#.]?[a-zA-Z_-]+\s*\{/.test(t)) return true;
+        if (/(?:box-shadow|border-radius|background|font-size|padding|margin)\s*:\s*[^;]{2,}/i.test(t)) return true;
+        if (/<\/?(?:html|head|body|style|script|div|canvas|button|input)\b/i.test(t)) return true;
+        if (/<!DOCTYPE\s+html/i.test(t)) return true;
+        // long runs of code punctuation
+        const symbols = (t.match(/[{};<>]/g) || []).length;
+        if (t.length > 80 && symbols > t.length / 12) return true;
+        return false;
+    }
+
+    function scrubProseKeepHuman(text) {
+        let t = String(text || '');
+        // Drop trailing/leading fence markers left in prose
+        t = t.replace(/```[\w]*\s*/g, '').replace(/```/g, '');
+        return t.trim();
+    }
+
     function formatAiReplyHtml(text) {
         const raw = String(text || '');
-        const fences = extractFences(raw);
+        let fences = extractFences(raw);
 
-        // No fences: maybe raw HTML document
+        // Unfenced full HTML document
         if (!fences.length) {
             const trimmed = raw.trim();
             if (looksLikeHtmlDocument(trimmed, '')) {
                 return { html: buildPreviewBlock(trimmed), hasCode: true };
             }
+            // Half-baked: starts with <!DOCTYPE or <html mid-message without fences
+            const htmlStart = trimmed.search(/<!DOCTYPE\s+html|<html[\s>]/i);
+            if (htmlStart >= 0 && trimmed.length - htmlStart > 200) {
+                const prose = scrubProseKeepHuman(trimmed.slice(0, htmlStart));
+                const code = trimmed.slice(htmlStart);
+                let html = '';
+                if (prose) html += '<div class="ai-text">' + escapeHtmlText(prose).replace(/\n/g, '<br>') + '</div>';
+                html += buildPreviewBlock(code);
+                return { html: html, hasCode: true };
+            }
             return { html: raw, hasCode: false };
         }
 
-        // If multiple fences but one big HTML doc was split because of nested ```,
-        // merge consecutive html-ish fragments into one when they clearly continue a document.
+        // Merge consecutive fences that are clearly one HTML/CSS/JS document
+        const merged = [];
+        for (let i = 0; i < fences.length; i++) {
+            let f = Object.assign({}, fences[i]);
+            let code = f.content;
+            let lang = f.lang;
+            while (i + 1 < fences.length) {
+                const next = fences[i + 1];
+                const gap = raw.slice(f.end, next.start).trim();
+                const htmlish = looksLikeHtmlDocument(code, lang) || lang === 'html' || lang === 'htm' || lang === 'css' || lang === 'javascript' || lang === 'js';
+                const nextCont =
+                    looksLikeHtmlDocument(next.content, next.lang) ||
+                    /<\/?(html|head|body|script|style|div|canvas)/i.test(next.content) ||
+                    /[{};]\s*[#.]?[a-zA-Z_-]+\s*\{/.test(next.content) ||
+                    ['html','htm','css','js','javascript'].indexOf(next.lang) >= 0;
+                if (htmlish && (gap.length < 12 || nextCont || looksLikeCodeLeak(gap))) {
+                    code = code + '\n' + next.content;
+                    f.end = next.end;
+                    f.content = code;
+                    if (!lang) lang = next.lang;
+                    f.lang = lang;
+                    i++;
+                } else break;
+            }
+            merged.push(f);
+        }
+        fences = merged;
+
         let hasCode = false;
         let last = 0;
         let html = '';
+        let combinedHtmlCode = '';
 
         for (let i = 0; i < fences.length; i++) {
             const f = fences[i];
-            const before = raw.slice(last, f.start);
+            let before = raw.slice(last, f.start);
+            // If "before" is mostly leaked code, fold into the file instead of chat
+            if (looksLikeCodeLeak(before) && (looksLikeHtmlDocument(f.content, f.lang) || f.lang === 'html' || f.lang === 'css')) {
+                f.content = scrubProseKeepHuman(before) + '\n' + f.content;
+                before = '';
+            } else {
+                before = scrubProseKeepHuman(before);
+                // Remove pure code lines from prose
+                if (looksLikeCodeLeak(before)) before = '';
+            }
             if (before.trim()) {
                 html += '<div class="ai-text">' + escapeHtmlText(before).replace(/\n/g, '<br>') + '</div>';
             }
 
             let code = f.content;
             let lang = f.lang;
-
-            // Merge following fence pieces if this is broken HTML split mid-document
-            if (looksLikeHtmlDocument(code, lang) || lang === 'html' || lang === 'htm') {
-                while (i + 1 < fences.length) {
-                    const next = fences[i + 1];
-                    const gap = raw.slice(f.end, next.start).trim();
-                    // Only merge if gap is tiny (just a ``` artifact) or next looks like HTML continuation
-                    const nextLooksCont =
-                        /<\/?(html|head|body|script|style|div|canvas)/i.test(next.content) ||
-                        next.lang === 'html' || next.lang === 'htm' || next.lang === 'javascript' || next.lang === 'js';
-                    if (gap.length < 8 || nextLooksCont) {
-                        code = code + '\n' + next.content;
-                        // advance
-                        i++;
-                        f.end = next.end;
-                    } else break;
-                }
-                html += buildPreviewBlock(code);
+            if (looksLikeHtmlDocument(code, lang) || lang === 'html' || lang === 'htm' || lang === 'css') {
+                combinedHtmlCode = combinedHtmlCode ? (combinedHtmlCode + '\n' + code) : code;
             } else if (looksLikeHtmlDocument(code, lang)) {
                 html += buildPreviewBlock(code);
             } else {
@@ -8253,11 +8343,23 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             last = f.end;
         }
 
-        const tail = raw.slice(last);
+        let tail = raw.slice(last);
+        if (looksLikeCodeLeak(tail) || looksLikeHtmlDocument(tail, '')) {
+            combinedHtmlCode = combinedHtmlCode ? (combinedHtmlCode + '\n' + scrubProseKeepHuman(tail)) : scrubProseKeepHuman(tail);
+            tail = '';
+        } else {
+            tail = scrubProseKeepHuman(tail);
+            if (looksLikeCodeLeak(tail)) tail = '';
+        }
+
+        if (combinedHtmlCode && combinedHtmlCode.trim()) {
+            html += buildPreviewBlock(combinedHtmlCode);
+            hasCode = true;
+        }
         if (tail.trim()) {
             html += '<div class="ai-text">' + escapeHtmlText(tail).replace(/\n/g, '<br>') + '</div>';
         }
-        return { html: hasCode ? html : raw, hasCode };
+        return { html: hasCode ? html : raw, hasCode: hasCode };
     }
 
     function finishHydrateFrame(frame, code) {
