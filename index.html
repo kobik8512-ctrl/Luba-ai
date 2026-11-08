@@ -449,25 +449,27 @@
         .msg-tools {
             position: static;
             display: flex;
-            gap: 6px;
+            gap: 8px;
             z-index: 2;
-            margin-top: 8px;
-            justify-content: flex-end;
-            opacity: 0.85;
+            margin-top: 6px;
+            margin-bottom: 2px;
+            justify-content: flex-start;
+            opacity: 1;
+            padding-left: 2px;
         }
         .message.ai .message-body {
             padding-right: 12px; /* text can use full width — tools are below */
         }
         .copy-btn, .speak-btn {
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.12);
-            color: #ccc;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.16);
+            color: #e5e5e5;
             cursor: pointer;
             font-size: 13px;
             opacity: 1;
             transition: background 0.15s, color 0.15s;
-            width: 30px;
-            height: 30px;
+            width: 34px;
+            height: 34px;
             border-radius: 10px;
             display: inline-flex;
             align-items: center;
@@ -8787,10 +8789,11 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             };
             tools.appendChild(copyBtn);
             tools.appendChild(speakBtn);
-            content.appendChild(tools);
+            body.appendChild(content);
+            body.appendChild(tools);
+        } else {
+            body.appendChild(content);
         }
-
-        body.appendChild(content);
 
         const timeEl = document.createElement('div');
         timeEl.className = 'timestamp';
