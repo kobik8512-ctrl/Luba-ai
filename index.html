@@ -9151,7 +9151,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         chatHistory = cloudMsgs.slice(-40);
         lastCloudChatUpdatedAt = cloudUpdated || Date.now();
         saveUserChatHistory(currentUser.username, chatHistory);
-        if (!opts.silent) renderSavedMessages();
+        // Always paint when we actually applied cloud messages (not every 5s poll)
+        if (!isGenerating && !document.getElementById('typing-indicator')) {
+            renderSavedMessages();
+        }
         return true;
     }
 
@@ -9282,11 +9285,19 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         stopChatSyncPolling();
         chatSyncTimer = setInterval(() => {
             if (!currentUser || !getAuthToken()) return;
-            pullCloudChat({ silent: false }).catch(() => {});
+            // Never rebuild the chat UI while Luba is typing / generating — that kills the bubble
+            if (typeof isGenerating !== 'undefined' && isGenerating) {
+                enforceLiveBan(true).catch(() => {});
+                return;
+            }
+            if (document.getElementById('typing-indicator')) {
+                enforceLiveBan(true).catch(() => {});
+                return;
+            }
+            // silent: true — only re-render if pullCloudChat actually applied new messages
+            pullCloudChat({ silent: true }).catch(() => {});
             enforceLiveBan(true).catch(() => {});
-            // Instant verification approve/deny notification (no page refresh)
             checkVerifyNotice().catch(() => {});
-            // Sync mode/theme from other phones on same account
             syncCloudPrefsLive().catch(() => {});
         }, 5000);
     }
@@ -11007,6 +11018,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         { cmd: '/webadd', desc: 'Search web for textures/3D assets and add them' },
         { cmd: '/search', desc: 'Force a live web search for your question only' },
         { cmd: '/topic', desc: 'Web search using the whole chat topic + your question' },
+        { cmd: '/rechat', desc: 'Re-read full chat (scripts, files, all messages)' },
         { cmd: '/short', desc: 'Answer short and direct' },
         { cmd: '/detailed', desc: 'Long thorough answer' },
         { cmd: '/roast', desc: 'Savage funny roast (still honest)' },
@@ -11051,6 +11063,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     let slashFiltered = [];
     let pendingTruthMode = false;
     let pendingForceSearch = false;
+    let pendingRechatMode = false;
     let pendingTopicSearch = false;
     let pendingCopyMode = false;
     let pendingExactMode = false;
@@ -11130,6 +11143,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             else if (cmd === '/webadd') { pendingWebAddMode = true; pendingForceSearch = true; }
             else if (cmd === '/search') pendingForceSearch = true;
             else if (cmd === '/topic') { pendingTopicSearch = true; pendingForceSearch = true; }
+            else if (cmd === '/rechat' || cmd === '/reread' || cmd === '/context') { pendingRechatMode = true; pendingFixMode = true; }
             else if (cmd === '/short') pendingShortMode = true;
             else if (cmd === '/detailed') pendingDetailedMode = true;
             else if (cmd === '/roast') pendingRoastMode = true;
