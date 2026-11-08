@@ -6067,6 +6067,7 @@ async function spendCoin(username, cost) {
             if (trimmed.length > 40) trimmed = trimmed.slice(-40);
             const compact = compactHistoryForStorage(trimmed);
             localStorage.setItem(key, JSON.stringify(compact));
+            try { localStorage.setItem('luba_chat_updated_' + userKey(username), String(Date.now())); } catch (_) {}
         } catch (err) {
             let trimmed = compactHistoryForStorage(history.slice());
             while (trimmed.length > 4) {
