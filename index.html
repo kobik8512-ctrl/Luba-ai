@@ -4546,6 +4546,15 @@ async function spendCoin(username, cost) {
             const data = await res.json().catch(() => null);
             if (!data) return { error: 'Bad response from worker (' + res.status + ')' };
 
+            // Cloudflare free KV daily write cap — soft-fail so chat UI does not show raw "KV put() limit"
+            try {
+                const errStr = String((data && (data.error || data.message)) || '');
+                if (/KV put|limit exceeded for the day/i.test(errStr)) {
+                    window.__lubaKvLimited = true;
+                    return { ok: false, error: 'storage_limit', soft: true };
+                }
+            } catch (_) {}
+
             // Instant lock from ANY server response (ban / IP ban / deleted)
             try {
                 if (currentUser && !isOwnerAccount(currentUser)) {
@@ -11524,6 +11533,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     /** Clean ugly raw API error strings only. Do NOT rename Gemini→Luba in normal replies. */
     function sanitizeAiError(msg) {
         let s = String(msg || 'Something went wrong.');
+        // Cloudflare KV daily write limit — never show raw infra text as Luba's reply
+        if (/KV put\(\) limit exceeded|put\(\) limit exceeded for the day|limit exceeded for the day/i.test(s)) {
+            return "Server storage hit today's free limit. Your chat still works on this device — try again later. Messages are kept on the phone.";
+        }
         // Hide provider migration / Interactions API spam
         if (/no longer available to new users|Interactions API|ai\.theservice|update your code to use the model/i.test(s)) {
             return 'Luba hit a temporary model issue. Tap Retry — a different model will be used.';
