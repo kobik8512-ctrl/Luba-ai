@@ -7010,7 +7010,7 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 8, 2026 (Kobiverse company identity)
+        const TERMS_TEXT = `Last updated: November 8, 2026 (/rechat full-context command)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi (company: Kobiverse). Contact: lubaai.official@gmail.com · TikTok @luba_ai. The Settings link “Luba's story” opens the true origin story (Roblox ban, MM2, dump project that became Luba). By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
@@ -7057,7 +7057,7 @@ We may update these Terms. Continued use after changes means you accept the upda
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
 
-Slash commands and Modes only change how the assistant replies; they do not create a separate data sale. /search looks up your question; /topic may use recent chat context to build a better search query before fetching live results. Named saved chats (max 100 per account) and the current chat thread may be stored on your device and, when you are logged in, synced to our servers so you can continue on another phone. Attached code/HTML files may be stored with that chat history; large files may be stored in full on-device while only a trimmed slice is sent to the AI model. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
+Slash commands (including /rechat to re-read the whole chat) and Modes only change how the assistant replies; they do not create a separate data sale. /search looks up your question; /topic may use recent chat context to build a better search query before fetching live results. Named saved chats (max 100 per account) and the current chat thread may be stored on your device and, when you are logged in, synced to our servers so you can continue on another phone. Attached code/HTML files may be stored with that chat history; large files may be stored in full on-device while only a trimmed slice is sent to the AI model. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
 
 2. Account data
 We may store username, password hash, profile photo, preferences (including mode settings), verification status, coin/message counters, and session tokens.
@@ -12046,6 +12046,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         pendingTruthMode = false;
         pendingForceSearch = false;
         pendingTopicSearch = false;
+        pendingRechatMode = false;
         pendingCopyMode = false;
         pendingAddMode = false;
         pendingWebAddMode = false;
@@ -12512,6 +12513,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (pendingFixMode) {
             systemPrompt += "\n\nFIX MODE: Continue the SAME previous game/app from this chat. Fix bugs and apply improvements. Do not start a different project.";
         }
+        if (pendingRechatMode) {
+            systemPrompt += "\n\nRECHAT MODE (/rechat): You MUST re-read the FULL conversation provided in this request — every user message, every assistant message, every HTML/script/code block, every file description, every fix request. Treat that full thread as ground truth. Do NOT drop features, do NOT invent a new weaker project, do NOT forget scripts that already appeared. Summarize silently what the current project is, then answer the user's latest request while preserving everything already built. If code was in earlier messages, keep that same codebase and only change what the user asked.";
+        }
         if (pendingPlanMode) systemPrompt += "\n\nPLAN MODE: Reply as a clear step-by-step plan with ordered steps. Practical and doable.";
         if (pendingStepsMode) systemPrompt += "\n\nSTEPS MODE: Numbered steps only. Minimal intro. No long essays.";
         if (pendingProsMode) systemPrompt += "\n\nPROS/CONS MODE: Give balanced Pros and Cons sections, then a short bottom line.";
@@ -12664,10 +12668,16 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
 
         // More history when iterating so the previous HTML stays in context
-        const historyLimit = isSimpleChat ? 4
+        let historyLimit = isSimpleChat ? 4
             : (isIterateMsg ? 12
             : (text && text.length > 80000 ? 3
             : (text && text.length > 12000 ? 6 : 14)));
+        // /rechat: pull almost the whole thread so scripts/files/comments are not dropped
+        if (pendingRechatMode) {
+            historyLimit = Math.min(40, Math.max(chatHistory.length, 24));
+        } else if (isIterateMsg) {
+            historyLimit = Math.max(historyLimit, 16);
+        }
         const recent = chatHistory.slice(-historyLimit);
 
         const contents = recent.map(m => ({
