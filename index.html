@@ -9647,12 +9647,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (!currentUser) return;
         try {
             if (Array.isArray(list) && list.length > MAX_SAVED_CHATS) list = list.slice(0, MAX_SAVED_CHATS);
-            localStorage.setItem('luba_saved_' + userKey(currentUser.username), JSON.stringify(list));
+            const key = 'luba_saved_' + userKey(currentUser.username);
+            localStorage.setItem(key, JSON.stringify(list));
+            const stamp = Date.now();
+            localStorage.setItem(key + '_updated', String(stamp));
+            lastNamedSavedUpdatedAt = stamp;
         } catch (err) {
             alert("Couldn't save — storage is full. Try deleting an old saved chat first.");
             return;
         }
-        // Sync named saves to server (all phones) — server becomes source of truth (deletes included)
         const token = getAuthToken();
         if (token) {
             cloudPost({
@@ -9660,10 +9663,35 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 token,
                 saved: list
             }).then((data) => {
-                if (data && data.ok) lastNamedSavedUpdatedAt = Date.now();
+                if (data && data.ok) {
+                    lastNamedSavedUpdatedAt = Date.now();
+                    try {
+                        localStorage.setItem('luba_saved_' + userKey(currentUser.username) + '_updated', String(lastNamedSavedUpdatedAt));
+                    } catch (_) {}
+                }
             }).catch(() => {});
         }
     }
+
+    function mergeNamedSavedLists(localList, cloudList) {
+        const map = {};
+        (cloudList || []).forEach(function(c) {
+            if (c && c.id) map[c.id] = c;
+        });
+        (localList || []).forEach(function(c) {
+            if (!c || !c.id) return;
+            map[c.id] = c;
+        });
+        const merged = Object.keys(map).map(function(k) { return map[k]; });
+        merged.sort(function(a, b) {
+            const ta = Number(String(a.id || '').replace(/\D/g, '')) || 0;
+            const tb = Number(String(b.id || '').replace(/\D/g, '')) || 0;
+            return tb - ta;
+        });
+        if (merged.length > MAX_SAVED_CHATS) return merged.slice(0, MAX_SAVED_CHATS);
+        return merged;
+    }
+
 
     async function pullNamedSavedChats() {
         const token = getAuthToken();
@@ -9674,19 +9702,47 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const cloudUpdated = data.updatedAt || 0;
         const localList = getSavedChats();
 
-        // Server wins when it is newer — so deletes on phone A disappear on phone B
-        if (cloudUpdated && cloudUpdated >= lastNamedSavedUpdatedAt) {
+        let localStamp = 0;
+        try {
+            localStamp = Number(localStorage.getItem('luba_saved_' + userKey(currentUser.username) + '_updated') || 0);
+        } catch (_) {}
+        if (localStamp > lastNamedSavedUpdatedAt) lastNamedSavedUpdatedAt = localStamp;
+
+        const localOnly = (localList || []).filter(function(c) {
+            return c && c.id && !(cloudList || []).some(function(x) { return x && x.id === c.id; });
+        });
+        const localIsFresher = localStamp && (!cloudUpdated || localStamp >= cloudUpdated);
+        const localHasMore = (localList || []).length > (cloudList || []).length;
+
+        // Keep local-only chats (5th+ save before cloud caught up) — merge & push up
+        if (localOnly.length || localIsFresher || localHasMore) {
+            const merged = mergeNamedSavedLists(localList, cloudList);
+            try {
+                localStorage.setItem('luba_saved_' + userKey(currentUser.username), JSON.stringify(merged));
+            } catch (_) {}
+            try {
+                const res = await cloudPost({ action: 'save_named_chats', token, saved: merged });
+                if (res && res.ok) {
+                    lastNamedSavedUpdatedAt = Date.now();
+                    localStorage.setItem('luba_saved_' + userKey(currentUser.username) + '_updated', String(lastNamedSavedUpdatedAt));
+                }
+            } catch (_) {}
+            return;
+        }
+
+        // Cloud is strictly newer
+        if (cloudUpdated && cloudUpdated > lastNamedSavedUpdatedAt) {
             try {
                 localStorage.setItem(
                     'luba_saved_' + userKey(currentUser.username),
-                    JSON.stringify(cloudList)
+                    JSON.stringify(cloudList.slice(0, MAX_SAVED_CHATS))
                 );
             } catch (_) {}
             lastNamedSavedUpdatedAt = cloudUpdated;
             return;
         }
 
-        // Local is newer / cloud empty: upload local (including deletes already applied locally)
+        // Local is newer / cloud empty: upload local
         if (localList.length && (!cloudUpdated || lastNamedSavedUpdatedAt > cloudUpdated)) {
             const res = await cloudPost({
                 action: 'save_named_chats',
