@@ -4546,12 +4546,14 @@ async function spendCoin(username, cost) {
             const data = await res.json().catch(() => null);
             if (!data) return { error: 'Bad response from worker (' + res.status + ')' };
 
-            // Cloudflare free KV daily write cap — soft-fail so chat UI does not show raw "KV put() limit"
+            // Cloudflare free KV daily write cap — only soft-fail failed responses (never kill ok:true login)
             try {
-                const errStr = String((data && (data.error || data.message)) || '');
-                if (/KV put|limit exceeded for the day/i.test(errStr)) {
-                    window.__lubaKvLimited = true;
-                    return { ok: false, error: 'storage_limit', soft: true };
+                if (data && data.ok === false) {
+                    const errStr = String(data.error || data.message || '');
+                    if (/KV put|limit exceeded for the day/i.test(errStr)) {
+                        window.__lubaKvLimited = true;
+                        return { ok: false, error: 'storage_limit', soft: true };
+                    }
                 }
             } catch (_) {}
 
@@ -6500,10 +6502,28 @@ async function spendCoin(username, cost) {
                 return;
             }
 
-            // Server returned something unexpected — show raw hint
-            if (cloud && cloud.ok === true && !cloud.token) {
-                loginError.textContent = 'Server login incomplete (no session). Try again.';
+            // Server verified user but could not store session (KV full) — still log in
+            if (cloud && cloud.ok === true && cloud.profile && !cloud.token) {
+                const user = profileToLocalUser(cloud.profile, { cloud: false });
+                try { user.passwordHash = await hashPassword(pw); } catch (_) {}
+                cacheLocalUser(user);
+                setCurrentUsername(user.username);
+                rememberDeviceAccount(user.username);
+                storageRemove('luba_manual_logout');
+                await enterApp(user);
                 return;
+            }
+            if (cloud && cloud.ok === true && !cloud.token) {
+                // No profile either — try local cache
+                const users = getUsers();
+                const localUser = users[String(uname).toLowerCase()] || users[userKey(uname)];
+                if (localUser && (await passwordMatches(pw, localUser.passwordHash))) {
+                    setCurrentUsername(localUser.username);
+                    rememberDeviceAccount(localUser.username);
+                    storageRemove('luba_manual_logout');
+                    await enterApp(localUser);
+                    return;
+                }
             }
 
             // Server reachable and says account is gone → wipe local cache, never log in
@@ -6698,13 +6718,19 @@ async function spendCoin(username, cost) {
                 return;
             }
 
-            // If server says taken / error, show it
+            // Real server errors (taken, invalid) — show them
             if (cloud && cloud.error) {
-                signupError.textContent = String(cloud.error);
-                return;
+                const err = String(cloud.error);
+                const softNet = cloud.soft || cloud.error === 'storage_limit' ||
+                    /storage_limit|KV put|limit exceeded|Failed to fetch|network|Bad response|fetch/i.test(err);
+                if (!softNet) {
+                    signupError.textContent = err;
+                    return;
+                }
+                // else fall through to local account
             }
 
-            // Server unreachable — last resort local account + warning
+            // Server unreachable / storage full — local account on this phone
             const users = getUsers();
             const key = nameCheck.value.toLowerCase();
             if (users[key]) {
