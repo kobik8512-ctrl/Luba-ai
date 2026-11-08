@@ -6479,9 +6479,9 @@ async function spendCoin(username, cost) {
                 return;
             }
 
-            if (cloud && cloud.ok && cloud.token && cloud.profile) {
-                setAuthToken(cloud.token);
-                const user = profileToLocalUser(cloud.profile, { cloud: true });
+            if (cloud && cloud.ok && cloud.profile) {
+                if (cloud.token) setAuthToken(cloud.token);
+                const user = profileToLocalUser(cloud.profile, { cloud: !!cloud.token });
                 try { user.passwordHash = await hashPassword(pw); } catch (_) {}
                 cacheLocalUser(user);
                 setCurrentUsername(user.username);
@@ -6491,8 +6491,6 @@ async function spendCoin(username, cost) {
                     await enterApp(user);
                 } catch (enterErr) {
                     console.error('enterApp failed', enterErr);
-                    loginError.textContent = 'Logged in but failed to open chat: ' + (enterErr && enterErr.message ? enterErr.message : 'unknown');
-                    // Still mark logged-in so they can use the app
                     try {
                         currentUser = user;
                         document.body.classList.add('logged-in');
@@ -6525,11 +6523,28 @@ async function spendCoin(username, cost) {
                 return;
             }
 
-            // Any other server error (wrong password, etc.) — do not use local bypass
+            // Storage limit / soft server errors → try local account on this phone
             if (cloud && cloud.ok === false && cloudErr) {
-                // Wrong password still valid message
+                const soft =
+                    cloud.soft ||
+                    cloud.error === 'storage_limit' ||
+                    /storage_limit|KV put|limit exceeded for the day/i.test(cloudErr);
+                if (soft || /storage|limit exceeded/i.test(cloudErr)) {
+                    const users = getUsers();
+                    const localUser = users[String(uname).toLowerCase()] || users[userKey(uname)];
+                    if (localUser && (await passwordMatches(pw, localUser.passwordHash))) {
+                        setCurrentUsername(localUser.username);
+                        rememberDeviceAccount(localUser.username);
+                        storageRemove('luba_manual_logout');
+                        await enterApp(localUser);
+                        return;
+                    }
+                    // Password may be correct on server but local cache missing — not "wrong password"
+                    loginError.textContent =
+                        'Server is full for today (storage limit). If this phone has never logged this account in before, try again tomorrow. If you used this phone before, check password.';
+                    return;
+                }
                 loginError.textContent = cloudErr;
-                // If wrong password, keep local; if banned handled above
                 return;
             }
 
@@ -6648,8 +6663,8 @@ async function spendCoin(username, cost) {
                 return;
             }
 
-            if (cloud && cloud.ok && cloud.token && cloud.profile) {
-                setAuthToken(cloud.token);
+            if (cloud && cloud.ok && cloud.profile) {
+                if (cloud.token) setAuthToken(cloud.token);
                 const user = profileToLocalUser(cloud.profile, { dob: dob });
                 try { user.passwordHash = await hashPassword(pw); } catch (_) {}
                 cacheLocalUser(user);
@@ -6659,7 +6674,31 @@ async function spendCoin(username, cost) {
                 return;
             }
 
-            // If server says taken / error, show it (don't create phone-only ghost accounts)
+            // Storage full — allow local account on this phone only (same form data)
+            if (cloud && (cloud.soft || cloud.error === 'storage_limit' || /storage_limit|KV put|limit exceeded/i.test(String(cloud.error || '')))) {
+                const users = getUsers();
+                const key = nameCheck.value.toLowerCase();
+                if (users[key]) {
+                    signupError.textContent = 'That username is already on this phone. Try logging in.';
+                    return;
+                }
+                const hash = await hashPassword(pw);
+                const user = {
+                    username: nameCheck.value,
+                    passwordHash: hash,
+                    gender: selectedGender || 'boy',
+                    dob: dob,
+                    createdAt: Date.now(),
+                    cloud: false
+                };
+                cacheLocalUser(user);
+                setCurrentUsername(user.username);
+                rememberDeviceAccount(user.username);
+                await enterApp(user);
+                return;
+            }
+
+            // If server says taken / error, show it
             if (cloud && cloud.error) {
                 signupError.textContent = String(cloud.error);
                 return;
