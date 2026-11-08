@@ -6020,15 +6020,7 @@ async function spendCoin(username, cost) {
                     localStorage.removeItem('luba_chat_' + username);
                 }
             }
-            // session backup (refresh while reply was in flight)
-            if (!raw) {
-                try { raw = sessionStorage.getItem(key); } catch (_) {}
-            }
-            if (!raw) return [];
-            let parsed = [];
-            try { parsed = JSON.parse(raw) || []; } catch (_) { return []; }
-            if (!Array.isArray(parsed)) return [];
-            return parsed;
+            return raw ? JSON.parse(raw) : [];
         } catch {
             return [];
         }
@@ -6068,26 +6060,17 @@ async function spendCoin(username, cost) {
     }
     function saveUserChatHistory(username, history) {
         const key = 'luba_chat_' + userKey(username);
-        const stampKey = 'luba_chat_updated_' + userKey(username);
         try {
             let trimmed = history;
             if (trimmed.length > 40) trimmed = trimmed.slice(-40);
             const compact = compactHistoryForStorage(trimmed);
             localStorage.setItem(key, JSON.stringify(compact));
-            localStorage.setItem(stampKey, String(Date.now()));
-            try {
-                // Emergency backup for refresh mid-reply
-                sessionStorage.setItem(key, JSON.stringify(compact));
-                sessionStorage.setItem(stampKey, String(Date.now()));
-            } catch (_) {}
         } catch (err) {
             let trimmed = compactHistoryForStorage(history.slice());
-            // Prefer dropping oldest, keep newest (including the message just sent)
-            while (trimmed.length > 2) {
-                trimmed = trimmed.slice(1);
+            while (trimmed.length > 4) {
+                trimmed = trimmed.slice(4);
                 try {
                     localStorage.setItem(key, JSON.stringify(trimmed));
-                    localStorage.setItem(stampKey, String(Date.now()));
                     return;
                 } catch (_) {}
             }
@@ -7027,7 +7010,7 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 8, 2026 (/rechat full-context command)
+        const TERMS_TEXT = `Last updated: November 8, 2026 (Kobiverse company identity)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi (company: Kobiverse). Contact: lubaai.official@gmail.com · TikTok @luba_ai. The Settings link “Luba's story” opens the true origin story (Roblox ban, MM2, dump project that became Luba). By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
@@ -7074,7 +7057,7 @@ We may update these Terms. Continued use after changes means you accept the upda
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
 
-Slash commands (including /rechat to re-read the whole chat) and Modes only change how the assistant replies; they do not create a separate data sale. /search looks up your question; /topic may use recent chat context to build a better search query before fetching live results. Named saved chats (max 100 per account) and the current chat thread may be stored on your device and, when you are logged in, synced to our servers so you can continue on another phone. Attached code/HTML files may be stored with that chat history; large files may be stored in full on-device while only a trimmed slice is sent to the AI model. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
+Slash commands and Modes only change how the assistant replies; they do not create a separate data sale. /search looks up your question; /topic may use recent chat context to build a better search query before fetching live results. Named saved chats (max 100 per account) and the current chat thread may be stored on your device and, when you are logged in, synced to our servers so you can continue on another phone. Attached code/HTML files may be stored with that chat history; large files may be stored in full on-device while only a trimmed slice is sent to the AI model. Leaderboard may show public username, avatar, verification/admin/owner badges, and activity scores (messages or time online).
 
 2. Account data
 We may store username, password hash, profile photo, preferences (including mode settings), verification status, coin/message counters, and session tokens.
@@ -9116,45 +9099,20 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             return false;
         }
 
-        // Local save stamp — never let stale cloud wipe a message just sent
-        let localUpdated = 0;
-        try {
-            localUpdated = Number(localStorage.getItem('luba_chat_updated_' + userKey(currentUser.username)) || 0);
-        } catch (_) {}
-        let localLastTime = 0;
-        try {
-            for (let i = chatHistory.length - 1; i >= 0; i--) {
-                const t = chatHistory[i] && chatHistory[i].time;
-                if (t) {
-                    // time may be "3:04 PM" string — also accept numeric
-                    if (typeof t === 'number') localLastTime = Math.max(localLastTime, t);
-                }
-            }
-        } catch (_) {}
-        const cloudIsNewer = cloudUpdated && cloudUpdated > (localUpdated || 0) + 500;
-        const localIsFresher = localUpdated && (!cloudUpdated || localUpdated >= cloudUpdated);
-
         const shouldApply =
-            (!recentlyCleared && cloudLen > localLen && cloudIsNewer && !localIsFresher) ||
-            (cloudLen === localLen && cloudIsNewer && !localIsFresher) ||
-            (opts.force && !recentlyCleared && cloudLen > localLen && cloudIsNewer && !localIsFresher);
+            (!recentlyCleared && cloudLen > localLen) ||
+            (cloudLen === localLen && cloudUpdated && cloudUpdated > (lastCloudChatUpdatedAt || 0) + 300) ||
+            (opts.force && !recentlyCleared && cloudLen >= localLen);
 
         if (!shouldApply) {
-            // If local is ahead, push to cloud so other devices catch up
-            if (localLen && (localLen > cloudLen || localIsFresher)) {
-                cloudPost({ action: 'save_chat', token, messages: chatHistory }).catch(() => {});
-            }
             if (cloudUpdated) lastCloudChatUpdatedAt = cloudUpdated;
             return false;
         }
 
-        chatHistory = cloudMsgs.slice(-40);
+        chatHistory = cloudMsgs.slice(-30);
         lastCloudChatUpdatedAt = cloudUpdated || Date.now();
         saveUserChatHistory(currentUser.username, chatHistory);
-        // Always paint when we actually applied cloud messages (not every 5s poll)
-        if (!isGenerating && !document.getElementById('typing-indicator')) {
-            renderSavedMessages();
-        }
+        if (!opts.silent) renderSavedMessages();
         return true;
     }
 
@@ -9285,19 +9243,11 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         stopChatSyncPolling();
         chatSyncTimer = setInterval(() => {
             if (!currentUser || !getAuthToken()) return;
-            // Never rebuild the chat UI while Luba is typing / generating — that kills the bubble
-            if (typeof isGenerating !== 'undefined' && isGenerating) {
-                enforceLiveBan(true).catch(() => {});
-                return;
-            }
-            if (document.getElementById('typing-indicator')) {
-                enforceLiveBan(true).catch(() => {});
-                return;
-            }
-            // silent: true — only re-render if pullCloudChat actually applied new messages
-            pullCloudChat({ silent: true }).catch(() => {});
+            pullCloudChat({ silent: false }).catch(() => {});
             enforceLiveBan(true).catch(() => {});
+            // Instant verification approve/deny notification (no page refresh)
             checkVerifyNotice().catch(() => {});
+            // Sync mode/theme from other phones on same account
             syncCloudPrefsLive().catch(() => {});
         }, 5000);
     }
@@ -11018,7 +10968,6 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         { cmd: '/webadd', desc: 'Search web for textures/3D assets and add them' },
         { cmd: '/search', desc: 'Force a live web search for your question only' },
         { cmd: '/topic', desc: 'Web search using the whole chat topic + your question' },
-        { cmd: '/rechat', desc: 'Re-read full chat (scripts, files, all messages)' },
         { cmd: '/short', desc: 'Answer short and direct' },
         { cmd: '/detailed', desc: 'Long thorough answer' },
         { cmd: '/roast', desc: 'Savage funny roast (still honest)' },
@@ -11063,7 +11012,6 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     let slashFiltered = [];
     let pendingTruthMode = false;
     let pendingForceSearch = false;
-    let pendingRechatMode = false;
     let pendingTopicSearch = false;
     let pendingCopyMode = false;
     let pendingExactMode = false;
@@ -11143,7 +11091,6 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             else if (cmd === '/webadd') { pendingWebAddMode = true; pendingForceSearch = true; }
             else if (cmd === '/search') pendingForceSearch = true;
             else if (cmd === '/topic') { pendingTopicSearch = true; pendingForceSearch = true; }
-            else if (cmd === '/rechat' || cmd === '/reread' || cmd === '/context') { pendingRechatMode = true; pendingFixMode = true; }
             else if (cmd === '/short') pendingShortMode = true;
             else if (cmd === '/detailed') pendingDetailedMode = true;
             else if (cmd === '/roast') pendingRoastMode = true;
@@ -11197,7 +11144,14 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const menu = document.getElementById('slash-menu');
         if (!menu || !userInput) return;
         const val = userInput.value;
-        // Support stacking: "/copy /exa" shows menu for the last token
+        // Slash commands ONLY at the start of the message (stackable: "/copy /exactly …")
+        // Mid-text "/something" is normal words, not a command
+        if (!/^\s*\//.test(val)) {
+            menu.classList.remove('open');
+            menu.innerHTML = '';
+            slashFiltered = [];
+            return;
+        }
         const m = val.match(/(?:^|\s)(\/[a-zA-Z]*)$/);
         if (!m) {
             menu.classList.remove('open');
@@ -11605,6 +11559,9 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 (r.snippet ? String(r.snippet).replace(/\s+/g, ' ').slice(0, 280) : '')
             ).join('\n\n');
             window._lubaLastSources = top;
+            try {
+                window._lubaLastSearchMeta = { query: q, sources: (top || []).slice(0, 5), at: Date.now() };
+            } catch (_) {}
             return { ok: true, summary: 'WEB RESULTS for "' + q + '":\n\n' + summary };
         } catch (e) {
             return { ok: false, error: 'network' };
@@ -11903,7 +11860,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             }
             _pasteAttachBuffer = null;
             if (input) {
-                input.value = '';
+                // Restore typed note — never wipe the user's message into the file
+                const keep = (window.__lubaAttachNote || input.value || '').trim();
+                window.__lubaAttachNote = null;
+                input.value = keep && keep.length < 1500 ? keep : '';
                 input.placeholder = 'Add a note about this file (optional)...';
                 try { input.focus(); } catch (_) {}
             }
@@ -12011,8 +11971,20 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                         e.preventDefault();
                         e.stopPropagation();
                         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+                        // Keep any short note the user already typed — do not swallow it into the file
+                        try {
+                            const note = String(input.value || '').trim();
+                            if (note && note.length < 1500 && note !== pasted && pasted.indexOf(note) !== 0) {
+                                window.__lubaAttachNote = note;
+                            }
+                        } catch (_) {}
                         setTimeout(function() {
-                            if (input.value && input.value.length > 1500) input.value = '';
+                            // Only clear if the huge paste leaked into the box
+                            if (input.value && input.value.length > 1500) {
+                                input.value = window.__lubaAttachNote || '';
+                            } else if (window.__lubaAttachNote) {
+                                input.value = window.__lubaAttachNote;
+                            }
                         }, 0);
                         openAttachFileModal(pasted);
                         return false;
@@ -12024,7 +11996,14 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 const v = input.value || '';
                 if (v.length >= 1500 && !pendingCodeFile) {
                     const saved = v;
-                    input.value = '';
+                    // If first lines look like a short note, keep them
+                    const lines = saved.split('\n');
+                    let note = '';
+                    if (lines[0] && lines[0].length < 200 && !looksLikeFullFile(lines[0])) {
+                        note = lines[0].trim();
+                    }
+                    window.__lubaAttachNote = note || window.__lubaAttachNote || '';
+                    input.value = window.__lubaAttachNote || '';
                     openAttachFileModal(saved);
                 }
             });
@@ -12099,7 +12078,6 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         pendingTruthMode = false;
         pendingForceSearch = false;
         pendingTopicSearch = false;
-        pendingRechatMode = false;
         pendingCopyMode = false;
         pendingAddMode = false;
         pendingWebAddMode = false;
@@ -12300,6 +12278,13 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         closeSlashMenu();
         // Long paste still in input? Offer attach once more on send
         if (!isRetry && !pendingCodeFile && looksLikeFullFile(text)) {
+            // Don't treat a short leading note + pasted file as "all file"
+            try {
+                const lines = String(text).split('\n');
+                if (lines[0] && lines[0].length < 200 && lines.length > 3) {
+                    window.__lubaAttachNote = lines[0].trim();
+                }
+            } catch (_) {}
             openAttachFileModal(text);
             return;
         }
@@ -12566,9 +12551,6 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         if (pendingFixMode) {
             systemPrompt += "\n\nFIX MODE: Continue the SAME previous game/app from this chat. Fix bugs and apply improvements. Do not start a different project.";
         }
-        if (pendingRechatMode) {
-            systemPrompt += "\n\nRECHAT MODE (/rechat): You MUST re-read the FULL conversation provided in this request — every user message, every assistant message, every HTML/script/code block, every file description, every fix request. Treat that full thread as ground truth. Do NOT drop features, do NOT invent a new weaker project, do NOT forget scripts that already appeared. Summarize silently what the current project is, then answer the user's latest request while preserving everything already built. If code was in earlier messages, keep that same codebase and only change what the user asked.";
-        }
         if (pendingPlanMode) systemPrompt += "\n\nPLAN MODE: Reply as a clear step-by-step plan with ordered steps. Practical and doable.";
         if (pendingStepsMode) systemPrompt += "\n\nSTEPS MODE: Numbered steps only. Minimal intro. No long essays.";
         if (pendingProsMode) systemPrompt += "\n\nPROS/CONS MODE: Give balanced Pros and Cons sections, then a short bottom line.";
@@ -12647,10 +12629,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         // Broad: anything that needs live/current facts (net worth, prices, scores, news, etc.)
         // Explicit "search the web / search for X / look this up" commands
         const explicitSearch = /\b((?:please\s+)?(?:can you\s+)?(?:search|google|look\s*up|find)\s+(?:(?:in|on)\s+(?:the\s+)?web\s+)?(?:for\s+)?|search\s+it|search\s+this|web\s*search)\b/i.test(msgText);
-        const needsSearchTool = explicitSearch
+        const         needsSearchTool = explicitSearch
             || /\b(search|look\s*up|google|news|score|weather|price|priced|pricing|latest|current|who won|release date|today|yesterday|net\s*worth|worth|stock|shares|market|billion|million|richest|poorest|population|how many|unemployment|inflation|gdp|crypto|bitcoin|ethereum|gold price|oil price|exchange rate|currency|live|trending|breaking|election|poll|forecast)\b/i.test(msgText)
             || /\b(what(?:'s| is)|whats|how much|how many)\b.{0,60}\b(worth|price|cost|score|salary|age|population|height)\b/i.test(msgText)
-            || (/\b(elon|musk|trump|biden|celebrity|billionaire)\b/i.test(msgText) && /\b(worth|rich|money|wealth|fortune)\b/i.test(msgText));
+            || (/\b(elon|musk|trump|biden|celebrity|billionaire)\b/i.test(msgText) && /\b(worth|rich|money|wealth|fortune)\b/i.test(msgText))
+            // Slang, codes, "what does X mean", ambiguous tokens — search before guessing
+            || /\b(what does|whats? that mean|meaning of|stand for|stands for|slang|urban dictionary|define|definition)\b/i.test(msgText)
+            || /\b(i\d{1,4}[a-z]?|wyd|hmu|down bad|rizz|sigma|skibidi|gyatt|no cap|bussin)\b/i.test(msgText)
+            || (/\b(what|whats|what's)\b/i.test(msgText) && msgText.trim().split(/\s+/).length <= 8)
+            || (/^[a-z0-9]{4,12}$/i.test(msgText.trim()) && !/^(yes|no|ok|okay|hi|hey|hello|thanks|thx)$/i.test(msgText.trim()));
         // Tools for image/calc/search; also allow tools on normal non-trivial chats so save_memory / web_search can fire
         const needsTools = !!(needsImageTool || needsCalcTool || needsSearchTool || activeMode === 'html' || activeMode === 'code' || (!isIterateMsg && msgText.length >= 80));
         const isSimpleChat = !imageToSend && !needsTools && msgText.length > 0 && msgText.length < 120
@@ -12721,16 +12708,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         }
 
         // More history when iterating so the previous HTML stays in context
-        let historyLimit = isSimpleChat ? 4
+        const historyLimit = isSimpleChat ? 4
             : (isIterateMsg ? 12
             : (text && text.length > 80000 ? 3
             : (text && text.length > 12000 ? 6 : 14)));
-        // /rechat: pull almost the whole thread so scripts/files/comments are not dropped
-        if (pendingRechatMode) {
-            historyLimit = Math.min(40, Math.max(chatHistory.length, 24));
-        } else if (isIterateMsg) {
-            historyLimit = Math.max(historyLimit, 16);
-        }
         const recent = chatHistory.slice(-historyLimit);
 
         const contents = recent.map(m => ({
@@ -12740,7 +12721,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
         const visionItems = (mediaList || []).filter(function(m){ return m && m.dataUrl && !m.isModel && String(m.dataUrl).indexOf('data:') === 0; }).slice(0, 10);
         if (forcedSearchBlock) {
-            systemPrompt += "\n\nWhen LIVE WEB SEARCH RESULTS are provided with the user message, you MUST use them as the main source. Give the best clear, direct answer (numbers, dates, names). Prefer search results over training memory. If results conflict, say so briefly and pick the most credible source. Do not pretend you did not search.";
+            systemPrompt += "\n\nAlways prefer LIVE WEB SEARCH RESULTS over guessing slang, codes, or trending meanings. When LIVE WEB SEARCH RESULTS are provided with the user message, you MUST use them as the main source. Give the best clear, direct answer (numbers, dates, names). Prefer search results over training memory. If results conflict, say so briefly and pick the most credible source. Do not pretend you did not search.";
         }
 
         // If user attached images and wants them in a build, force exact-image placeholders
