@@ -6020,7 +6020,15 @@ async function spendCoin(username, cost) {
                     localStorage.removeItem('luba_chat_' + username);
                 }
             }
-            return raw ? JSON.parse(raw) : [];
+            // session backup (refresh while reply was in flight)
+            if (!raw) {
+                try { raw = sessionStorage.getItem(key); } catch (_) {}
+            }
+            if (!raw) return [];
+            let parsed = [];
+            try { parsed = JSON.parse(raw) || []; } catch (_) { return []; }
+            if (!Array.isArray(parsed)) return [];
+            return parsed;
         } catch {
             return [];
         }
@@ -6060,17 +6068,26 @@ async function spendCoin(username, cost) {
     }
     function saveUserChatHistory(username, history) {
         const key = 'luba_chat_' + userKey(username);
+        const stampKey = 'luba_chat_updated_' + userKey(username);
         try {
             let trimmed = history;
             if (trimmed.length > 40) trimmed = trimmed.slice(-40);
             const compact = compactHistoryForStorage(trimmed);
             localStorage.setItem(key, JSON.stringify(compact));
+            localStorage.setItem(stampKey, String(Date.now()));
+            try {
+                // Emergency backup for refresh mid-reply
+                sessionStorage.setItem(key, JSON.stringify(compact));
+                sessionStorage.setItem(stampKey, String(Date.now()));
+            } catch (_) {}
         } catch (err) {
             let trimmed = compactHistoryForStorage(history.slice());
-            while (trimmed.length > 4) {
-                trimmed = trimmed.slice(4);
+            // Prefer dropping oldest, keep newest (including the message just sent)
+            while (trimmed.length > 2) {
+                trimmed = trimmed.slice(1);
                 try {
                     localStorage.setItem(key, JSON.stringify(trimmed));
+                    localStorage.setItem(stampKey, String(Date.now()));
                     return;
                 } catch (_) {}
             }
@@ -9099,17 +9116,39 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             return false;
         }
 
+        // Local save stamp — never let stale cloud wipe a message just sent
+        let localUpdated = 0;
+        try {
+            localUpdated = Number(localStorage.getItem('luba_chat_updated_' + userKey(currentUser.username)) || 0);
+        } catch (_) {}
+        let localLastTime = 0;
+        try {
+            for (let i = chatHistory.length - 1; i >= 0; i--) {
+                const t = chatHistory[i] && chatHistory[i].time;
+                if (t) {
+                    // time may be "3:04 PM" string — also accept numeric
+                    if (typeof t === 'number') localLastTime = Math.max(localLastTime, t);
+                }
+            }
+        } catch (_) {}
+        const cloudIsNewer = cloudUpdated && cloudUpdated > (localUpdated || 0) + 500;
+        const localIsFresher = localUpdated && (!cloudUpdated || localUpdated >= cloudUpdated);
+
         const shouldApply =
-            (!recentlyCleared && cloudLen > localLen) ||
-            (cloudLen === localLen && cloudUpdated && cloudUpdated > (lastCloudChatUpdatedAt || 0) + 300) ||
-            (opts.force && !recentlyCleared && cloudLen >= localLen);
+            (!recentlyCleared && cloudLen > localLen && cloudIsNewer && !localIsFresher) ||
+            (cloudLen === localLen && cloudIsNewer && !localIsFresher) ||
+            (opts.force && !recentlyCleared && cloudLen > localLen && cloudIsNewer && !localIsFresher);
 
         if (!shouldApply) {
+            // If local is ahead, push to cloud so other devices catch up
+            if (localLen && (localLen > cloudLen || localIsFresher)) {
+                cloudPost({ action: 'save_chat', token, messages: chatHistory }).catch(() => {});
+            }
             if (cloudUpdated) lastCloudChatUpdatedAt = cloudUpdated;
             return false;
         }
 
-        chatHistory = cloudMsgs.slice(-30);
+        chatHistory = cloudMsgs.slice(-40);
         lastCloudChatUpdatedAt = cloudUpdated || Date.now();
         saveUserChatHistory(currentUser.username, chatHistory);
         if (!opts.silent) renderSavedMessages();
