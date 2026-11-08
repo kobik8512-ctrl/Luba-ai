@@ -3,7 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luba AI</title>
+    <title>Luba AI — by Kobiverse</title>
+    <meta name="description" content="Luba AI is a web-based AI chat assistant by Kobi under Kobiverse. Chat, HTML apps in chat, accounts, web search. Live at luba-ai.vercel.app. TikTok @luba_ai">
+    <meta name="theme-color" content="#131314">
+    <meta name="application-name" content="Luba AI">
+    <meta name="author" content="Kobi / Kobiverse">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20512%20512%22%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%2296%22%20fill=%22%23000000%22/%3E%3Cpath%20fill=%22%23ffffff%22%20d=%22M256%2072%20L428%20172%20L428%20340%20L256%20440%20L84%20340%20L84%20172%20Z%22/%3E%3Ccircle%20cx=%22256%22%20cy=%22256%22%20r=%2272%22%20fill=%22%23000000%22/%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20512%20512%22%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%2296%22%20fill=%22%23000000%22/%3E%3Cpath%20fill=%22%23ffffff%22%20d=%22M256%2072%20L428%20172%20L428%20340%20L256%20440%20L84%20340%20L84%20172%20Z%22/%3E%3Ccircle%20cx=%22256%22%20cy=%22256%22%20r=%2272%22%20fill=%22%23000000%22/%3E%3C/svg%3E">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Luba AI">
+    <meta property="og:title" content="Luba AI — by Kobiverse">
+    <meta property="og:description" content="AI chat assistant by Kobi (Kobiverse). Accounts, HTML mode, web search. https://luba-ai.vercel.app">
+    <meta property="og:url" content="https://luba-ai.vercel.app/">
+    <meta property="og:image" content="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20512%20512%22%3E%3Crect%20width=%22512%22%20height=%22512%22%20rx=%2296%22%20fill=%22%23000000%22/%3E%3Cpath%20fill=%22%23ffffff%22%20d=%22M256%2072%20L428%20172%20L428%20340%20L256%20440%20L84%20340%20L84%20172%20Z%22/%3E%3Ccircle%20cx=%22256%22%20cy=%22256%22%20r=%2272%22%20fill=%22%23000000%22/%3E%3C/svg%3E">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Luba AI — by Kobiverse">
+    <meta name="twitter:description" content="AI chat assistant by Kobi (Kobiverse). Live at luba-ai.vercel.app · TikTok @luba_ai">
+
+    
     <!-- KaTeX renders LaTeX math (the $...$ / $$...$$ style output the AI
          writes) as real math symbols instead of raw text with backslashes
          and dollar signs. -->
@@ -7454,6 +7471,14 @@ You also have a generate_image tool — use it for any draw/generate/edit-photo 
 - This applies even to arithmetic that looks quick or trivial (e.g. "297 + 973 * 93"). Do not skip the explanation just because you could give the number in one line — walk through the order of operations (PEMDAS/BODMAS) step by step, then give the final result. Never reply with only the final number while study mode is on.`;
 
     const HTML_MODE_INSTRUCTIONS = `HTML MODE IS CURRENTLY ON. The user wants a WORKING interactive app / game in the chat preview. Ship your ABSOLUTE MAX quality — this mode is for complete, polished, feature-rich results that look and feel like real production apps, not sketches or demos.
+
+QUALITY RULES (non-negotiable):
+- Never ship a single gray button, one blank screen, or a "demo" with almost no features.
+- Always include: polished dark UI, real layout, working controls, feedback states (hover/active), and at least several meaningful features the user can use immediately.
+- Games: movement/input, score or goal, win/lose or progress, restart, readable HUD.
+- Tools/apps: clear navigation, inputs that do something, results visible on screen, no dead buttons.
+- Prefer thoughtful structure over the shortest possible code. Longer complete code is better than short broken code.
+- If the user asks to fix or add features, keep the same project and improve it — do not replace it with a weaker different app.
 
 OUTPUT FORMAT (exact):
 0) NEVER paste CSS/JS/HTML outside the fence. If the user sees raw box-shadow or #counter-title in the chat bubble, you failed. Chat text = short intro only; entire app = inside ONE \`\`\`html fence.
