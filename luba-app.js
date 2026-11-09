@@ -9090,14 +9090,17 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         // Explicit "search the web / search for X / look this up" commands
         const explicitSearch = /\b((?:please\s+)?(?:can you\s+)?(?:search|google|look\s*up|find)\s+(?:(?:in|on)\s+(?:the\s+)?web\s+)?(?:for\s+)?|search\s+it|search\s+this|web\s*search)\b/i.test(msgText);
         const         needsSearchTool = explicitSearch
-            || /\b(search|look\s*up|google|news|score|weather|price|priced|pricing|latest|current|who won|release date|today|yesterday|net\s*worth|worth|stock|shares|market|billion|million|richest|poorest|population|how many|unemployment|inflation|gdp|crypto|bitcoin|ethereum|gold price|oil price|exchange rate|currency|live|trending|breaking|election|poll|forecast)\b/i.test(msgText)
-            || /\b(what(?:'s| is)|whats|how much|how many)\b.{0,60}\b(worth|price|cost|score|salary|age|population|height)\b/i.test(msgText)
-            || (/\b(elon|musk|trump|biden|celebrity|billionaire)\b/i.test(msgText) && /\b(worth|rich|money|wealth|fortune)\b/i.test(msgText))
-            // Slang, codes, "what does X mean", ambiguous tokens — search before guessing
-            || /\b(what does|whats? that mean|meaning of|stand for|stands for|slang|urban dictionary|define|definition)\b/i.test(msgText)
-            || /\b(i\d{1,4}[a-z]?|wyd|hmu|down bad|rizz|sigma|skibidi|gyatt|no cap|bussin)\b/i.test(msgText)
-            || (/\b(what|whats|what's)\b/i.test(msgText) && msgText.trim().split(/\s+/).length <= 8)
-            || (/^[a-z0-9]{4,12}$/i.test(msgText.trim()) && !/^(yes|no|ok|okay|hi|hey|hello|thanks|thx)$/i.test(msgText.trim()));
+            // AUTO-SEARCH only for clear question openers — not code-fix chatter
+            || /^(?:how|why|what\s+is|what\s+are|who\s+is|who\s+are|when\s+is|where\s+is)\b/i.test(String(msgText || '').trim())
+            || /\b(what does|whats? that mean|meaning of|define|definition of)\b/i.test(msgText)
+            || /\b(how much|how many|who won|weather|stock price|bitcoin price)\b/i.test(msgText);
+        // Mid-debug / HTML-code fix: never auto-search on "fix this" (manual /search /topic still work)
+        if ((/\b(fix\s+this|fix\s+the|debug|broken|doesn'?t work|not working)\b/i.test(msgText)
+            || (typeof pendingFixMode !== 'undefined' && pendingFixMode)
+            || activeMode === 'html' || activeMode === 'code')
+            && !explicitSearch && !pendingForceSearch) {
+            needsSearchTool = false;
+        }
         // Tools for image/calc/search; also allow tools on normal non-trivial chats so save_memory / web_search can fire
         const needsTools = !!(needsImageTool || needsCalcTool || needsSearchTool || activeMode === 'html' || activeMode === 'code' || (!isIterateMsg && msgText.length >= 80));
         const isSimpleChat = !imageToSend && !needsTools && msgText.length > 0 && msgText.length < 120
@@ -9137,13 +9140,73 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             return q.slice(0, 220);
         }
 
-        // Pre-search: actually hit the web, then feed results into the model
+
+        function isMidFixDebugMessage(msg) {
+            const m = String(msg || '');
+            return /\b(fix\s+this|fix\s+the|fix\s+my|debug|broken|bug|error|doesn'?t work|not working|this button|this code|this script|syntax error)\b/i.test(m)
+                || (typeof pendingFixMode !== 'undefined' && pendingFixMode)
+                || activeMode === 'html' || activeMode === 'code';
+        }
+
+        // Build a technical Google query from conversation (never raw "fix this")
+        function buildTechnicalFixSearchQuery(msg, history) {
+            const blobs = [];
+            (history || []).slice(-10).forEach(function(m) {
+                const c = String(m && m.content || '');
+                const codes = c.match(/```[\s\S]{20,8000}?```/g);
+                if (codes) codes.forEach(function(x){ blobs.push(x.replace(/```\w*/g,'').slice(0, 400)); });
+                const errs = c.match(/(?:TypeError|ReferenceError|SyntaxError|Uncaught|Cannot read|is not defined|failed to)[^\n]{0,120}/gi);
+                if (errs) errs.forEach(function(x){ blobs.push(x); });
+            });
+            blobs.push(String(msg || ''));
+            const text = blobs.join('\n');
+            const terms = [];
+            if (/canvas/i.test(text)) terms.push('HTML5 Canvas');
+            if (/position|offset|left|top|transform/i.test(text)) terms.push('CSS positioning');
+            if (/button|onclick|addEventListener/i.test(text)) terms.push('JavaScript button click handler');
+            if (/three\.js|webgl|mesh|gltf/i.test(text)) terms.push('Three.js');
+            if (/flex|grid/i.test(text)) terms.push('CSS flexbox grid layout');
+            if (/localStorage|indexedDB/i.test(text)) terms.push('browser storage');
+            if (/fetch|CORS|API/i.test(text)) terms.push('fetch API CORS');
+            const err = text.match(/(?:TypeError|ReferenceError|SyntaxError|Uncaught|Cannot read properties)[^\n]{0,80}/i);
+            if (err) terms.push(err[0].slice(0, 80));
+            const kw = text.match(/\b[A-Za-z][A-Za-z0-9_-]{3,24}\b/g) || [];
+            const stop = { fix:1, this:1, that:1, please:1, with:1, from:1, code:1, make:1, just:1, have:1, like:1, want:1, need:1, button:1, error:1 };
+            kw.forEach(function(w) {
+                const low = w.toLowerCase();
+                if (!stop[low] && terms.length < 8) terms.push(w);
+            });
+            const q = terms.join(' ').replace(/\s+/g, ' ').trim();
+            if (q.length < 12) return '';
+            return (q + ' javascript html fix').slice(0, 200);
+        }
+
+
+                // Pre-search: actually hit the web, then feed results into the model
         let forcedSearchBlock = '';
         if ((needsSearchTool || pendingForceSearch || pendingWebAddMode) && !imageToSend) {
             try {
                 let searchQ = buildSearchQuery(msgText);
                 if (pendingTopicSearch) {
-                    searchQ = buildTopicSearchQuery(msgText, chatHistory);
+                    // /topic: use conversation topic, never raw "fix this"
+                    if (isMidFixDebugMessage(msgText)) {
+                        searchQ = buildTechnicalFixSearchQuery(msgText, chatHistory);
+                        if (!searchQ) {
+                            // No valid technical query — skip search, let model fix from context
+                            searchQ = '';
+                        }
+                    } else {
+                        searchQ = buildTopicSearchQuery(msgText, chatHistory);
+                    }
+                } else if (isMidFixDebugMessage(msgText) && (needsSearchTool || pendingForceSearch)) {
+                    searchQ = buildTechnicalFixSearchQuery(msgText, chatHistory);
+                    if (!searchQ && !pendingForceSearch) {
+                        // skip useless Google call mid-fix
+                    }
+                }
+                if (!searchQ && isMidFixDebugMessage(msgText) && !pendingForceSearch && !pendingWebAddMode) {
+                    // abort pre-search entirely
+                    throw new Error('skip_search_midfix');
                 }
                 if (pendingWebAddMode) {
                     // Keep search light — we mainly use known-good CDN paths in the prompt
@@ -10145,34 +10208,79 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
     function forgeResolveTargetMesh(op) {
         const F = window.__forge;
-        if (!F || !F._meshByName) return null;
-        const n = op && (op.name || op.target || op.id || op.object);
-        if (n && F._meshByName[n]) return F._meshByName[n];
-        // fuzzy: name contains
-        if (n) {
-            const key = String(n).toLowerCase();
-            const keys = Object.keys(F._meshByName);
-            for (let i = 0; i < keys.length; i++) {
-                if (keys[i].toLowerCase().indexOf(key) >= 0 || key.indexOf(keys[i].toLowerCase()) >= 0) {
-                    return F._meshByName[keys[i]];
+        if (!F) return null;
+        const n = op && (op.name || op.target || op.id || op.object || op.mesh || op.part);
+        const partHint = op && (op.part || op.sub || op.child || op.meshName || '');
+
+        function findInTree(root, key) {
+            if (!root || !key) return null;
+            const k = String(key).toLowerCase().replace(/\s+/g, '_');
+            let found = null;
+            root.traverse(function(ch) {
+                if (found) return;
+                const nm = String(ch.name || '').toLowerCase();
+                if (!nm) return;
+                if (nm === k || nm.indexOf(k) >= 0 || k.indexOf(nm) >= 0) found = ch;
+                // common part words: hood, wheel, door, window, body, cabin
+                if (!found && k.length >= 3 && nm.indexOf(k) >= 0) found = ch;
+            });
+            return found;
+        }
+
+        // 1) Explicit child / part name across whole scene
+        if (n || partHint) {
+            const keys = [n, partHint].filter(Boolean);
+            for (let ki = 0; ki < keys.length; ki++) {
+                const key = keys[ki];
+                // registered roots
+                if (F._meshByName && F._meshByName[key]) {
+                    const root = F._meshByName[key];
+                    // if op wants a sub-part, dig into children
+                    if (partHint && partHint !== key) {
+                        const sub = findInTree(root, partHint);
+                        if (sub) return sub;
+                    }
+                    // if name looks like a part, search all roots for child
+                    const asChild = findInTree(F.scene, key);
+                    if (asChild && asChild !== root) return asChild;
+                    return root;
                 }
+                const child = findInTree(F.scene, key);
+                if (child) return child;
             }
-            // match label
-            const objs = F._objects || [];
-            for (let i = 0; i < objs.length; i++) {
-                if (objs[i] && objs[i].label && String(objs[i].label).toLowerCase().indexOf(key) >= 0) {
-                    if (F._meshByName[objs[i].name]) return F._meshByName[objs[i].name];
+            // fuzzy on registry keys
+            if (F._meshByName) {
+                const key = String(n || partHint).toLowerCase();
+                const keys2 = Object.keys(F._meshByName);
+                for (let i = 0; i < keys2.length; i++) {
+                    if (keys2[i].toLowerCase().indexOf(key) >= 0 || key.indexOf(keys2[i].toLowerCase()) >= 0) {
+                        const root = F._meshByName[keys2[i]];
+                        if (partHint) {
+                            const sub = findInTree(root, partHint);
+                            if (sub) return sub;
+                        }
+                        return root;
+                    }
                 }
             }
         }
+
         // Prefer last user GLTF, then any last object
         const objs = F._objects || [];
         for (let i = objs.length - 1; i >= 0; i--) {
-            if (objs[i] && objs[i].userGltf && F._meshByName[objs[i].name]) return F._meshByName[objs[i].name];
+            if (objs[i] && objs[i].userGltf && F._meshByName && F._meshByName[objs[i].name]) {
+                const root = F._meshByName[objs[i].name];
+                if (partHint || n) {
+                    const sub = findInTree(root, partHint || n);
+                    if (sub) return sub;
+                }
+                return root;
+            }
         }
-        if (objs.length && F._meshByName[objs[objs.length - 1].name]) return F._meshByName[objs[objs.length - 1].name];
-        const keys = Object.keys(F._meshByName);
-        return keys.length ? F._meshByName[keys[keys.length - 1]] : null;
+        for (let i = objs.length - 1; i >= 0; i--) {
+            if (objs[i] && F._meshByName && F._meshByName[objs[i].name]) return F._meshByName[objs[i].name];
+        }
+        return null;
     }
 
     function forgeSetSkyColor(colorHex) {
@@ -10734,7 +10842,43 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         return null;
     }
 
-    async function forgeSendBuild() {
+    async 
+    function forgeBuildSceneManifest() {
+        const F = window.__forge;
+        if (!F || !F.scene) return { objects: [], sky: null, note: 'empty' };
+        const objects = [];
+        const roots = F._objects || [];
+        roots.forEach(function(meta) {
+            const root = F._meshByName && F._meshByName[meta.name];
+            const children = [];
+            if (root && root.traverse) {
+                root.traverse(function(ch) {
+                    if (ch.isMesh) {
+                        children.push({
+                            name: ch.name || '(unnamed_mesh)',
+                            type: 'Mesh',
+                            material: ch.material ? (Array.isArray(ch.material) ? ch.material.length + ' slots' : '1 slot') : 'none'
+                        });
+                    }
+                });
+            }
+            objects.push({
+                id: meta.name,
+                label: meta.label || meta.name,
+                userGltf: !!meta.userGltf,
+                children: children.slice(0, 40)
+            });
+        });
+        let sky = null;
+        try {
+            if (F.scene.background && F.scene.background.isColor) {
+                sky = '#' + F.scene.background.getHexString();
+            }
+        } catch (_) {}
+        return { objects: objects, sky: sky, count: objects.length };
+    }
+
+async function forgeSendBuild() {
         if (!currentUser) { alert('Log in first'); return; }
         const input = document.getElementById('forge-input');
         const text = (input && input.value || '').trim();
@@ -10770,16 +10914,25 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
         try {
             const F = window.__forge;
-            const sceneSummary = (F && F._objects && F._objects.length)
-                ? F._objects.map(function(o){ return o.name + '(' + o.label + ')'; }).join(', ')
+            const manifest = forgeBuildSceneManifest();
+            const sceneSummary = (manifest.objects && manifest.objects.length)
+                ? manifest.objects.map(function(o) {
+                    const kids = (o.children || []).slice(0, 12).map(function(c){ return c.name; }).join(', ');
+                    return o.id + '(' + o.label + ')' + (kids ? (' children:[' + kids + ']') : '');
+                }).join(' | ')
                 : 'empty floor';
+            const sceneTreeJson = JSON.stringify(manifest).slice(0, 6000);
+            const wantsComplex = /\b(shader|physics|raycast|animation|rig|particle|postprocess|shadow|water|terrain|advanced)\b/i.test(text);
 
             const wantsFullGame = /\b(game|html app|website|clicker|platformer|playable|full game)\b/i.test(text);
 
             const system = 'You are Luba inside LUBA FORGE — your twin builder studio (live 3D, Blender + Unity mix).\n' +
                 'PERSONALITY: Still Luba — warm, respectful, playful. If user says hi/hey, greet them like a friend (not robotic). For owner Kobi: call him boss/Kobi, be loyal and energetic. Use light emojis sometimes. Then help build.\n' +
                 'You are Luba inside LUBA FORGE — a live 3D builder (like Blender + Unity mix).\n' +
+                'SCENE TREE MANIFEST (use exact child mesh names for part edits):\n' + sceneTreeJson + '\n' +
                 'Current scene objects: ' + sceneSummary + '.\n' +
+                'TARGETING: paint/color a PART (hood/wheel/door) → set name or part to that child mesh id from the manifest; never only the parent root when a part is named.\n' +
+                'Sky only: {"action":"sky","color":"#87ceeb"}. Multi-color = separate ops per child mesh.\n' +
                 (attachedModels.length ? ('User uploaded GLB already in viewport: ' + attachedModels.map(function(m){return m.name||'model';}).join(', ') + '. NEVER clear the scene or replace it with primitives. Only move/scale if they asked.\n') : '') +
                 '\n' +
                 'RULES:\n' +
