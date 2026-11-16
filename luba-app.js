@@ -170,6 +170,22 @@
         return String(user.username).toLowerCase() === OWNER_USERNAME;
     }
 
+    // Luba Supporter (paid extras). Owner always counts as supporter.
+    // Paste your real Stripe / Lemon Squeezy payment link here when ready:
+    const SUPPORTER_PAYMENT_URL = 'https://luba-ai.vercel.app'; // replace with your checkout link
+    function isSupporter(user) {
+        user = user || currentUser;
+        if (!user) return false;
+        if (isOwnerAccount(user)) return true;
+        return !!(user.supporter || user.isSupporter || user.supporterUntil && Number(user.supporterUntil) > Date.now());
+    }
+    function requireSupporter(featureName) {
+        if (isSupporter()) return true;
+        const msg = (featureName || 'This feature') + ' is for Luba Supporters. Open Settings → Luba Supporter to unlock extras (chat stays free).';
+        try { alert(msg); } catch (_) {}
+        return false;
+    }
+
 
     // ============================================================
     // Daily coins (message limit) — owner unlimited
@@ -187,6 +203,16 @@
             const admin = isUserAdmin(currentUser);
             // Owner + admin + verified flag all count as verified for the blue check
             const hasVerifiedFlag = owner || admin || !!(currentUser && currentUser.verified);
+            const hasSupporterFlag = (typeof isSupporter === 'function') ? isSupporter(currentUser) : !!(currentUser && currentUser.supporter);
+            try {
+                const sNote = document.getElementById('settings-supporter-note');
+                if (sNote) sNote.style.display = hasSupporterFlag ? 'block' : 'none';
+                const sBox = document.getElementById('supporter-box');
+                if (sBox && hasSupporterFlag) {
+                    const btn = document.getElementById('supporter-checkout-btn');
+                    if (btn) { btn.textContent = 'Supporter active'; btn.disabled = true; }
+                }
+            } catch (_) {}
             const hbV = document.getElementById('header-verified-badge');
             const hbA = document.getElementById('header-admin-badge');
             const hbO = document.getElementById('header-owner-badge');
@@ -2688,7 +2714,9 @@ async function spendCoin(username, cost) {
             createdAt: extras.createdAt || Date.now(),
             cloud: true,
             verified: !!(profile.verified) || !!(profile.admin),
-            admin: !!(profile.admin)
+            admin: !!(profile.admin),
+            supporter: !!(profile.supporter),
+            supporterUntil: profile.supporterUntil || null
         };
     }
 
@@ -4461,6 +4489,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
 
     window.downloadLubaFile = function (btn) {
         try {
+            // One-click Download is a Luba Supporter extra (Copy / Open still free)
+            if (typeof requireSupporter === 'function' && !requireSupporter('One-click Download')) return;
             const id = btn.getAttribute('data-code-id');
             const name = btn.getAttribute('data-file-name') || 'luba-file.txt';
             const code = (window.__lubaCodeStore && window.__lubaCodeStore[id]) || '';
@@ -5417,7 +5447,10 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                 appendMessage('ai', content, msg.time, false, true);
             }
         });
-        try { chatContainer.scrollTop = chatContainer.scrollHeight; } catch (_) {}
+        try {
+            if (nearBottom) chatContainer.scrollTop = chatContainer.scrollHeight;
+            else chatContainer.scrollTop = prevScroll;
+        } catch (_) {}
         try { hydrateMediaInChat(); } catch (_) {}
         // Second pass — IndexedDB can be slow on mobile after reopen
         setTimeout(function () { try { hydrateMediaInChat(); } catch (_) {} }, 300);
@@ -5508,6 +5541,16 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             return false;
         }
 
+        // Avoid UI rebuild if the thread is already the same (stops "reload" feel)
+        try {
+            const sameLen = chatHistory.length === cloudMsgs.slice(-30).length;
+            const lastL = chatHistory.length ? String(chatHistory[chatHistory.length - 1].content || '') : '';
+            const lastC = cloudMsgs.length ? String(cloudMsgs[cloudMsgs.length - 1].content || '') : '';
+            if (sameLen && lastL === lastC && !opts.force) {
+                lastCloudChatUpdatedAt = cloudUpdated || Date.now();
+                return false;
+            }
+        } catch (_) {}
         chatHistory = cloudMsgs.slice(-30);
         lastCloudChatUpdatedAt = cloudUpdated || Date.now();
         saveUserChatHistory(currentUser.username, chatHistory);
@@ -5642,7 +5685,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         stopChatSyncPolling();
         chatSyncTimer = setInterval(() => {
             if (!currentUser || !getAuthToken()) return;
-            pullCloudChat({ silent: false }).catch(() => {});
+            pullCloudChat({ silent: true }).catch(() => {});
             enforceLiveBan(true).catch(() => {});
             // Instant verification approve/deny notification (no page refresh)
             checkVerifyNotice().catch(() => {});
@@ -11631,3 +11674,30 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             }
         }
     }, true);
+
+    document.addEventListener('click', function (e) {
+        const t = e.target && e.target.closest && e.target.closest('#supporter-checkout-btn');
+        if (!t) return;
+        e.preventDefault();
+        const url = (typeof SUPPORTER_PAYMENT_URL === 'string' && SUPPORTER_PAYMENT_URL) ? SUPPORTER_PAYMENT_URL : 'https://luba-ai.vercel.app';
+        try { window.open(url, '_blank'); } catch (_) { location.href = url; }
+    });
+
+    window.ownerSetSupporter = async function (username, on) {
+        try {
+            const res = await cloudPost({
+                action: 'owner_set_supporter',
+                ownerPassword: typeof OWNER_PASSWORD !== 'undefined' ? OWNER_PASSWORD : '',
+                username: username,
+                supporter: !!on
+            });
+            if (res && res.ok) {
+                alert((on ? 'Supporter ON for @' : 'Supporter OFF for @') + username);
+                try { if (typeof renderOwnerUserList === 'function') renderOwnerUserList(); } catch (_) {}
+            } else {
+                alert((res && res.error) || 'Failed');
+            }
+        } catch (e) {
+            alert('Failed: ' + (e && e.message ? e.message : e));
+        }
+    };
