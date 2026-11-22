@@ -9152,6 +9152,15 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             q = q.replace(/^\s*(?:search\s+it|search\s+this|web\s*search)\s*[:\-]?\s*/i, '');
             q = q.replace(/[?!.]+$/g, '').trim();
             if (!q || q.length < 2) q = String(raw || '').trim();
+            // Rewrite conversational rumor questions into search-friendly queries
+            const low = q.toLowerCase();
+            if (/\b(did|does|is it true|actually|really)\b/.test(low) &&
+                /\b(eat|ate|poop|shit|rumor|scandal|controversy|meme)\b/.test(low)) {
+                // pull likely name tokens (capitalized words) + topic keywords
+                const names = (q.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/g) || []).join(' ');
+                const base = (names || q).trim();
+                q = (base + ' knowyourmeme OR controversy OR rumor OR allegation').slice(0, 200);
+            }
             return q.slice(0, 200);
         }
 
@@ -9198,7 +9207,11 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                         forcedSearchBlock = '\n\nWEBADD SEARCH NOTES for "' + searchQ + '":\n' + ws.summary +
                             '\n\nREMINDER: Only use asset URLs if they are clearly public https image/texture links. Prefer the known-good threejs.org/examples/textures/ URLs from system instructions. If search results are pages (not direct .jpg/.png texture files), IGNORE them for loading and use procedural meshes + known-good textures instead. Never insert broken URLs that crash the app.';
                     } else {
-                        forcedSearchBlock = '\n\nLIVE WEB SEARCH RESULTS for "' + searchQ + '" (use these as the main source; give the best clear answer; do not invent older figures):\n' + ws.summary;
+                        forcedSearchBlock = '\n\nLIVE WEB SEARCH RESULTS for "' + searchQ + '":\n' + ws.summary +
+                            '\n\nINSTRUCTIONS FOR THESE RESULTS: Use them as the main source. Report what they claim. ' +
+                            'If a result is a meme encyclopedia, news, or forum documenting a rumor, say that clearly (meme vs proven fact). ' +
+                            'Do not invent "no evidence exists" if the results themselves document the story, meme, or allegations. ' +
+                            'Stay honest and clear; do not invent older figures for numbers topics.';
                     }
                     setTypingStatus('Reading search results…');
                 } else {
