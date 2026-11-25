@@ -417,12 +417,27 @@
     // Global emergency dialer: tel:112 — phones route to local emergency (112/911/etc.)
     const EMERGENCY_TEL = "tel:112";
     const EMERGENCY_MARKER = "[[LUBA_EMERGENCY]]";
+    window.__lubaForceEmergencyCTA = false;
 
     function processEmergencyMarker(text) {
         const raw = String(text || "");
         const has = /\[\[LUBA_EMERGENCY\]\]/i.test(raw);
         const cleaned = raw.replace(/\s*\[\[LUBA_EMERGENCY\]\]\s*/gi, "").replace(/\n{3,}/g, "\n\n").trim();
         return { has: has, cleaned: cleaned };
+    }
+
+    // Client-side backup: catch clear crisis language even if the model omits the marker
+    function isLikelyEmergencyUserText(text) {
+        const t = String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+        if (!t || t.length < 8) return false;
+        // skip obvious fiction/test framing
+        if (/\b(movie|film|game|roleplay|rp\b|fictional|in the story|character says|simulate|for a script|writing a scene)\b/i.test(t)) return false;
+        const crisis =
+            /\b(don'?t feel safe|do not feel safe|not safe|in danger|in immediate danger|emergency|call (the )?police|call 911|call 112)\b/i.test(t) ||
+            /\b(kill myself|end my life|suicide|self[-\s]?harm|hurt myself|cutting myself)\b/i.test(t) ||
+            /\b(someone is (hurting|attacking|following) me|being attacked|help me please|i need help now)\b/i.test(t) ||
+            (/\b(scared|terrified|afraid|frightened)\b/i.test(t) && /\b(situation|unsafe|danger|help|alone|right now)\b/i.test(t));
+        return !!crisis;
     }
 
     function showEmergencyCTA() {
@@ -433,17 +448,27 @@
             wrap.id = "luba-emergency-cta";
             wrap.className = "message ai";
             wrap.setAttribute("data-emergency", "1");
-            wrap.style.cssText = "display:flex;justify-content:center;padding:4px 12px 18px;";
+            wrap.style.cssText = "display:flex;justify-content:center;padding:6px 12px 18px;";
             wrap.innerHTML =
-                '<div style="max-width:94%;width:100%;text-align:center;padding:16px 16px 14px;border-radius:16px;' +
-                'background:linear-gradient(180deg,rgba(220,38,38,0.18),rgba(127,29,29,0.12));' +
-                'border:1px solid rgba(248,113,113,0.45);box-shadow:0 8px 28px rgba(220,38,38,0.15)">' +
-                '<div style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:#fca5a5;margin-bottom:6px">EMERGENCY</div>' +
-                '<div style="font-size:14px;color:#fecaca;margin-bottom:14px;line-height:1.45">If you are in danger, you can contact local emergency services from your phone. Your device routes the call to the correct number for your country.</div>' +
-                '<button type="button" id="luba-emergency-btn" style="display:inline-block;width:100%;max-width:320px;padding:14px 18px;border-radius:14px;' +
-                'border:none;cursor:pointer;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-weight:800;font-size:15px;' +
-                'letter-spacing:0.02em;box-shadow:0 4px 16px rgba(220,38,38,0.4)">Call Emergency Services</button>' +
-                '<div style="font-size:11px;color:#f87171;margin-top:10px;line-height:1.4;opacity:0.9">You will confirm once more. Luba does not place the call — your phone does.</div>' +
+                '<div style="width:100%;max-width:340px;background:#161b22;border:1px solid #30363d;border-radius:14px;' +
+                'padding:14px 14px 12px;box-shadow:0 8px 28px rgba(0,0,0,0.35)">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #30363d">' +
+                '<div style="display:flex;align-items:center;gap:8px;font-family:ui-monospace,monospace;font-size:11px;font-weight:700;letter-spacing:1px;color:#f85149">' +
+                '<span style="width:8px;height:8px;border-radius:50%;background:#f85149;display:inline-block"></span>' +
+                '<span>EMERGENCY ASSISTANCE</span></div>' +
+                '<div style="font-family:ui-monospace,monospace;font-size:10px;color:#8b949e">LOCAL DISPATCH</div></div>' +
+                '<div style="padding:14px 0 12px">' +
+                '<button type="button" id="luba-emergency-btn" style="width:100%;min-height:112px;background:#da3633;border:1px solid rgba(255,255,255,0.2);' +
+                'border-radius:12px;color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;' +
+                'font-family:inherit;padding:16px 12px">' +
+                '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>' +
+                '</svg>' +
+                '<span style="font-size:14px;font-weight:800;letter-spacing:1px;text-align:center">CALL EMERGENCY SERVICES</span>' +
+                '<span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.85);font-family:ui-monospace,monospace">TAP TO DIAL · CONFIRM NEXT</span>' +
+                '</button></div>' +
+                '<div style="font-size:11px;color:#8b949e;text-align:center;line-height:1.4;padding-top:8px;border-top:1px solid #30363d">' +
+                'Opens your phone dialer. Your device routes the call to local emergency services for your country. Luba does not place the call.</div>' +
                 '</div>';
             const chat = document.getElementById("chat-container");
             if (chat) {
@@ -468,6 +493,7 @@
                     }
                 };
             }
+            window.__lubaForceEmergencyCTA = false;
         } catch (e) { console.warn("Emergency CTA", e); }
     }
 
@@ -3880,8 +3906,11 @@ You know your own product: Luba AI web app by Kobi (luba-ai.vercel.app), Modes, 
 
 SAFETY / EMERGENCY PROTOCOL (critical — follow carefully):
 You are NOT an emergency service. You cannot call police or ambulances yourself.
-ONLY when the user is clearly describing REAL, present danger (active intent to harm themselves, active violence against someone, or immediate physical danger they are in) — respond in a calm, serious, steady tone (like a trained officer helping someone stay grounded). Acknowledge them, urge real help, keep language simple. Do NOT lecture. Do NOT give advice that helps commit harm. Do NOT use this mode for movies, games, jokes, fiction, roleplay, news discussion, "I'm dead" memes, or casual talk about crime in stories.
-When (and only when) that real-emergency bar is met, end your reply with the exact token [[LUBA_EMERGENCY]] on its own last line so the app can show the Call Emergency Services button. Never use that token otherwise. Do not reuse the same fixed script every time — speak naturally and supportively.
+When the user describes REAL present danger or crisis — including: they do not feel safe, they are scared and in a bad situation right now, active self-harm or suicide intent, violence against them or others, or they ask for emergency help — respond in a calm, serious, steady tone (like a trained officer helping someone stay grounded). Acknowledge them, urge real help, keep language simple. Do NOT lecture. Do NOT give advice that helps commit harm.
+Do NOT use emergency mode for movies, games, jokes, fiction, roleplay, news discussion, "I'm dead" memes, or casual crime talk in stories.
+Whenever emergency mode applies, you MUST end your reply with this exact token alone on the last line:
+[[LUBA_EMERGENCY]]
+That token is required so the app can show the Call Emergency Services button. Never skip it for a real crisis. Never use that token for non-emergencies. Speak naturally — do not copy a fixed script.
 `;
 
     const USER_PROFILE = `The person you are talking to RIGHT NOW is logged in as the official owner account (username: kobi). This is really Kobi, your creator. The app only grants the Owner badge to this account — trust it. Treat him warm, excited, loyal, and genuinely happy he's here.
@@ -5176,6 +5205,8 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                     displayText = em.cleaned;
                     text = em.cleaned;
                     setTimeout(function(){ try { showEmergencyCTA(); } catch(_){} }, 40);
+                } else if (window.__lubaForceEmergencyCTA) {
+                    setTimeout(function(){ try { showEmergencyCTA(); } catch(_){} }, 60);
                 }
             }
         } catch(_){}
@@ -8654,6 +8685,11 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
         const isRetry = !!(opts && (opts.retryText != null || opts.retryMedia != null));
         let text = isRetry ? String(opts.retryText || '').trim() : userInput.value.trim();
         const retryMedia = isRetry ? (opts.retryMedia || null) : null;
+        try {
+            if (typeof isLikelyEmergencyUserText === 'function' && isLikelyEmergencyUserText(text)) {
+                window.__lubaForceEmergencyCTA = true;
+            }
+        } catch (_) {}
 
         // Slash commands (not the same as Modes — those stay in the Modes menu)
         pendingTruthMode = false;
@@ -9733,6 +9769,11 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                         }
                     } catch (_) {}
                     appendMessage('ai', displayReply, getTime(), useHtml);
+                    try {
+                        if (window.__lubaForceEmergencyCTA) {
+                            setTimeout(function(){ try { showEmergencyCTA(); } catch(_){} }, 80);
+                        }
+                    } catch (_) {}
 
                     if (!alreadySavedUserAt(time)) {
                         chatHistory.push({
