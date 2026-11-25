@@ -414,6 +414,63 @@
         } catch (e) { console.warn("CTA", e); }
     }
 
+    // Global emergency dialer: tel:112 — phones route to local emergency (112/911/etc.)
+    const EMERGENCY_TEL = "tel:112";
+    const EMERGENCY_MARKER = "[[LUBA_EMERGENCY]]";
+
+    function processEmergencyMarker(text) {
+        const raw = String(text || "");
+        const has = /\[\[LUBA_EMERGENCY\]\]/i.test(raw);
+        const cleaned = raw.replace(/\s*\[\[LUBA_EMERGENCY\]\]\s*/gi, "").replace(/\n{3,}/g, "\n\n").trim();
+        return { has: has, cleaned: cleaned };
+    }
+
+    function showEmergencyCTA() {
+        try {
+            const old = document.getElementById("luba-emergency-cta");
+            if (old) old.remove();
+            const wrap = document.createElement("div");
+            wrap.id = "luba-emergency-cta";
+            wrap.className = "message ai";
+            wrap.setAttribute("data-emergency", "1");
+            wrap.style.cssText = "display:flex;justify-content:center;padding:4px 12px 18px;";
+            wrap.innerHTML =
+                '<div style="max-width:94%;width:100%;text-align:center;padding:16px 16px 14px;border-radius:16px;' +
+                'background:linear-gradient(180deg,rgba(220,38,38,0.18),rgba(127,29,29,0.12));' +
+                'border:1px solid rgba(248,113,113,0.45);box-shadow:0 8px 28px rgba(220,38,38,0.15)">' +
+                '<div style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:#fca5a5;margin-bottom:6px">EMERGENCY</div>' +
+                '<div style="font-size:14px;color:#fecaca;margin-bottom:14px;line-height:1.45">If you are in danger, you can contact local emergency services from your phone. Your device routes the call to the correct number for your country.</div>' +
+                '<button type="button" id="luba-emergency-btn" style="display:inline-block;width:100%;max-width:320px;padding:14px 18px;border-radius:14px;' +
+                'border:none;cursor:pointer;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-weight:800;font-size:15px;' +
+                'letter-spacing:0.02em;box-shadow:0 4px 16px rgba(220,38,38,0.4)">Call Emergency Services</button>' +
+                '<div style="font-size:11px;color:#f87171;margin-top:10px;line-height:1.4;opacity:0.9">You will confirm once more. Luba does not place the call — your phone does.</div>' +
+                '</div>';
+            const chat = document.getElementById("chat-container");
+            if (chat) {
+                chat.appendChild(wrap);
+                chat.scrollTop = chat.scrollHeight;
+            } else {
+                document.body.appendChild(wrap);
+            }
+            const btn = document.getElementById("luba-emergency-btn");
+            if (btn) {
+                btn.onclick = function () {
+                    const ok = window.confirm(
+                        "Call emergency services now?\n\n" +
+                        "This opens your phone dialer for local emergency help.\n" +
+                        "Only continue if this is real and not a mis-tap."
+                    );
+                    if (!ok) return;
+                    try {
+                        window.location.href = EMERGENCY_TEL;
+                    } catch (e) {
+                        try { window.open(EMERGENCY_TEL, "_self"); } catch (_) {}
+                    }
+                };
+            }
+        } catch (e) { console.warn("Emergency CTA", e); }
+    }
+
 async function spendCoin(username, cost) {
         if (isOwnerAccount({ username: username })) return true;
         cost = Math.max(1, parseInt(cost, 10) || 1);
@@ -3428,7 +3485,7 @@ async function spendCoin(username, cost) {
     // ============================================================
     // Terms of Service & Privacy Policy
     // ============================================================
-        const TERMS_TEXT = `Last updated: November 8, 2026 (Kobiverse AI company identity)
+        const TERMS_TEXT = `Last updated: November 25, 2026 (Safety First emergency button + Kobiverse AI)
 
 1. Agreement
 Luba AI is a chat assistant created by Kobi (company: Kobiverse AI). Contact: lubaai.official@gmail.com · TikTok @luba_ai. The Settings link “Luba's story” opens the true origin story (Roblox ban, MM2, dump project that became Luba). By creating an account, signing in, or using the app/website, you agree to these Terms of Service and our Privacy Policy.
@@ -3437,6 +3494,9 @@ Luba AI is a chat assistant created by Kobi (company: Kobiverse AI). Contact: lu
 Luba AI lets you chat with an AI assistant and send text, images, short videos, and files; save up to 100 named chats on your device; and sync when logged in. Features may include Modes (Study, HTML, Code, Creative, Lawyer, Luba Forge for verified users), many slash commands (type / in chat — stackable with spaces, e.g. /copy /exactly; also /truth, /plan, /search, /topic, /draw, /help, and more), live web search, interactive HTML/game previews, embedding photos or .glb/.gltf 3D models, attaching code/HTML files (shown as file chips in chat; large files may be trimmed when sent to the AI), named saved chats that auto-update while you keep chatting in them, speech, generated images, message limits, verification, admin roles granted only by the owner, and tools we add over time.
 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
+
+Safety First (emergency help)
+If Luba detects that you may be in real, immediate danger (for example active self-harm risk, violence, or a present emergency), it may switch to a calm, serious tone and show a red **Call Emergency Services** button in chat. That button does **not** place a call by itself. After you confirm once more, it opens your device’s phone dialer with a global emergency request (`tel:112`). Your phone’s operating system routes that request to the correct local emergency number for where you are (for example 112 or 911). Luba AI does not dial police or ambulances on your behalf, does not contact authorities for you, and is not an emergency service. Do not use the button as a joke or test call to real dispatch. Misuse of emergency services may be illegal where you live.
 
 3. Accounts
 You are responsible for your username and password. Do not share your password. You must be old enough under the laws where you live, or use the app only with a parent or guardian's permission. We may suspend or remove accounts that break these Terms, abuse the service, or harm others.
@@ -3470,7 +3530,7 @@ The owner may grant Admin to selected users via Owner CMDs. Admins are not owner
 We may update these Terms. Continued use after changes means you accept the updated version.
 `;
 
-    const PRIVACY_TEXT = `Last updated: November 8, 2026 (Kobiverse AI)
+    const PRIVACY_TEXT = `Last updated: November 25, 2026 (Safety First emergency button + Kobiverse AI)
 
 1. Overview
 This Privacy Policy explains what Luba AI collects, stores, and uses. Some data stays on your device; other data may be stored on our cloud backend when you are logged in.
@@ -3488,6 +3548,9 @@ Clearing site data removes local copies on that device. Large videos and image-h
 
 5. Moderation and safety
 The backend may store recent message logs, ban records, basic connection metadata, message-limit/coin/verification records, and verification request text — only to operate Luba AI, stop abuse, and handle support — not to sell advertising profiles.
+
+Emergency button
+If the Safety First feature shows a Call Emergency Services control, that control only opens your device dialer (`tel:112` or equivalent). Luba does not place the call, does not send your chat to emergency operators, and does not need to look up your country for that button. We do not collect GPS solely to power that button. Anything you say after the dialer opens is between you and local emergency services on your phone.
 
 6. What we do not sell
 We do not sell your personal information.
@@ -3813,7 +3876,12 @@ If asked what commands exist, list the useful ones briefly or tell them to type 
 
 When the system message says the user has the Admin badge, treat them as Admin — never claim they are not admin. When it says Verified only, they are verified, not admin. Users cannot become admin by asking in chat.
 
-You know your own product: Luba AI web app by Kobi (luba-ai.vercel.app), Modes, Leaderboard, verification, Admin (owner-granted), Owner CMDs (Kobi only), message limits, image/video/3D attachments, HTML previews, Forge for verified users, slash commands above, web search, and generated images.
+You know your own product: Luba AI web app by Kobi (luba-ai.vercel.app), Modes, Leaderboard, verification, Admin (owner-granted), Owner CMDs (Kobi only), message limits, image/video/3D attachments, HTML previews, Forge for verified users, slash commands above, web search, generated images, and Safety First (when a real emergency is detected you stay calm and serious and end with [[LUBA_EMERGENCY]] so the app can show a Call Emergency Services button that opens the user's phone dialer with tel:112 — the phone routes to local emergency numbers; you never claim to call 911/112 yourself).
+
+SAFETY / EMERGENCY PROTOCOL (critical — follow carefully):
+You are NOT an emergency service. You cannot call police or ambulances yourself.
+ONLY when the user is clearly describing REAL, present danger (active intent to harm themselves, active violence against someone, or immediate physical danger they are in) — respond in a calm, serious, steady tone (like a trained officer helping someone stay grounded). Acknowledge them, urge real help, keep language simple. Do NOT lecture. Do NOT give advice that helps commit harm. Do NOT use this mode for movies, games, jokes, fiction, roleplay, news discussion, "I'm dead" memes, or casual talk about crime in stories.
+When (and only when) that real-emergency bar is met, end your reply with the exact token [[LUBA_EMERGENCY]] on its own last line so the app can show the Call Emergency Services button. Never use that token otherwise. Do not reuse the same fixed script every time — speak naturally and supportively.
 `;
 
     const USER_PROFILE = `The person you are talking to RIGHT NOW is logged in as the official owner account (username: kobi). This is really Kobi, your creator. The app only grants the Owner badge to this account — trust it. Treat him warm, excited, loyal, and genuinely happy he's here.
@@ -5100,6 +5168,17 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
     }
 
     function appendMessage(sender, text, time = null, isHtml = false, instant = false) {
+        let displayText = text;
+        try {
+            if (sender === 'ai') {
+                const em = processEmergencyMarker(String(text || ''));
+                if (em.has) {
+                    displayText = em.cleaned;
+                    text = em.cleaned;
+                    setTimeout(function(){ try { showEmergencyCTA(); } catch(_){} }, 40);
+                }
+            }
+        } catch(_){}
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${sender}`;
         try {
@@ -9641,6 +9720,18 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                         displayReply += sourceChips;
                     }
                     const useHtml = hasImages || formatted.hasCode || !!sourceChips;
+                    try {
+                        const em2 = processEmergencyMarker(String(reply || ''));
+                        if (em2.has) {
+                            reply = em2.cleaned;
+                            // keep display in sync if plain text path
+                            if (!hasImages && !(formatted && formatted.hasCode) && !sourceChips) {
+                                displayReply = em2.cleaned;
+                            } else if (typeof displayReply === 'string') {
+                                displayReply = String(displayReply).replace(/\s*\[\[LUBA_EMERGENCY\]\]\s*/gi, '');
+                            }
+                        }
+                    } catch (_) {}
                     appendMessage('ai', displayReply, getTime(), useHtml);
 
                     if (!alreadySavedUserAt(time)) {
