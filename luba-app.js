@@ -3496,7 +3496,7 @@ Luba AI lets you chat with an AI assistant and send text, images, short videos, 
 The AI can be wrong. It is not a doctor, lawyer, bank, or emergency service. Do not rely on it as the only source for medical, legal, financial, or safety decisions.
 
 Safety First (emergency help)
-If Luba detects that you may be in real, immediate danger (for example active self-harm risk, violence, or a present emergency), it may switch to a calm, serious tone and show a red **Call Emergency Services** button in chat. That button does **not** place a call by itself. After you confirm once more, it opens your device’s phone dialer with a global emergency request (`tel:112`). Your phone’s operating system routes that request to the correct local emergency number for where you are (for example 112 or 911). Luba AI does not dial police or ambulances on your behalf, does not contact authorities for you, and is not an emergency service. Do not use the button as a joke or test call to real dispatch. Misuse of emergency services may be illegal where you live.
+If Luba detects that you may be in real, immediate danger (for example active self-harm risk, violence, or a present emergency), it may switch to a calm, serious tone and show a red Call Emergency Services button in chat. That button does not place a call by itself. After you confirm once more, it opens your device phone dialer with a global emergency request (tel:112). Your phone operating system routes that request to the correct local emergency number for where you are (for example 112 or 911). Luba AI does not dial police or ambulances on your behalf, does not contact authorities for you, and is not an emergency service. Do not use the button as a joke or test call to real dispatch. Misuse of emergency services may be illegal where you live.
 
 3. Accounts
 You are responsible for your username and password. Do not share your password. You must be old enough under the laws where you live, or use the app only with a parent or guardian's permission. We may suspend or remove accounts that break these Terms, abuse the service, or harm others.
@@ -3550,7 +3550,7 @@ Clearing site data removes local copies on that device. Large videos and image-h
 The backend may store recent message logs, ban records, basic connection metadata, message-limit/coin/verification records, and verification request text — only to operate Luba AI, stop abuse, and handle support — not to sell advertising profiles.
 
 Emergency button
-If the Safety First feature shows a Call Emergency Services control, that control only opens your device dialer (`tel:112` or equivalent). Luba does not place the call, does not send your chat to emergency operators, and does not need to look up your country for that button. We do not collect GPS solely to power that button. Anything you say after the dialer opens is between you and local emergency services on your phone.
+If the Safety First feature shows a Call Emergency Services control, that control only opens your device dialer (tel:112 or equivalent). Luba does not place the call, does not send your chat to emergency operators, and does not need to look up your country for that button. We do not collect GPS solely to power that button. Anything you say after the dialer opens is between you and local emergency services on your phone.
 
 6. What we do not sell
 We do not sell your personal information.
