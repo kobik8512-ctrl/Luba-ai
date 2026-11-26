@@ -32,7 +32,6 @@
     const signupError = document.getElementById('signup-error');
     const genderBoy = document.getElementById('gender-boy');
     const genderGirl = document.getElementById('gender-girl');
-    const genderOther = document.getElementById('gender-other');
     const genderStatus = document.getElementById('gender-status');
 
     // Settings account
@@ -2674,30 +2673,14 @@ async function spendCoin(username, cost) {
         selectedGender = 'boy';
         genderBoy.classList.add('selected');
         genderGirl.classList.remove('selected');
-        if (genderOther) genderOther.classList.remove('selected');
         clearGenderStatus();
     };
     genderGirl.onclick = () => {
         selectedGender = 'girl';
         genderGirl.classList.add('selected');
         genderBoy.classList.remove('selected');
-        if (genderOther) genderOther.classList.remove('selected');
         clearGenderStatus();
     };
-    if (genderOther) {
-        genderOther.onclick = () => {
-            // Not allowed — only boy and girl
-            genderOther.classList.remove('selected');
-            genderBoy.classList.add('selected');
-            genderGirl.classList.remove('selected');
-            selectedGender = 'boy';
-            if (genderStatus) {
-                genderStatus.classList.remove('empty', 'ok', 'checking');
-                genderStatus.classList.add('bad');
-                genderStatus.innerHTML = ICON_BAD + ' There is only 2 genders';
-            }
-        };
-    }
 
     // Live username validation (signup) — Roblox-style feedback as you type
     const signupUsernameInput = document.getElementById('signup-username');
@@ -2789,7 +2772,7 @@ async function spendCoin(username, cost) {
         return {
             username: profile.username,
             passwordHash: extras.passwordHash || null,
-            gender: profile.gender === 'girl' ? 'girl' : (profile.gender === 'other' ? 'other' : 'boy'),
+            gender: profile.gender === 'girl' ? 'girl' : 'boy',
             dob: profile.birthday || extras.dob || null,
             profilePic: profile.avatarDataUrl || extras.profilePic || null,
             avatarDataUrl: profile.avatarDataUrl || extras.profilePic || null,
