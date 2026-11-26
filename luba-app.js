@@ -173,16 +173,11 @@
     // Paste your real Stripe / Lemon Squeezy payment link here when ready:
     const SUPPORTER_PAYMENT_URL = 'https://luba-ai.vercel.app'; // replace with your checkout link
     function isSupporter(user) {
-        user = user || currentUser;
-        if (!user) return false;
-        if (isOwnerAccount(user)) return true;
-        return !!(user.supporter || user.isSupporter || user.supporterUntil && Number(user.supporterUntil) > Date.now());
+        // Supporter paywall closed — all extras free for everyone
+        return true;
     }
     function requireSupporter(featureName) {
-        if (isSupporter()) return true;
-        const msg = (featureName || 'This feature') + ' is for Luba Supporters. Open Settings → Luba Supporter to unlock extras (chat stays free).';
-        try { alert(msg); } catch (_) {}
-        return false;
+        return true;
     }
 
 
@@ -205,9 +200,9 @@
             const hasSupporterFlag = (typeof isSupporter === 'function') ? isSupporter(currentUser) : !!(currentUser && currentUser.supporter);
             try {
                 const sNote = document.getElementById('settings-supporter-note');
-                if (sNote) sNote.style.display = hasSupporterFlag ? 'block' : 'none';
+                if (sNote) sNote.style.display = 'none';
                 const sBox = document.getElementById('supporter-box');
-                if (sBox && hasSupporterFlag) {
+                if (sBox) { sBox.style.display = 'none'; } if (false && sBox && hasSupporterFlag) {
                     const btn = document.getElementById('supporter-checkout-btn');
                     if (btn) { btn.textContent = 'Supporter active'; btn.disabled = true; }
                 }
