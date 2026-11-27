@@ -971,6 +971,11 @@ async function spendCoin(username, cost) {
             const data = await res.json().catch(() => null);
             if (!data) return { error: 'Bad response from worker (' + res.status + ')' };
 
+            // Worker returns { user }; app expects { profile }
+            try {
+                if (data.user && !data.profile) data.profile = data.user;
+            } catch (_) {}
+
             // Cloudflare free KV daily write cap — only soft-fail failed responses (never kill ok:true login)
             try {
                 if (data && data.ok === false) {
@@ -2414,17 +2419,43 @@ async function spendCoin(username, cost) {
         }
 
         const check = isValidUsername(val, options);
-        if (check.ok) {
-            statusEl.classList.add('ok');
-            statusEl.innerHTML = ICON_OK + ' Username is available';
-            inputEl.classList.add('username-ok');
-            return true;
-        } else {
+        if (!check.ok) {
             statusEl.classList.add('bad');
             statusEl.innerHTML = ICON_BAD + ' ' + check.msg;
             inputEl.classList.add('username-bad');
             return false;
         }
+
+        // Local format OK — verify against cloud so other devices cannot steal taken names
+        statusEl.classList.add('checking');
+        statusEl.innerHTML = 'Checking…';
+        const reqId = String(Date.now()) + Math.random();
+        inputEl._lubaUserCheckId = reqId;
+        (async function () {
+            try {
+                const cloud = await cloudPost({ action: 'check_username', username: check.value });
+                if (inputEl._lubaUserCheckId !== reqId) return;
+                statusEl.classList.remove('checking', 'ok', 'bad');
+                if (cloud && cloud.ok && cloud.available === false) {
+                    statusEl.classList.add('bad');
+                    statusEl.innerHTML = ICON_BAD + ' That username is already taken.';
+                    inputEl.classList.add('username-bad');
+                    inputEl.classList.remove('username-ok');
+                    return;
+                }
+                statusEl.classList.add('ok');
+                statusEl.innerHTML = ICON_OK + ' Username is available';
+                inputEl.classList.add('username-ok');
+                inputEl.classList.remove('username-bad');
+            } catch (_) {
+                if (inputEl._lubaUserCheckId !== reqId) return;
+                statusEl.classList.remove('checking');
+                statusEl.classList.add('ok');
+                statusEl.innerHTML = ICON_OK + ' Username looks free (offline check)';
+                inputEl.classList.add('username-ok');
+            }
+        })();
+        return true;
     }
 
     function isValidPassword(pw) {
@@ -2769,12 +2800,12 @@ async function spendCoin(username, cost) {
             passwordHash: extras.passwordHash || null,
             gender: profile.gender === 'girl' ? 'girl' : 'boy',
             dob: profile.birthday || extras.dob || null,
-            profilePic: profile.avatarDataUrl || extras.profilePic || null,
-            avatarDataUrl: profile.avatarDataUrl || extras.profilePic || null,
-            lastUsernameChange: extras.lastUsernameChange || 0,
-            createdAt: extras.createdAt || Date.now(),
+            profilePic: profile.profilePic || profile.avatarDataUrl || extras.profilePic || null,
+            avatarDataUrl: profile.profilePic || profile.avatarDataUrl || extras.profilePic || null,
+            lastUsernameChange: profile.lastUsernameChange || extras.lastUsernameChange || 0,
+            createdAt: profile.createdAt || extras.createdAt || Date.now(),
             cloud: true,
-            verified: !!(profile.verified) || !!(profile.admin),
+            verified: !!(profile.verified) || isOwnerAccount({ username: profile.username }),
             admin: !!(profile.admin),
             supporter: !!(profile.supporter),
             supporterUntil: profile.supporterUntil || null
@@ -3105,65 +3136,25 @@ async function spendCoin(username, cost) {
                 return;
             }
 
-            // Storage full — allow local account on this phone only (same form data)
+            // Storage/limit errors — do NOT create local-only accounts (they break on other devices / Play Store)
             if (cloud && (cloud.soft || cloud.error === 'storage_limit' || /storage_limit|KV put|limit exceeded/i.test(String(cloud.error || '')))) {
-                const users = getUsers();
-                const key = nameCheck.value.toLowerCase();
-                if (users[key]) {
-                    signupError.textContent = 'That username is already on this phone. Try logging in.';
-                    return;
-                }
-                const hash = await hashPassword(pw);
-                const user = {
-                    username: nameCheck.value,
-                    passwordHash: hash,
-                    gender: selectedGender || 'boy',
-                    dob: dob,
-                    createdAt: Date.now(),
-                    cloud: false
-                };
-                cacheLocalUser(user);
-                setCurrentUsername(user.username);
-                rememberDeviceAccount(user.username);
-                await enterApp(user);
+                signupError.textContent = 'Server is busy saving accounts right now. Please try again in a few minutes.';
                 return;
             }
 
-            // Real server errors (taken, invalid) — show them
+            // Real server errors (taken, invalid, etc.)
             if (cloud && cloud.error) {
                 const err = String(cloud.error);
-                const softNet = cloud.soft || cloud.error === 'storage_limit' ||
-                    /storage_limit|KV put|limit exceeded|Failed to fetch|network|Bad response|fetch/i.test(err);
-                if (!softNet) {
+                if (/Failed to fetch|network|Bad response|fetch/i.test(err)) {
+                    signupError.textContent = 'Cannot reach server. Check your internet and try again.';
+                } else {
                     signupError.textContent = err;
-                    return;
                 }
-                // else fall through to local account
-            }
-
-            // Server unreachable / storage full — local account on this phone
-            const users = getUsers();
-            const key = nameCheck.value.toLowerCase();
-            if (users[key]) {
-                signupError.textContent = 'That username is already taken on this phone.';
                 return;
             }
-            const hash = await hashPassword(pw);
-            const newUser = {
-                username: nameCheck.value,
-                passwordHash: hash,
-                gender: selectedGender,
-                dob: dob,
-                profilePic: null,
-                lastUsernameChange: 0,
-                createdAt: Date.now(),
-                cloud: false
-            };
-            users[key] = newUser;
-            saveUsers(users);
-            setCurrentUsername(newUser.username);
-            rememberDeviceAccount(newUser.username);
-            await enterApp(newUser);
+
+            // No useful cloud response
+            signupError.textContent = 'Could not create account. Check your internet and try again.';
         } finally {
             if (signupBtn) signupBtn.disabled = false;
         }
@@ -3737,7 +3728,7 @@ Made on Earth by humans.
                 '<div style="font-weight:700;color:#e2e8f0;">Luba\'s story</div></div>' +
                 '<iframe id="luba-story-frame" title="Luba story" style="flex:1;width:100%;border:0;background:#07090f;"></iframe>';
             document.body.appendChild(overlay);
-            document.getElementById('luba-story-close').onclick = function() {
+            const _storyClose = document.getElementById('luba-story-close'); if (_storyClose) _storyClose.onclick = function() {
                 overlay.style.display = 'none';
                 const fr = document.getElementById('luba-story-frame');
                 if (fr) fr.removeAttribute('src');
@@ -3943,12 +3934,13 @@ When someone says hi / hey / hello:
 Use emojis when they fit (not every message, but don't be emoji-dead either).
 Keep answers clear and natural. Short dry one-liners are fine sometimes, but overall you should feel alive, kind, and interested.
 
-When analyzing images, be specific and honest — actually look at what is in the photo (objects, people, place, colors, text). Never pretend you cannot see an attached image.
-If the user sends a photo and asks to change it (add a dog, remove something, change background, etc.):
+When analyzing images, be specific and honest — actually look at what is in the photo (objects, people, place, colors, text). Never pretend you cannot see an attached image.`;
+
+    // Tools / formatting stay in system build — not in the Settings personality box
+    const LUBA_TOOLS_HINT = `When the user sends a photo and asks to change it (add a dog, remove something, change background, etc.):
 1) Briefly acknowledge what you see in their photo.
 2) Call generate_image with a FULL photorealistic prompt that recreates their scene PLUS the change.
 3) Do not refuse or only describe without generating.
-
 For math use LaTeX $...$ / $$...$$.
 You also have a generate_image tool — use it for any draw/generate/edit-photo request. Prefer realistic photo style unless they ask for art.`;
 
@@ -4167,7 +4159,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
             "This overrides the default warm/friendly style. Do not ignore it. " +
             "Only the permanent name/creator rules above outrank this):\n" +
             customPersonality;
-        let prompt = identityBlock + nameBlock + memoryBlock + personalityBlock + (modeBlock ? "\n\n" + modeBlock : "");
+        let prompt = identityBlock + nameBlock + memoryBlock + personalityBlock + "\n\n" + LUBA_TOOLS_HINT + (modeBlock ? "\n\n" + modeBlock : "");
         // Owner account: rule goes last so it wins over ragebait / mean personalities
         if (owner) {
             prompt += "\n\n" + KOBI_OWNER_OVERRIDE;
