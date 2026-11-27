@@ -9457,7 +9457,7 @@ This is a BUILD STUDIO session: prioritize shipping a runnable project over long
                             model,
                             payload,
                             token: (typeof getAuthToken === 'function' ? (getAuthToken() || '') : '') || '',
-                            coinCost: (typeof messageCoinCost === 'function' ? messageCoinCost(text, activeMode) : 1),
+                            coinCost: 0, // already charged via spend_coins — do not double-bill
                             username: (currentUser && currentUser.username) ? currentUser.username : undefined
                         }),
                         signal: abortController.signal
